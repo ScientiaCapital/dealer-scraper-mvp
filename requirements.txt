@@ -1,0 +1,9 @@
+# Core dependencies for Dealer Scraper MVP
+# Note: Playwright is accessed via MCP tools, not Python package
+
+# No additional Python packages required for MCP mode
+# The scraper uses MCP Playwright tools directly
+
+# Optional: For future Browserbase integration
+# requests>=2.31.0
+# python-dotenv>=1.0.0
