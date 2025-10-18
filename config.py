@@ -18,6 +18,14 @@ if RUNPOD_ENDPOINT_ID:
 else:
     RUNPOD_API_URL = ""
 
+# Browserbase API Configuration
+BROWSERBASE_API_KEY = os.getenv("BROWSERBASE_API_KEY", "")
+BROWSERBASE_PROJECT_ID = os.getenv("BROWSERBASE_PROJECT_ID", "")
+
+# Browserbase API URLs
+BROWSERBASE_API_URL = "https://www.browserbase.com/v1/sessions"
+BROWSERBASE_TIMEOUT = 60000  # 60 seconds default timeout
+
 # CSS Selectors
 SELECTORS = {
     "cookie_accept": "button:has-text('Accept Cookies')",
