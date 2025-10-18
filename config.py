@@ -180,3 +180,91 @@ ZIP_CODES_MIDWEST = [
     "63101",  # St. Louis, MO
     "64101",  # Kansas City, MO
 ]
+
+# ============================================================================
+# COPERNIQ PARTNER PROSPECTING - SREC State ZIP Codes
+# ============================================================================
+# Focus: States with Solar Renewable Energy Credit programs (sustainable post-ITC)
+# Priority: CA, TX, PA, MA, NJ, FL (primary focus)
+
+# California - SGIP + NEM 3.0
+ZIP_CODES_CALIFORNIA = [
+    # San Francisco Bay Area
+    "94102", "94301", "94022", "94024", "94027",  # SF, Palo Alto, Los Altos, Atherton
+    # Los Angeles
+    "90001", "90210", "90265", "91101",  # LA, Beverly Hills, Malibu, Pasadena
+    # San Diego
+    "92101", "92037", "92067",  # Downtown SD, La Jolla, Rancho Santa Fe
+    # Sacramento
+    "95814", "95819",  # Downtown, East Sac
+    # Orange County
+    "92660", "92625", "92657",  # Newport Beach, Corona del Mar
+]
+
+# Texas - Deregulated Market + ERCOT
+ZIP_CODES_TEXAS = [
+    # Houston
+    "77002", "77019", "77024", "77005", "77056",  # Downtown, River Oaks, Memorial, West U, Galleria
+    # Dallas
+    "75201", "75205", "75225", "75229",  # Downtown, Highland Park, Preston Hollow
+    # Austin
+    "78701", "78746", "78733", "78730",  # Downtown, Westlake Hills, Barton Creek
+    # San Antonio
+    "78201", "78209",  # Downtown, Alamo Heights
+    # Fort Worth
+    "76102", "76107",  # Downtown, Rivercrest
+]
+
+# Pennsylvania - PA SREC Program
+ZIP_CODES_PENNSYLVANIA = [
+    # Philadelphia
+    "19102", "19103", "19146",  # Center City
+    # Philadelphia suburbs (wealthy)
+    "19035", "19087", "19085", "19003", "19010",  # Gladwyne, Wayne, Villanova, Ardmore, Bryn Mawr
+    # Pittsburgh
+    "15222", "15215", "15238",  # Downtown, Fox Chapel, Sewickley
+]
+
+# Massachusetts - SREC II + SMART Program
+ZIP_CODES_MASSACHUSETTS = [
+    # Boston
+    "02108", "02116", "02199",  # Downtown, Back Bay
+    # Boston suburbs (wealthy)
+    "02467", "02481", "02492", "02445", "02482",  # Chestnut Hill, Wellesley, Needham, Brookline
+    # Cambridge
+    "02138", "02139", "02142",  # Cambridge
+]
+
+# New Jersey - NJ TREC Program
+ZIP_CODES_NEW_JERSEY = [
+    # Northern NJ (wealthy)
+    "07078", "07920", "07039", "07931",  # Short Hills, Basking Ridge, Livingston, Far Hills
+    # Central NJ
+    "08540", "08648",  # Princeton, Lawrence
+    # Shore
+    "07733", "07740", "07726",  # Holmdel, Long Branch, Englishtown
+]
+
+# Florida - Net Metering + Property Tax Exemptions
+ZIP_CODES_FLORIDA = [
+    # Miami
+    "33109", "33139", "33158", "33156",  # Fisher Island, Miami Beach, Pinecrest, Palmetto Bay
+    # Palm Beach
+    "33480", "33455",  # Palm Beach, Hobe Sound
+    # Naples
+    "34102", "34103",  # Naples, Old Naples
+    # Tampa
+    "33606", "33629",  # South Tampa, Bayshore
+    # Orlando
+    "32801", "32819",  # Downtown, Dr. Phillips
+]
+
+# Combined SREC state ZIPs (for batch scraping)
+ZIP_CODES_SREC_ALL = (
+    ZIP_CODES_CALIFORNIA +
+    ZIP_CODES_TEXAS +
+    ZIP_CODES_PENNSYLVANIA +
+    ZIP_CODES_MASSACHUSETTS +
+    ZIP_CODES_NEW_JERSEY +
+    ZIP_CODES_FLORIDA
+)
