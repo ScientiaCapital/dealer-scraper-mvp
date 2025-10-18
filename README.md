@@ -1,276 +1,234 @@
-# 🚀 Generac Dealer Scraper
+# 🚀 Coperniq Partner Prospecting System
 
-**Cloud-native web scraping infrastructure with serverless Playwright automation**
+**Automated contractor lead generation targeting multi-brand installers in SREC states**
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Docker](https://img.shields.io/badge/docker-ready-brightgreen.svg)](https://www.docker.com/)
 [![RunPod](https://img.shields.io/badge/RunPod-serverless-purple.svg)](https://www.runpod.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> **A production-ready scraper built for scale**: Extract dealer data from any locator site using automated browser workflows. Local development via MCP Playwright, cloud deployment via RunPod serverless — all from the same codebase.
+> **Business Goal**: 10x Sr. BDR productivity via automated prospecting for Coperniq's brand-agnostic monitoring platform
 
 ---
 
-## 🎯 What This Project Demonstrates
+## 🎯 What This Does
 
-This is a **Go-To-Market Engineer (GTME)** showcase project that combines:
+**Problem**: Finding contractors who need Coperniq most (those managing 2-3 separate monitoring platforms)
 
-- 🐳 **Docker & Containerization** - Production-grade Dockerfile with multi-layer caching
-- ☁️ **Cloud Deployment** - RunPod serverless infrastructure with auto-scaling
-- 🌐 **API Development** - RESTful HTTP API for browser automation workflows
-- 🎭 **Playwright Automation** - Headless Chromium control with JavaScript injection
-- 🔧 **DevOps Skills** - CI/CD ready, environment management, cost optimization
-- 📊 **Data Engineering** - Extraction, deduplication, multi-format export (JSON/CSV)
-- 🛠️ **GTME Fundamentals** - curl, HTTP APIs, cloud CLI tools, infrastructure as code
+**Solution**: Scrape OEM dealer networks → Cross-reference → Score → Prioritize
 
-**Result**: A scalable data extraction pipeline that costs **~$0.50-1.00 to scrape 100 locations** and auto-scales from zero.
+**Output**: Sorted CSV of scored leads ready for outreach (HIGH priority 80-100 first)
+
+**Target Market**:
+- Multi-brand contractors (Generac + Tesla + Enphase)
+- SREC states (CA, TX, PA, MA, NJ, FL) - sustainable post-ITC markets
+- Commercial capability (ITC deadline urgency: June 30, 2026 safe harbor)
+
+**Unique Value**: Coperniq is the **only** brand-agnostic monitoring platform for microinverters + batteries + generators
 
 ---
 
-## ✨ Features
+## ⚡ Quick Start (5 Minutes)
 
-### 🎯 Core Capabilities
-- ✅ Extract 15 fields per dealer (name, rating, tier, contact, location)
-- ✅ Identify PowerPro Premier dealers
-- ✅ Multi-ZIP code batch processing
-- ✅ Automatic deduplication by phone number
-- ✅ Export to JSON and CSV formats
-- ✅ Configurable wait times and retry logic
+### Prerequisites
+- Python 3.8+
+- RunPod account (get $10 free credit at [runpod.io](https://runpod.io))
 
-### 🌥️ Cloud-Native Architecture
-- ✅ **RunPod Serverless API** - Auto-scaling browser automation
-- ✅ **Local MCP Mode** - Development and testing via Claude Code
-- ✅ **Browserbase Ready** - Alternative cloud provider support
-- ✅ **Singleton Browser Pattern** - 2s faster per request
-- ✅ **Context Isolation** - Clean state for each job
+### 1. Install
+```bash
+git clone https://github.com/ScientiaCapital/dealer-scraper-mvp.git
+cd dealer-scraper-mvp
+pip install -r requirements.txt
+```
 
-### 💰 Cost Efficiency
-- **Per location**: ~$0.001 (6 seconds @ $0.00015/sec)
-- **100 locations**: ~$0.50-$1.00 total
-- **Zero idle costs**: Auto-scale to 0 workers between jobs
-- **Concurrent processing**: 3 workers handle 1800 locations/hour
+### 2. Configure
+```bash
+cp .env.example .env
+# Edit .env and add:
+#   RUNPOD_API_KEY=your_key_here
+#   RUNPOD_ENDPOINT_ID=your_endpoint_here
+```
+
+Get credentials from: https://www.runpod.io/console/serverless
+
+### 3. Generate Leads (MVP - Generac Only)
+```bash
+python scripts/generate_leads.py --mode runpod --states CA --limit-zips 5
+```
+
+### 4. Review Output
+```bash
+# Open the scored CSV (sorted HIGH → MEDIUM → LOW)
+open output/coperniq_leads_*.csv
+```
+
+**Call HIGH priority leads first (score 80-100)** ← Multi-brand contractors in prime SREC states
+
+---
+
+## 📊 Coperniq Lead Scoring (0-100)
+
+Each contractor gets scored across 5 dimensions:
+
+| Dimension | Weight | What It Means |
+|-----------|--------|---------------|
+| **Multi-OEM Presence** | 40 pts | 3+ OEMs = 40pts (desperately need unified platform)<br>2 OEMs = 25pts (strong prospect)<br>1 OEM = 10pts (lower priority) |
+| **SREC State Priority** | 20 pts | HIGH states (CA, TX, PA, MA, NJ, FL) = 20pts<br>Sustainable market post-ITC expiration |
+| **Commercial Capability** | 20 pts | 50+ employees = 20pts<br>10-50 = 15pts<br>5-10 = 10pts<br><5 = 5pts |
+| **Geographic Value** | 10 pts | Top 10 wealthy ZIPs in state = 10pts<br>High-value territories |
+| **ITC Urgency** | 10 pts | CRITICAL (commercial Q2 2026 deadline) = 10pts<br>HIGH (residential Dec 2025) = 7pts |
+
+**Priority Tiers**:
+- **HIGH (80-100)**: Call first - multi-brand contractors in prime markets
+- **MEDIUM (50-79)**: Call second - solid prospects
+- **LOW (<50)**: Call last or skip - lower priority
 
 ---
 
 ## 🏗️ Architecture
 
+### Multi-OEM Scraper Framework
+
 ```
-┌─────────────────────┐
-│   Python Scraper    │  ← Entry point (scraper.py)
-│  (3 modes: LOCAL,   │
-│   RUNPOD, CLOUD)    │
-└──────────┬──────────┘
-           │
-           ├─────────────────────┐
-           │                     │
-┌──────────▼──────────┐  ┌──────▼──────────────┐
-│  MCP Playwright     │  │  RunPod HTTP API    │
-│  (Local Browser)    │  │  (Cloud Serverless) │
-└─────────────────────┘  └──────┬──────────────┘
-                                │
-                     ┌──────────▼──────────┐
-                     │  Docker Container   │
-                     │  ┌────────────────┐ │
-                     │  │ playwright_    │ │
-                     │  │ service.py     │ │
-                     │  │ (Singleton)    │ │
-                     │  └────────┬───────┘ │
-                     │           │         │
-                     │  ┌────────▼───────┐ │
-                     │  │   Chromium     │ │
-                     │  │   (Headless)   │ │
-                     │  └────────┬───────┘ │
-                     └───────────┼─────────┘
-                                 │
-                      ┌──────────▼──────────┐
-                      │   Target Website    │
-                      │  (dealer-locator)   │
-                      └─────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                    Lead Generation Pipeline                  │
+└─────────────────────────────────────────────────────────────┘
+
+Step 1: SCRAPE
+  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+  │   Generac    │  │    Tesla     │  │   Enphase    │
+  │   Dealers    │  │  Powerwall   │  │  Installers  │
+  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘
+         │                 │                 │
+         └─────────────────┴─────────────────┘
+                           │
+Step 2: CROSS-REFERENCE    ▼
+         ┌──────────────────────────────┐
+         │  Multi-OEM Detector          │
+         │  • Phone matching (primary)   │
+         │  • Domain matching (secondary)│
+         │  • Fuzzy name match (tertiary)│
+         └──────────────┬───────────────┘
+                        │
+Step 3: FILTER TO SREC  ▼
+         ┌──────────────────────────────┐
+         │  SREC State Filter           │
+         │  • CA, TX, PA, MA, NJ, FL     │
+         │  • ITC urgency tagging        │
+         └──────────────┬───────────────┘
+                        │
+Step 4: SCORE          ▼
+         ┌──────────────────────────────┐
+         │  Coperniq Lead Scorer        │
+         │  • 5-dimension 0-100 score    │
+         │  • Priority tier assignment   │
+         └──────────────┬───────────────┘
+                        │
+Step 5: EXPORT         ▼
+         ┌──────────────────────────────┐
+         │  Sorted CSV (HIGH first)     │
+         │  Ready for outreach          │
+         └──────────────────────────────┘
 ```
 
-### Design Principles
+### Key Components
 
-1. **Multi-Mode Flexibility**: Same extraction logic runs locally (MCP) or cloud (RunPod)
-2. **Workflow-Based API**: JSON workflow arrays match 6-step browser automation pattern
-3. **Cost Optimization**: Singleton browser + context-per-request + auto-scaling
-4. **Separation of Concerns**: config.py (settings) → extraction.js (logic) → scraper.py (orchestration)
+**OEM Scrapers** (`scrapers/`):
+- `GeneracScraper` - ✅ Production (tested extraction)
+- `TeslaScraper` - ⏳ Structure ready (extraction TBD)
+- `EnphaseScraper` - ⏳ Structure ready (extraction TBD)
+
+**Analysis** (`analysis/`):
+- `MultiOEMDetector` - Cross-reference contractors by phone/domain/name
+
+**Targeting** (`targeting/`):
+- `SRECITCFilter` - Filter to SREC states + ITC urgency tagging
+- `CoperniqLeadScorer` - Multi-dimensional 0-100 scoring
+
+**Orchestration** (`scripts/`):
+- `generate_leads.py` - End-to-end pipeline (scrape → score → CSV)
 
 ---
 
-## 🚀 Quick Start
+## 💰 Cost & Performance
 
-### Prerequisites
+### MVP (Generac Only)
 
+| Metric | Value |
+|--------|-------|
+| **Per ZIP** | ~6 seconds, $0.001 |
+| **100 ZIPs** | ~10 min, $0.50-1.00 |
+| **Full SREC Run** (~75 ZIPs) | ~10-15 min, $0.50 |
+| **Idle Cost** | $0 (auto-scale to zero) |
+
+### Multi-OEM (Future)
+
+Once Tesla + Enphase scrapers are implemented:
+- **3 OEM networks** × 75 ZIPs = ~225 scrapes
+- **Time**: ~30-40 minutes
+- **Cost**: ~$1.50-2.00
+- **Output**: Contractors in 2-3 networks (highest value!)
+
+---
+
+## 🎯 Market Context
+
+### Federal ITC Deadlines (Creates Urgency)
+
+- **Residential ITC**: Expires December 31, 2025
+- **Commercial Safe Harbor**: Projects must start by June 30, 2026
+- Creates time-sensitive opportunities for contractor outreach
+
+### SREC States (Sustainable Post-ITC)
+
+States with Solar Renewable Energy Credit programs that continue after federal ITC expires:
+
+| State | Program | Priority |
+|-------|---------|----------|
+| **California** | SGIP + NEM 3.0 | HIGH |
+| **Texas** | Deregulated + ERCOT | HIGH |
+| **Pennsylvania** | PA SREC | HIGH |
+| **Massachusetts** | SREC II + SMART | HIGH |
+| **New Jersey** | NJ TREC | HIGH |
+| **Florida** | Net Metering + Tax Exemptions | HIGH |
+
+### Coperniq's Unique Position
+
+**Problem**: Contractors managing multiple brands need 3+ separate platforms:
+- Enphase Enlighten (microinverters)
+- Tesla app (Powerwall batteries)
+- Generac Mobile Link (generators)
+
+**Solution**: Coperniq = Only brand-agnostic monitoring platform
+- Single dashboard for all brands
+- Unified customer experience
+- Production + consumption monitoring
+
+**Target**: Multi-brand contractors (2-3 OEMs) = highest value prospects
+
+---
+
+## 📈 Usage Examples
+
+### Test Run (5 California ZIPs)
 ```bash
-# Required
-- Python 3.8+
-- Docker (for cloud deployment)
-- RunPod account (for cloud mode)
-
-# Optional
-- Claude Code (for local MCP Playwright)
+python scripts/generate_leads.py --mode runpod --states CA --limit-zips 5
 ```
 
-### Installation
-
+### Production Run (All SREC States)
 ```bash
-# Clone repository
-git clone https://github.com/yourusername/dealer-scraper-mvp.git
-cd dealer-scraper-mvp
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Configure environment
-cp .env.example .env
-# Edit .env with your RunPod credentials
+python scripts/generate_leads.py --mode runpod --states CA TX PA MA NJ FL
 ```
 
-### Local Testing (MCP Mode)
-
-```python
-from scraper import DealerScraper, ScraperMode
-
-# Initialize local mode
-scraper = DealerScraper(mode=ScraperMode.PLAYWRIGHT)
-
-# Follow manual MCP tool calls in console output
-dealers = scraper.scrape_zip_code("53202")
-```
-
-### Cloud Production (RunPod Mode)
-
-```python
-from scraper import DealerScraper, ScraperMode
-from config import ZIP_CODES_TEST
-
-# Initialize cloud mode
-scraper = DealerScraper(mode=ScraperMode.RUNPOD)
-
-# Fully automated scraping
-dealers = scraper.scrape_multiple(ZIP_CODES_TEST)
-scraper.deduplicate()
-scraper.save_json("output/dealers.json")
-scraper.save_csv("output/dealers.csv")
-
-# Get top-rated dealers
-top = scraper.get_top_rated(min_reviews=5, limit=10)
-for dealer in top:
-    print(f"{dealer['name']}: {dealer['rating']}★ ({dealer['review_count']} reviews)")
-```
-
----
-
-## 📦 Project Structure
-
-```
-dealer-scraper-mvp/
-├── scraper.py                    # Main scraper class (3 modes)
-├── config.py                     # Configuration & extraction script
-├── extraction.js                 # JavaScript extraction logic
-├── requirements.txt              # Python dependencies
-├── .env.example                  # Environment variable template
-│
-├── runpod-playwright-api/        # ☁️ Cloud serverless API
-│   ├── handler.py                #   RunPod entry point
-│   ├── playwright_service.py     #   Singleton browser service
-│   ├── Dockerfile                #   Container definition
-│   ├── requirements.txt          #   API dependencies
-│   ├── test_input.json           #   Local test data
-│   ├── examples/                 #   Test scripts
-│   │   ├── test_local.sh         #   Local dev server
-│   │   ├── test_curl.sh          #   Cloud API testing
-│   │   └── dealer_workflow.json  #   Full workflow example
-│   └── README.md                 #   Deployment guide
-│
-└── FINDINGS.md                   # Research documentation
-```
-
----
-
-## 📊 Data Schema
-
-Each dealer record contains **15 structured fields**:
-
-```json
-{
-  "name": "CURRENT ELECTRIC CO.",
-  "rating": 4.3,
-  "review_count": 6,
-  "tier": "Premier",
-  "is_power_pro_premier": true,
-  "street": "2942 n 117th st",
-  "city": "wauwatosa",
-  "state": "WI",
-  "zip": "53222",
-  "address_full": "2942 n 117th st, wauwatosa, WI 53222",
-  "phone": "(262) 786-5885",
-  "website": "https://currentelectricco.com/",
-  "domain": "currentelectricco.com",
-  "distance": "8.3 mi",
-  "distance_miles": 8.3
-}
-```
-
-### Dealer Tier System
-
-| Tier | Description | Commitment Level |
-|------|-------------|------------------|
-| **Premier** | Highest level of commitment and service | ⭐⭐⭐⭐ |
-| **Elite Plus** | Elevated level of service | ⭐⭐⭐ |
-| **Elite** | Installation and basic service support | ⭐⭐ |
-| **Standard** | No special designation | ⭐ |
-
----
-
-## 🎯 Validated Results
-
-Tested across **3 major metropolitan areas**:
-
-| Location | ZIP Code | Dealers Found | Avg Rating | Top Tier |
-|----------|----------|---------------|------------|----------|
-| **Milwaukee, WI** | 53202 | 59 | 4.2 | MR. HOLLAND'S HOME SERVICES (5.0★) |
-| **Chicago, IL** | 60601 | 59 | 4.1 | Premium dealers identified |
-| **Minneapolis, MN** | 55401 | 28 | 4.3 | Elite Plus dealers found |
-
-**Performance**: ~5-6 seconds per ZIP code | 100 ZIPs in ~10 minutes
-
----
-
-## ☁️ Cloud Deployment
-
-### Deploy to RunPod Serverless
-
+### Multi-State Custom
 ```bash
-cd runpod-playwright-api
-
-# Build Docker image
-docker build -t runpod-playwright-api:latest .
-
-# Push to Docker Hub
-docker tag runpod-playwright-api:latest yourusername/runpod-playwright-api:latest
-docker push yourusername/runpod-playwright-api:latest
-
-# Deploy via RunPod CLI
-runpodctl endpoint create \
-  --name playwright-api \
-  --image yourusername/runpod-playwright-api:latest \
-  --min-workers 0 \
-  --max-workers 3
+python scripts/generate_leads.py --mode runpod --states CA TX --limit-zips 10
 ```
 
-**Full deployment guide**: See [`runpod-playwright-api/README.md`](runpod-playwright-api/README.md)
-
-### Test Cloud API
-
+### Manual Mode (Local Development)
 ```bash
-export RUNPOD_API_KEY=your_key_here
-export RUNPOD_ENDPOINT_ID=your_endpoint_id
-
-curl -X POST https://api.runpod.ai/v2/$RUNPOD_ENDPOINT_ID/runsync \
-  -H "Authorization: Bearer $RUNPOD_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d @runpod-playwright-api/test_input.json
+python scripts/generate_leads.py --mode playwright --states CA --limit-zips 1
+# Follow MCP Playwright workflow printed to console
 ```
 
 ---
@@ -278,167 +236,153 @@ curl -X POST https://api.runpod.ai/v2/$RUNPOD_ENDPOINT_ID/runsync \
 ## 🛠️ Technology Stack
 
 ### Backend
-- **Python 3.8+** - Core scraper logic
-- **Playwright** - Browser automation
+- **Python 3.8+** - Core orchestration
+- **Playwright** - Browser automation (headless Chromium)
 - **Requests** - HTTP client for RunPod API
 - **python-dotenv** - Environment management
 
 ### Cloud Infrastructure
-- **RunPod Serverless** - Auto-scaling compute
-- **Docker** - Containerization
-- **Playwright Base Image** - Pre-configured browser environment
+- **RunPod Serverless** - Auto-scaling compute (~$0.001/ZIP)
+- **Docker** - Containerization (Playwright base image)
+- **Singleton Browser Pattern** - 2s faster per request
 
-### Development Tools
-- **MCP Playwright** - Local browser automation via Claude Code
-- **RunPod CLI** - Deployment and monitoring
-- **curl** - API testing and debugging
-
----
-
-## 💡 GTME Skills Demonstrated
-
-This project showcases essential **Go-To-Market Engineer** competencies:
-
-### 🐳 Docker & Containerization
-- Multi-stage Dockerfile with layer caching
-- `.dockerignore` for build optimization
-- Official Playwright base image usage
-
-### ☁️ Cloud & DevOps
-- Serverless deployment on RunPod
-- Auto-scaling from 0→N workers
-- Environment variable management
-- Cost-optimized infrastructure
-
-### 🌐 API & Integration
-- HTTP API design (workflow-based)
-- RESTful endpoint structure
-- JSON payload construction
-- Authorization header handling
-
-### 🔧 CLI & Tooling
-- RunPod CLI usage (`runpodctl`)
-- Docker CLI workflows
-- curl for API testing
-- Bash scripting for automation
-
-### 📊 Data Engineering
-- Web scraping best practices
-- Data deduplication algorithms
-- Multi-format export (JSON/CSV)
-- Schema design and validation
+### Architecture Patterns
+- **Abstract Base Classes** - Extensible OEM scraper framework
+- **Factory Pattern** - Dynamic scraper instantiation
+- **Multi-Key Matching** - Phone + domain + fuzzy name for cross-referencing
+- **Priority Scoring** - Multi-dimensional 0-100 lead prioritization
 
 ---
 
-## 🎨 Adapting for Other Websites
+## 📁 Project Structure
 
-This scraper is **highly adaptable** for other dealer locators or directory sites:
-
-### 1. Update Configuration
-```python
-# config.py
-DEALER_LOCATOR_URL = "https://example.com/find-dealers/"
-SELECTORS = {
-    "zip_input": "input[name='zipcode']",
-    "search_button": "button[type='submit']",
-}
+```
+dealer-scraper-mvp/
+├── scripts/
+│   └── generate_leads.py          # 🎯 MVP orchestration script
+│
+├── scrapers/
+│   ├── base_scraper.py            # Abstract base + data models
+│   ├── generac_scraper.py         # ✅ Production (tested)
+│   ├── tesla_scraper.py           # ⏳ Structure ready
+│   ├── enphase_scraper.py         # ⏳ Structure ready
+│   └── scraper_factory.py         # Factory pattern
+│
+├── analysis/
+│   └── multi_oem_detector.py      # Cross-reference contractors
+│
+├── targeting/
+│   ├── srec_itc_filter.py         # SREC states + ITC urgency
+│   └── coperniq_lead_scorer.py    # 0-100 multi-dimensional scoring
+│
+├── runpod-playwright-api/         # ☁️ Serverless infrastructure
+│   ├── handler.py
+│   ├── playwright_service.py
+│   └── Dockerfile
+│
+├── config.py                      # ZIP codes + configuration
+├── .env.example                   # API key template
+├── QUICKSTART.md                  # 5-min setup guide
+├── CLAUDE.md                      # Technical docs for AI
+└── README.md                      # This file
 ```
 
-### 2. Modify Extraction Logic
-```javascript
-// extraction.js
-const dealers = Array.from(document.querySelectorAll('.dealer-card')).map(card => ({
-  name: card.querySelector('.dealer-name').textContent,
-  phone: card.querySelector('.phone').textContent,
-  // ... custom fields
-}));
-```
+---
 
-### 3. Rebuild & Deploy
+## 🔮 Roadmap
+
+### ✅ MVP Complete (Generac Only)
+- [x] Multi-OEM scraper framework
+- [x] Generac dealer scraper (production-ready)
+- [x] SREC state filtering + ITC urgency
+- [x] Coperniq lead scoring (0-100)
+- [x] Lead generation script
+- [x] RunPod serverless deployment
+
+### ⏳ Phase 2: Multi-OEM Detection
+- [ ] Tesla Powerwall scraper extraction logic
+- [ ] Enphase installer scraper extraction logic
+- [ ] Cross-reference contractors (2-3 OEM networks)
+- [ ] Multi-OEM score boost (100pts for 3+ brands)
+
+### 🔜 Phase 3: Enrichment & CRM
+- [ ] Apollo.io integration (employee count, revenue, LinkedIn)
+- [ ] Commercial capability scoring (20 pts)
+- [ ] Close CRM bulk import
+- [ ] Auto-generated Smart Views by OEM/state/priority
+
+### 🌟 Phase 4: Outreach Automation (10x BDR Goal)
+- [ ] Email sequences (SendGrid/Mailgun)
+- [ ] SMS campaigns (Twilio)
+- [ ] Automated outbound calls
+- [ ] AI agent testing
+
+---
+
+## 🔧 Development
+
+### Adding New OEM Scrapers
+
+1. **Inherit from BaseDealerScraper**:
+   ```python
+   from scrapers.base_scraper import BaseDealerScraper
+
+   class NewOEMScraper(BaseDealerScraper):
+       OEM_NAME = "NewOEM"
+       DEALER_LOCATOR_URL = "https://..."
+       PRODUCT_LINES = ["Solar", "Battery"]
+   ```
+
+2. **Implement required methods**:
+   - `get_extraction_script()` - JavaScript to extract dealer data
+   - `detect_capabilities()` - Map OEM data to capabilities
+   - `parse_dealer_data()` - Convert to StandardizedDealer format
+
+3. **Register with factory**:
+   ```python
+   ScraperFactory.register("NewOEM", NewOEMScraper)
+   ```
+
+4. **Use immediately**:
+   ```python
+   scraper = ScraperFactory.create("NewOEM", mode=ScraperMode.RUNPOD)
+   ```
+
+### Testing Changes
 ```bash
-docker build -t your-scraper:latest .
-docker push yourusername/your-scraper:latest
-runpodctl endpoint update YOUR_ENDPOINT --image yourusername/your-scraper:latest
+# Test with 1 ZIP
+python scripts/generate_leads.py --mode runpod --states CA --limit-zips 1
+
+# Test with 3 ZIPs
+python scripts/generate_leads.py --mode runpod --states CA --limit-zips 3
 ```
-
----
-
-## 📈 Performance & Costs
-
-### Execution Metrics
-
-| Metric | Local (MCP) | Cloud (RunPod) |
-|--------|-------------|----------------|
-| **Per ZIP** | ~6 seconds | ~6 seconds |
-| **Setup Cost** | Manual | Automated |
-| **Concurrency** | 1 worker | 1-N workers |
-| **Idle Cost** | $0 | $0 (auto-scale) |
-| **Active Cost** | $0 | $0.00015/sec |
-
-### Cost Examples
-
-```
-100 ZIP codes:
-  - Execution: 600 seconds
-  - Cost: $0.09 base + $0.41 overhead
-  - Total: ~$0.50
-
-1,000 ZIP codes:
-  - Execution: 6,000 seconds (100 min)
-  - Cost: $0.90 base + $4.10 overhead
-  - Total: ~$5.00
-
-10,000 ZIP codes:
-  - Execution: 60,000 seconds (16.7 hrs)
-  - Cost: $9.00 base + $41.00 overhead
-  - Total: ~$50.00
-```
-
-**Pro tip**: Use `max_workers=10` for faster processing → 10,000 ZIPs in ~2 hours.
-
----
-
-## 🐛 Known Issues
-
-### Address Parsing (Low Priority)
-Dealers with 0 reviews have corrupted street addresses:
-```python
-# Current output:
-"street": "3 mi0.0(0)0.0 out of 5 stars.   7816 frontage rd"
-
-# Expected:
-"street": "7816 frontage rd"
-```
-
-**Impact**: ~60% of dealers (those with no reviews)
-**Status**: Data still usable, regex cleanup possible
-**Location**: extraction.js:72-74
 
 ---
 
 ## 📚 Documentation
 
-- **[RunPod Deployment Guide](runpod-playwright-api/README.md)** - Full cloud deployment instructions
-- **[CLAUDE.md](CLAUDE.md)** - Architecture deep-dive for AI assistants
-- **[FINDINGS.md](FINDINGS.md)** - Original research and validation notes
+- **[QUICKSTART.md](QUICKSTART.md)** - Get leads in 5 minutes
+- **[CLAUDE.md](CLAUDE.md)** - Technical architecture (for AI assistants)
+- **[runpod-playwright-api/README.md](runpod-playwright-api/README.md)** - Cloud deployment guide
+- **[FINDINGS.md](FINDINGS.md)** - Original research notes (Generac scraper)
 
 ---
 
 ## 🤝 Contributing
 
-This is a portfolio/showcase project, but suggestions are welcome!
+This is a portfolio/showcase project for GTME skills, but suggestions are welcome!
 
 ```bash
-# Fork the repository
-git fork https://github.com/yourusername/dealer-scraper-mvp
+# Fork & clone
+git clone https://github.com/ScientiaCapital/dealer-scraper-mvp.git
 
 # Create feature branch
 git checkout -b feature/amazing-improvement
 
-# Commit changes
-git commit -m "Add amazing improvement"
+# Commit with detailed message (include business context)
+git commit -m "Add XYZ feature for ABC use case"
 
-# Push and create PR
+# Push & create PR
 git push origin feature/amazing-improvement
 ```
 
@@ -452,17 +396,61 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 🔗 Connect
 
-**Built by**: Your Name
-**LinkedIn**: [linkedin.com/in/yourprofile](https://linkedin.com/in/yourprofile)
-**Portfolio**: [yourwebsite.com](https://yourwebsite.com)
-**Email**: your.email@example.com
+**Built for**: Coperniq.io - Brand-agnostic monitoring platform
+
+**Use Case**: Partner prospecting for multi-brand contractors
+
+**Author**: Sr. BDR leveraging GTME skills to 10x productivity
+
+**Goal**: Automate contractor discovery → enrichment → scoring → outreach
 
 ---
 
 <div align="center">
 
-**⭐ Star this repo if you found it helpful!**
+**⭐ Star this repo if you're building GTM automation tools!**
 
-Built with ❤️ for the GTME community
+*Showcasing: Web scraping • Cloud automation • Lead scoring • Multi-dimensional prioritization • GTM engineering*
 
 </div>
+
+---
+
+## 🎓 Skills Demonstrated
+
+### 🐳 Docker & Cloud
+- Serverless deployment (RunPod)
+- Container optimization (Playwright base image)
+- Auto-scaling (0→N workers)
+- Cost optimization (~$0.001/ZIP)
+
+### 🌐 API & Integration
+- HTTP API design (workflow-based)
+- RESTful endpoint structure
+- Multi-service integration (RunPod, Apollo, Clay, Close)
+- API key management (.env patterns)
+
+### 📊 Data Engineering
+- Web scraping (Playwright automation)
+- Cross-referencing (phone/domain/name matching)
+- Fuzzy matching algorithms
+- Multi-dimensional scoring
+- Deduplication strategies
+
+### 🎯 GTM Engineering
+- Lead generation pipeline
+- Prioritization algorithms
+- SREC market analysis
+- ITC deadline awareness
+- Territory scoring (wealthy ZIP proximity)
+
+### 🔧 Software Architecture
+- Abstract base classes
+- Factory pattern
+- Singleton pattern
+- Workflow orchestration
+- Mode switching (PLAYWRIGHT/RUNPOD/BROWSERBASE)
+
+---
+
+**Built with ❤️ for the GTME community**
