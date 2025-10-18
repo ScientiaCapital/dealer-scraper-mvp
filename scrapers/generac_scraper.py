@@ -51,7 +51,7 @@ class GeneracScraper(BaseDealerScraper):
     
     def __init__(self, mode: ScraperMode = ScraperMode.PLAYWRIGHT):
         super().__init__(mode)
-        
+
         # Load RunPod config if in RUNPOD mode
         if mode == ScraperMode.RUNPOD:
             self.runpod_api_key = os.getenv("RUNPOD_API_KEY")
@@ -60,6 +60,11 @@ class GeneracScraper(BaseDealerScraper):
                 "RUNPOD_API_URL",
                 f"https://api.runpod.ai/v2/{self.runpod_endpoint_id}/runsync"
             )
+
+        # Load Browserbase config if in BROWSERBASE mode
+        if mode == ScraperMode.BROWSERBASE:
+            self.browserbase_api_key = os.getenv("BROWSERBASE_API_KEY")
+            self.browserbase_project_id = os.getenv("BROWSERBASE_PROJECT_ID")
     
     def get_extraction_script(self) -> str:
         """
@@ -279,7 +284,112 @@ class GeneracScraper(BaseDealerScraper):
             raise Exception(f"RunPod API request failed: {str(e)}")
         except json.JSONDecodeError:
             raise Exception("Failed to parse RunPod API response as JSON")
-    
+
+    def _scrape_with_browserbase(self, zip_code: str) -> List[StandardizedDealer]:
+        """
+        BROWSERBASE mode: Execute automated scraping via Browserbase cloud browser.
+
+        Browserbase provides remote browser sessions accessible via Playwright CDP.
+        This method:
+        1. Creates a Browserbase session
+        2. Connects via Playwright CDP
+        3. Executes the 6-step Generac workflow
+        4. Extracts dealer data
+        5. Closes the session
+
+        Requires: playwright Python package (pip install playwright)
+        """
+        if not self.browserbase_api_key or not self.browserbase_project_id:
+            raise ValueError(
+                "Missing Browserbase credentials. Set BROWSERBASE_API_KEY and BROWSERBASE_PROJECT_ID in .env"
+            )
+
+        try:
+            # Import playwright (only imported when BROWSERBASE mode is used)
+            try:
+                from playwright.sync_api import sync_playwright
+            except ImportError:
+                raise ImportError(
+                    "Browserbase mode requires 'playwright' package. "
+                    "Install with: pip install playwright && playwright install chromium"
+                )
+
+            print(f"[Browserbase] Creating session for ZIP {zip_code}...")
+
+            # Step 1: Create Browserbase session
+            create_session_url = f"https://www.browserbase.com/v1/sessions"
+            headers = {
+                "X-BB-API-Key": self.browserbase_api_key,
+                "Content-Type": "application/json",
+            }
+            payload = {
+                "projectId": self.browserbase_project_id,
+            }
+
+            response = requests.post(create_session_url, json=payload, headers=headers, timeout=10)
+            response.raise_for_status()
+            session_data = response.json()
+
+            session_id = session_data["id"]
+            connect_url = session_data["connectUrl"]  # WebSocket URL for CDP
+
+            print(f"[Browserbase] Session created: {session_id}")
+            print(f"[Browserbase] Connecting to remote browser...")
+
+            # Step 2: Connect to Browserbase via Playwright CDP
+            with sync_playwright() as p:
+                browser = p.chromium.connect_over_cdp(connect_url)
+                context = browser.contexts[0]  # Browserbase provides a default context
+                page = context.pages[0] if context.pages else context.new_page()
+
+                print(f"[Browserbase] Connected! Navigating to dealer locator...")
+
+                # Step 3: Execute the 6-step workflow
+                # 1. Navigate
+                page.goto(self.DEALER_LOCATOR_URL, wait_until="networkidle", timeout=30000)
+
+                # 2. Dismiss cookie dialog
+                try:
+                    page.click(self.SELECTORS["cookie_accept"], timeout=5000)
+                except Exception:
+                    pass  # Cookie dialog may not appear
+
+                # 3. Fill ZIP code
+                page.fill(self.SELECTORS["zip_input"], zip_code)
+
+                # 4. Click search
+                page.click(self.SELECTORS["search_button"])
+
+                # 5. Wait for AJAX results (3 seconds)
+                page.wait_for_timeout(3000)
+
+                # 6. Extract dealer data
+                print(f"[Browserbase] Extracting dealer data...")
+                raw_dealers = page.evaluate(self.get_extraction_script())
+
+                print(f"[Browserbase] Extracted {len(raw_dealers)} dealers")
+
+                # Close browser connection
+                browser.close()
+
+            # Step 4: Close Browserbase session
+            delete_session_url = f"https://www.browserbase.com/v1/sessions/{session_id}"
+            requests.delete(delete_session_url, headers=headers, timeout=10)
+            print(f"[Browserbase] Session closed")
+
+            # Step 5: Parse results
+            dealers = [self.parse_dealer_data(d, zip_code) for d in raw_dealers]
+            return dealers
+
+        except requests.exceptions.Timeout:
+            raise Exception(f"Browserbase API timeout")
+        except requests.exceptions.RequestException as e:
+            raise Exception(f"Browserbase API request failed: {str(e)}")
+        except json.JSONDecodeError:
+            raise Exception("Failed to parse Browserbase API response as JSON")
+        except Exception as e:
+            raise Exception(f"Browserbase scraping failed: {str(e)}")
+
     def parse_results(self, results_json: List[Dict], zip_code: str) -> List[StandardizedDealer]:
         """
         Helper method to parse manual PLAYWRIGHT results.

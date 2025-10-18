@@ -115,36 +115,113 @@ Each lead gets 0-100 score across 5 dimensions:
 
 ---
 
-## Next Steps (Future Enhancements)
+## Advanced Workflow: Full Enrichment Pipeline
 
-Once you have RunPod working, you can add:
+Once you have the basic leads, enrich them for better targeting:
 
-### 1. **Multi-OEM Detection** (Identifies contractors in 2-3 OEM networks)
-   - Add Tesla Powerwall scraper extraction logic
-   - Add Enphase installer scraper extraction logic
+### Step 5: Enrich with Apollo.io (Employee Count, Revenue, Emails)
+
+**What it does:** Adds company data + decision-maker contacts for accurate scoring
+
+```bash
+# 1. Get Apollo API key from https://app.apollo.io/#/settings/integrations/api
+# 2. Add to .env:
+echo "APOLLO_API_KEY=your_apollo_key" >> .env
+
+# 3. Enrich your leads
+python scripts/enrich_with_apollo.py --input output/generac_master_list.json
+```
+
+**Output:** `output/generac_master_list_apollo.json`
+
+**What's added:**
+- Employee count (accurate commercial capability scoring - 20 pts)
+- Revenue estimate
+- Decision-maker emails (Owner, GM, Operations Manager)
+- LinkedIn profiles (company + contacts)
+
+---
+
+### Step 6: Enrich with Clay.com (Waterfall Enrichment) [OPTIONAL]
+
+**What it does:** Adds additional data via waterfall enrichment
+
+```bash
+# 1. Create Clay table at https://clay.com
+# 2. Add Webhook integration → Copy URL to .env:
+echo "CLAY_WEBHOOK_URL=https://clay.com/webhooks/..." >> .env
+
+# 3. Send leads to Clay
+python scripts/enrich_with_clay.py --input output/generac_master_list_apollo.json
+
+# 4. Wait 1-5 minutes for Clay processing
+# 5. Export enriched CSV from Clay table
+```
+
+**What Clay adds:**
+- Additional emails (Apollo → Hunter → Snov.io waterfall)
+- Phone validation
+- Tech stack (BuiltWith)
+- Social profiles (Facebook, Twitter)
+
+---
+
+### Step 7: Upload to Close CRM (Automated Outreach)
+
+**What it does:** Imports leads with Smart Views for organized calling
+
+```bash
+# 1. Get Close CRM API key from https://app.close.com/settings/api/
+# 2. Add to .env:
+echo "CLOSE_API_KEY=your_close_key" >> .env
+
+# 3. Create custom fields in Close CRM UI (see scripts/upload_to_close.py docstring)
+
+# 4. Upload leads
+python scripts/upload_to_close.py --input output/generac_master_list_apollo.json
+```
+
+**What's created:**
+- ✅ All contractors imported as leads
+- ✅ 6 state-based Smart Views (CA, TX, PA, MA, NJ, FL)
+- ✅ Sorted by Coperniq Score (HIGH priority first)
+- ✅ Decision-maker emails attached to each lead
+
+**Next:** Go to https://app.close.com → Use Smart Views → Start calling HIGH priority (80-100) leads!
+
+---
+
+## Alternative: Browserbase Cloud Browser
+
+If you prefer Browserbase over RunPod:
+
+```bash
+# 1. Get credentials from https://www.browserbase.com/dashboard
+# 2. Add to .env:
+echo "BROWSERBASE_API_KEY=your_key" >> .env
+echo "BROWSERBASE_PROJECT_ID=your_project_id" >> .env
+
+# 3. Install Playwright (required for Browserbase mode)
+pip install playwright && playwright install chromium
+
+# 4. Run with Browserbase
+python scripts/generate_leads.py --mode browserbase --states CA --limit-zips 5
+```
+
+---
+
+## Future Enhancements
+
+### 1. **Multi-OEM Detection** (Find contractors in 2-3 OEM networks)
+   - Add Tesla Powerwall scraper extraction logic (structure ready)
+   - Add Enphase installer scraper extraction logic (structure ready)
    - Re-run to find contractors certified across multiple brands
    - **Value:** Multi-brand contractors NEED Coperniq (managing 3 platforms is painful)
 
-### 2. **Apollo Enrichment** (Get employee count, revenue, LinkedIn)
-   - Add `APOLLO_API_KEY` to `.env`
-   - Improves commercial capability scoring (20 points)
-   - Adds contact discovery for outreach
-
-### 3. **Close CRM Import** (Automated lead import + Smart Views)
-   - Add `CLOSE_API_KEY` to `.env`
-   - Auto-creates segmented Smart Views by:
-     - OEM presence (3+ OEMs, 2 OEMs, 1 OEM)
-     - SREC state (CA, TX, PA, MA, NJ, FL)
-     - Priority tier (HIGH, MEDIUM, LOW)
-
-### 4. **Clay Automation** (Advanced enrichment workflows)
-   - Add `CLAY_WEBHOOK_URL` to `.env`
-   - Build custom enrichment waterfall
-
-### 5. **Outreach Automation** (10x BDR goal)
+### 2. **Outreach Automation** (10x BDR goal)
    - Email sequences (SendGrid/Mailgun)
    - SMS campaigns (Twilio)
-   - AI agent testing (future)
+   - AI agent testing
 
 ---
 

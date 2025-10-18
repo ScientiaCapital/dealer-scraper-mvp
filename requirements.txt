@@ -1,7 +1,12 @@
 # Core dependencies for Dealer Scraper MVP
-# Note: Playwright is accessed via MCP tools (local mode) or RunPod API (cloud mode)
+# Note: Playwright is accessed via MCP tools (PLAYWRIGHT mode) or RunPod API (RUNPOD mode)
 
 # HTTP client and environment variable management
-# Required for RunPod serverless API integration
+# Required for RunPod and Browserbase API integration
 requests>=2.31.0
 python-dotenv>=1.0.0
+
+# Optional: Playwright for Browserbase cloud browser automation
+# Install with: pip install playwright && playwright install chromium
+# Only required for BROWSERBASE mode
+# playwright>=1.40.0
