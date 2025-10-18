@@ -6,6 +6,18 @@ Includes selectors, extraction script, and ZIP code lists
 # Generac Dealer Locator URL
 DEALER_LOCATOR_URL = "https://www.generac.com/dealer-locator/"
 
+# RunPod Serverless API Configuration
+import os
+
+RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY", "")
+RUNPOD_ENDPOINT_ID = os.getenv("RUNPOD_ENDPOINT_ID", "")
+
+# Construct RunPod API URL from endpoint ID
+if RUNPOD_ENDPOINT_ID:
+    RUNPOD_API_URL = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/runsync"
+else:
+    RUNPOD_API_URL = ""
+
 # CSS Selectors
 SELECTORS = {
     "cookie_accept": "button:has-text('Accept Cookies')",

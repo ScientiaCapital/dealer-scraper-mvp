@@ -10,10 +10,13 @@ from typing import List, Dict, Optional
 from enum import Enum
 from pathlib import Path
 import time
+import requests
+from dotenv import load_dotenv
 
 
 class ScraperMode(Enum):
     PLAYWRIGHT = "playwright"
+    RUNPOD = "runpod"
     BROWSERBASE = "browserbase"
 
 
@@ -21,6 +24,9 @@ class DealerScraper:
     """Base scraper that can use either Playwright or Browserbase"""
 
     def __init__(self, mode: ScraperMode = ScraperMode.PLAYWRIGHT, config: Optional[Dict] = None):
+        # Load environment variables for API keys
+        load_dotenv()
+
         self.mode = mode
         self.config = config or {}
         self.results = []
@@ -28,10 +34,12 @@ class DealerScraper:
     def scrape_zip_code(self, zip_code: str) -> List[Dict]:
         """
         Scrape dealers for a single ZIP code
-        This is a placeholder for MCP Playwright tool integration
+        Supports multiple backend modes: Playwright (MCP), RunPod (cloud), Browserbase
         """
         if self.mode == ScraperMode.PLAYWRIGHT:
             return self._scrape_with_playwright(zip_code)
+        elif self.mode == ScraperMode.RUNPOD:
+            return self._scrape_with_runpod(zip_code)
         elif self.mode == ScraperMode.BROWSERBASE:
             return self._scrape_with_browserbase(zip_code)
 
@@ -55,6 +63,76 @@ class DealerScraper:
         print("  5. browser_wait_for 3 seconds")
         print("  6. browser_evaluate with extraction.js")
         return []
+
+    def _scrape_with_runpod(self, zip_code: str) -> List[Dict]:
+        """
+        Scrape using RunPod serverless Playwright API
+        Makes HTTP POST request to cloud-hosted browser automation service
+        Returns extracted dealer data or empty list on error
+        """
+        from config import (
+            RUNPOD_API_KEY,
+            RUNPOD_API_URL,
+            DEALER_LOCATOR_URL,
+            EXTRACTION_SCRIPT,
+            WAIT_AFTER_SEARCH,
+        )
+
+        # Validate configuration
+        if not RUNPOD_API_KEY or not RUNPOD_API_URL:
+            print("[RunPod Error] Missing RUNPOD_API_KEY or RUNPOD_ENDPOINT_ID in .env")
+            print("Set these environment variables to use RunPod mode")
+            return []
+
+        # Build the 6-step workflow matching MCP Playwright pattern
+        workflow = [
+            {"action": "navigate", "url": DEALER_LOCATOR_URL},
+            {"action": "click", "selector": "button:has-text('Accept Cookies')"},
+            {"action": "fill", "selector": "input[name*='zip' i]", "text": zip_code},
+            {"action": "click", "selector": "button:has-text('Search')"},
+            {"action": "wait", "timeout": WAIT_AFTER_SEARCH * 1000},  # Convert to ms
+            {"action": "evaluate", "script": EXTRACTION_SCRIPT},
+        ]
+
+        # Prepare request payload
+        payload = {"input": {"workflow": workflow}}
+
+        headers = {
+            "Authorization": f"Bearer {RUNPOD_API_KEY}",
+            "Content-Type": "application/json",
+        }
+
+        try:
+            print(f"[RunPod] Scraping ZIP {zip_code} via cloud API...")
+            response = requests.post(
+                RUNPOD_API_URL,
+                json=payload,
+                headers=headers,
+                timeout=60,  # 60 second timeout
+            )
+            response.raise_for_status()
+
+            result = response.json()
+
+            # Check for RunPod-level errors
+            if "error" in result:
+                print(f"[RunPod Error] {result['error']}")
+                return []
+
+            # Extract dealers from response
+            dealers = result.get("results", [])
+            print(f"[RunPod] Extracted {len(dealers)} dealers from ZIP {zip_code}")
+            return dealers
+
+        except requests.exceptions.Timeout:
+            print(f"[RunPod Error] Request timeout after 60 seconds for ZIP {zip_code}")
+            return []
+        except requests.exceptions.RequestException as e:
+            print(f"[RunPod Error] HTTP request failed: {e}")
+            return []
+        except Exception as e:
+            print(f"[RunPod Error] Unexpected error: {e}")
+            return []
 
     def _scrape_with_browserbase(self, zip_code: str) -> List[Dict]:
         """Scrape using Browserbase cloud browser"""

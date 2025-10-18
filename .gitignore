@@ -11,18 +11,32 @@ build/
 dist/
 *.egg-info/
 
-# Environment
+# Environment variables (API keys, secrets)
 .env
-.env.local
+.env.*
+**/.env
+**/.env.*
+*_credentials.*
+*_key.*
+*_secret.*
 
 # Output files
 output/
 *.json
 *.csv
 !example_output.json
+!test_input.json
+!**/examples/*.json
 
-# Playwright
+# Docker and RunPod
+.docker/
+runpod-playwright-api/**/.env
+*.tar
+docker-compose.override.yml
+
+# Playwright and MCP tools
 .playwright-mcp/
+.serena/
 
 # IDE
 .vscode/
