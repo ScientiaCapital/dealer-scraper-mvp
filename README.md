@@ -1,4 +1,4 @@
-# 🚀 Coperniq Partner Prospecting System
+# 🚀 GTM Prospecting System
 
 **Automated contractor lead generation targeting multi-brand installers in SREC states**
 
