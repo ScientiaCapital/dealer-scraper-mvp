@@ -448,13 +448,10 @@ def main():
     print("STEP 2: Cross-referencing across OEMs...")
     detector = MultiOEMDetector()
 
-    # Combine all dealers from all OEMs
-    all_dealers_combined = []
-    for dealers in all_dealers_by_oem.values():
-        all_dealers_combined.extend(dealers)
-
-    # Add all dealers to detector at once
-    detector.add_dealers(all_dealers_combined)
+    # Add dealers from each OEM separately (detector needs to know which OEM each dealer is from)
+    for oem_name, dealers in all_dealers_by_oem.items():
+        detector.add_dealers(dealers, oem_name)
+        print(f"  Added {len(dealers)} unique {oem_name} dealers to detector")
 
     # Find matches (min_oem_count=1 includes all contractors)
     matches = detector.find_multi_oem_contractors(min_oem_count=1)
@@ -540,20 +537,20 @@ def main():
     print(f"  LOW (<50):       {low:4d} contractors")
     print()
 
-    # Multi-OEM gold list
-    gold_contractors = [m for m in scores if len(m.contractor.capabilities.oem_certifications) >= 2]
-    if gold_contractors:
-        print(f"🏆 GOLD CONTRACTORS (Multi-OEM): {len(gold_contractors)}")
+    # Multi-OEM gold list (from matches, not scores)
+    multi_oem_contractors = [m for m in matches if len(m.oem_sources) >= 2]
+    if multi_oem_contractors:
+        print(f"🏆 MULTI-OEM CONTRACTORS (2+ brands): {len(multi_oem_contractors)}")
         print()
 
         # Show top 10
         print("Top 10 Multi-OEM Contractors:")
-        for i, contractor in enumerate(gold_contractors[:10], 1):
-            oems = ", ".join(contractor.contractor.capabilities.oem_certifications)
-            print(f"  {i:2d}. {contractor.contractor.name[:50]:50s}")
+        for i, match in enumerate(multi_oem_contractors[:10], 1):
+            oems = ", ".join(sorted(match.oem_sources))
+            print(f"  {i:2d}. {match.primary_dealer.name[:50]:50s}")
             print(f"      OEMs: {oems}")
-            print(f"      Score: {contractor.total_score}/100")
-            print(f"      Phone: {contractor.contractor.phone}")
+            print(f"      Multi-OEM Score: {match.multi_oem_score}/100")
+            print(f"      Phone: {match.primary_dealer.phone}")
             print()
 
     print(f"✅ Master multi-OEM lead list ready: {csv_path}")
