@@ -51,3 +51,21 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Proprietary implementations (secret sauce)
+extraction.js
+config.py
+analysis/
+targeting/
+scrapers/generac_scraper.py
+scrapers/tesla_scraper.py
+scrapers/enphase_scraper.py
+scraper.py
+scripts/generate_leads.py
+enrichment/
+crm/
+data/
+CLAUDE.md
+QUICKSTART.md
+FINDINGS.md
+API_KEYS_GUIDE.md
