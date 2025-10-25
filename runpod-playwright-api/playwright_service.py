@@ -49,6 +49,9 @@ class PlaywrightService:
             - navigate: {"action": "navigate", "url": "https://..."}
             - click: {"action": "click", "selector": "button"}
             - fill: {"action": "fill", "selector": "input", "text": "value"}
+            - type: {"action": "type", "selector": "input", "text": "value", "delay": 100}
+            - wait_for_selector: {"action": "wait_for_selector", "selector": "div", "timeout": 5000, "state": "visible"}
+            - press: {"action": "press", "key": "Enter", "selector": "input"}  # selector optional
             - wait: {"action": "wait", "timeout": 3000}
             - evaluate: {"action": "evaluate", "script": "() => {...}"}
         """
@@ -70,7 +73,36 @@ class PlaywrightService:
                 
                 elif action == "fill":
                     page.fill(step["selector"], step["text"], timeout=5000)
-                
+
+                elif action == "type":
+                    # Type text character by character with delay (triggers autocomplete)
+                    selector = step["selector"]
+                    text = step["text"]
+                    delay = step.get("delay", 100)  # Default 100ms between keystrokes
+                    element = page.locator(selector)
+                    element.click()  # Focus first
+                    page.wait_for_timeout(300)  # Short pause after focus
+                    element.type(text, delay=delay)
+                    print(f"[PlaywrightService] Typed '{text}' with {delay}ms delay")
+
+                elif action == "wait_for_selector":
+                    # Wait for element to appear (critical for autocomplete dropdown)
+                    selector = step["selector"]
+                    timeout = step.get("timeout", 10000)  # Default 10s
+                    state = step.get("state", "visible")  # Default to visible
+                    page.wait_for_selector(selector, state=state, timeout=timeout)
+                    print(f"[PlaywrightService] Waited for selector: {selector} (state: {state})")
+
+                elif action == "press":
+                    # Press keyboard key (e.g., "Enter", "Escape", "Tab")
+                    key = step["key"]
+                    selector = step.get("selector", None)
+                    if selector:
+                        page.locator(selector).press(key)
+                    else:
+                        page.keyboard.press(key)
+                    print(f"[PlaywrightService] Pressed key: {key}")
+
                 elif action == "wait":
                     page.wait_for_timeout(step["timeout"])
                 
