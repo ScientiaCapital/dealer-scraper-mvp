@@ -1,0 +1,27 @@
+# Minimal RunPod Dockerfile - Generic Playwright Executor
+# This version ONLY includes what handler.py actually needs (no scrapers)
+#
+# Build from project root:
+#   docker build -f runpod-playwright-api/Dockerfile.minimal -t tmk74/dealer-scraper:minimal .
+#
+# Why minimal? RunPod handler is a GENERIC Playwright executor.
+# Scrapers call it via HTTP - they don't run inside it.
+
+FROM mcr.microsoft.com/playwright/python:v1.48.0
+
+# Set working directory
+WORKDIR /app
+
+# Install ONLY the Python packages handler.py imports
+# No need for full requirements.txt (has browserbase, apollo, etc.)
+RUN pip install --no-cache-dir playwright==1.48.0 runpod==1.7.0
+
+# Copy ONLY the handler and service files (no scrapers, no config)
+COPY runpod-playwright-api/handler.py ./handler.py
+COPY runpod-playwright-api/playwright_service.py ./playwright_service.py
+
+# Verify files copied correctly
+RUN ls -la && cat handler.py | head -10
+
+# RunPod expects Python script as entry point
+CMD ["python", "handler.py"]
