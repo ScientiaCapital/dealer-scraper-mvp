@@ -178,7 +178,23 @@ class StandardizedDealer:
     multi_oem_score: Optional[int] = None
     srec_state_priority: Optional[str] = None
     itc_urgency: Optional[str] = None
-    
+
+    # GTM/Marketing fields for targeted campaigns
+    seo_keywords: str = ""            # SEO keywords for organic search targeting
+    adwords_keywords: str = ""        # Google AdWords keywords for PPC campaigns
+    linkedin_search_query: str = ""   # LinkedIn Sales Navigator search query
+    meta_ads_targeting: str = ""      # Meta (Facebook/Instagram) ads targeting parameters
+    meta_custom_audience: str = ""    # Meta custom audience category for upload
+
+    # MEP+R (Mechanical, Electrical, Plumbing + Renewables) tracking
+    is_mep_contractor: bool = False   # Has MEP capabilities
+    is_self_performing: bool = False  # Actually does the work (not just sales)
+    mep_score: int = 0                # 0-100 score for MEP+R capabilities
+
+    # O&M and Resimercial tracking (high-value targets)
+    has_ops_maintenance: bool = False # Offers O&M services (recurring revenue)
+    is_resimercial: bool = False     # Does both residential AND commercial (diverse portfolio)
+
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON export"""
         return {
@@ -208,6 +224,16 @@ class StandardizedDealer:
             "multi_oem_score": self.multi_oem_score,
             "srec_state_priority": self.srec_state_priority,
             "itc_urgency": self.itc_urgency,
+            "seo_keywords": self.seo_keywords,
+            "adwords_keywords": self.adwords_keywords,
+            "linkedin_search_query": self.linkedin_search_query,
+            "meta_ads_targeting": self.meta_ads_targeting,
+            "meta_custom_audience": self.meta_custom_audience,
+            "is_mep_contractor": self.is_mep_contractor,
+            "is_self_performing": self.is_self_performing,
+            "mep_score": self.mep_score,
+            "has_ops_maintenance": self.has_ops_maintenance,
+            "is_resimercial": self.is_resimercial,
         }
 
 
