@@ -10,3 +10,9 @@ python-dotenv>=1.0.0
 # Install with: pip install playwright && playwright install chromium
 # Required for BROWSERBASE mode
 playwright>=1.35.0
+
+# Patchright: Stealth Playwright fork for bot detection bypass
+# Drop-in replacement for Playwright with patched automation fingerprints
+# Install browser: patchright install chromium
+# Required for STEALTH mode (Tesla, Enphase, and other OEMs with bot detection)
+patchright>=1.55.0

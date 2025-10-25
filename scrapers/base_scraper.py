@@ -17,7 +17,8 @@ class ScraperMode(Enum):
     """Execution mode for dealer scraping"""
     PLAYWRIGHT = "playwright"  # Local MCP Playwright
     RUNPOD = "runpod"         # RunPod serverless API
-    BROWSERBASE = "browserbase"  # Browserbase cloud (future)
+    BROWSERBASE = "browserbase"  # Browserbase cloud
+    PATCHRIGHT = "patchright"  # Patchright stealth (bot detection bypass)
 
 
 class DealerCapabilities:
@@ -44,7 +45,14 @@ class DealerCapabilities:
     
     # OEM certifications (populated by multi-OEM detector)
     oem_certifications: Set[str] = field(default_factory=set)
-    
+
+    # OEM-specific product capabilities (Coperniq's key value prop)
+    # Tracks which specific OEM brands this dealer is certified to install
+    generator_oems: Set[str] = field(default_factory=set)  # Generac, Kohler, Cummins
+    battery_oems: Set[str] = field(default_factory=set)     # Tesla, Generac, Enphase, LG, SolarEdge
+    microinverter_oems: Set[str] = field(default_factory=set)  # Enphase, APsystems
+    inverter_oems: Set[str] = field(default_factory=set)    # SolarEdge, SMA, Fronius
+
     def __init__(self):
         self.has_generator = False
         self.has_solar = False
@@ -60,6 +68,10 @@ class DealerCapabilities:
         self.is_gc = False
         self.is_sub = False
         self.oem_certifications = set()
+        self.generator_oems = set()
+        self.battery_oems = set()
+        self.microinverter_oems = set()
+        self.inverter_oems = set()
     
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON export"""
@@ -78,6 +90,10 @@ class DealerCapabilities:
             "is_gc": self.is_gc,
             "is_sub": self.is_sub,
             "oem_certifications": list(self.oem_certifications),
+            "generator_oems": list(self.generator_oems),
+            "battery_oems": list(self.battery_oems),
+            "microinverter_oems": list(self.microinverter_oems),
+            "inverter_oems": list(self.inverter_oems),
             "capability_count": self.get_capability_count(),
         }
     
@@ -285,7 +301,8 @@ class BaseDealerScraper(ABC):
         Execution varies by mode:
         - PLAYWRIGHT: Prints manual MCP instructions
         - RUNPOD: Makes HTTP request to serverless API
-        - BROWSERBASE: (Future) Cloud browser automation
+        - BROWSERBASE: Cloud browser automation
+        - PATCHRIGHT: Stealth mode with bot detection bypass
         
         Args:
             zip_code: 5-digit ZIP code to search
@@ -299,6 +316,8 @@ class BaseDealerScraper(ABC):
             return self._scrape_with_runpod(zip_code)
         elif self.mode == ScraperMode.BROWSERBASE:
             return self._scrape_with_browserbase(zip_code)
+        elif self.mode == ScraperMode.PATCHRIGHT:
+            return self._scrape_with_patchright(zip_code)
         else:
             raise ValueError(f"Unknown scraper mode: {self.mode}")
     
@@ -393,6 +412,16 @@ class BaseDealerScraper(ABC):
         """
         pass
     
+    @abstractmethod
+    def _scrape_with_patchright(self, zip_code: str) -> List[StandardizedDealer]:
+        """
+        PATCHRIGHT mode: Stealth browser automation with bot detection bypass.
+        
+        Each OEM scraper must implement this with their specific workflow.
+        Uses Patchright library for patched automation fingerprints.
+        """
+        pass
+    
     def _scrape_with_browserbase(self, zip_code: str) -> List[StandardizedDealer]:
         """
         BROWSERBASE mode: Cloud browser automation (future implementation).
@@ -445,6 +474,7 @@ class BaseDealerScraper(ABC):
             "has_electrical", "has_hvac", "has_roofing", "has_plumbing",
             "is_commercial", "is_residential", "is_gc", "is_sub",
             "capability_count", "oem_certifications",
+            "generator_oems", "battery_oems", "microinverter_oems", "inverter_oems",
             "apollo_enriched", "employee_count", "estimated_revenue", "linkedin_url",
             "coperniq_score", "multi_oem_score",
             "srec_state_priority", "itc_urgency",
@@ -462,6 +492,10 @@ class BaseDealerScraper(ABC):
                 # Convert lists to strings
                 row["certifications"] = ", ".join(row.get("certifications", []))
                 row["oem_certifications"] = ", ".join(row.get("oem_certifications", []))
+                row["generator_oems"] = ", ".join(row.get("generator_oems", []))
+                row["battery_oems"] = ", ".join(row.get("battery_oems", []))
+                row["microinverter_oems"] = ", ".join(row.get("microinverter_oems", []))
+                row["inverter_oems"] = ", ".join(row.get("inverter_oems", []))
                 writer.writerow(row)
         
         print(f"Saved {len(self.dealers)} dealers to {filepath}")
