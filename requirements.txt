@@ -6,7 +6,7 @@
 requests>=2.31.0
 python-dotenv>=1.0.0
 
-# Optional: Playwright for Browserbase cloud browser automation
+# Playwright for Browserbase cloud browser automation
 # Install with: pip install playwright && playwright install chromium
-# Only required for BROWSERBASE mode
-# playwright>=1.40.0
+# Required for BROWSERBASE mode
+playwright>=1.35.0
