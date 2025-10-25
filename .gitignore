@@ -38,6 +38,9 @@ docker-compose.override.yml
 .playwright-mcp/
 .serena/
 
+# Patchright stealth browser
+patchright-chrome-profile/
+
 # IDE
 .vscode/
 .idea/
