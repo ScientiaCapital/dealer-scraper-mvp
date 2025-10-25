@@ -42,14 +42,15 @@ class KohlerScraper(BaseDealerScraper):
     """
 
     OEM_NAME = "Kohler"
-    DEALER_LOCATOR_URL = "https://kohlerpower.com/en/residential/generators/dealer-locator"
+    # Note: Kohler Energy rebranded to Rehlko in 2024
+    DEALER_LOCATOR_URL = "https://www.kohlerhomeenergy.rehlko.com/find-a-dealer"
     PRODUCT_LINES = ["Home Generators", "Residential", "Standby", "Whole Home Backup"]
 
-    # CSS Selectors - PLACEHOLDER: Needs manual inspection
+    # CSS Selectors - Based on Rehlko/Kohler site structure
     SELECTORS = {
-        "cookie_accept": "button:has-text('Accept'), button:has-text('I Agree'), button:has-text('OK')",
-        "zip_input": "input[placeholder*='ZIP' i], input[placeholder*='postal' i], input[name*='zip' i]",
-        "search_button": "button:has-text('Search'), button:has-text('Find'), button[type='submit']",
+        "cookie_accept": "button:has-text('Accept')",
+        "zip_input": "input[type='text']",  # ZIP code input field
+        "search_button": "button:has-text('Go')",
     }
 
     def __init__(self, mode: ScraperMode = ScraperMode.PLAYWRIGHT):
