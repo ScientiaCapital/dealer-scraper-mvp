@@ -42,7 +42,11 @@ class DealerCapabilities:
     is_residential: bool = False
     is_gc: bool = False  # General contractor
     is_sub: bool = False  # Specialized sub-contractor
-    
+
+    # High-value contractor types (Coperniq priority targets)
+    has_om_capability: bool = False  # Operations & Maintenance (manages complex energy portfolios)
+    is_mep_r_contractor: bool = False  # MEP+R self-performing (Mechanical, Electrical, Plumbing, Roofing)
+
     # OEM certifications (populated by multi-OEM detector)
     oem_certifications: Set[str] = field(default_factory=set)
 
@@ -67,6 +71,8 @@ class DealerCapabilities:
         self.is_residential = False
         self.is_gc = False
         self.is_sub = False
+        self.has_om_capability = False
+        self.is_mep_r_contractor = False
         self.oem_certifications = set()
         self.generator_oems = set()
         self.battery_oems = set()
@@ -89,6 +95,8 @@ class DealerCapabilities:
             "is_residential": self.is_residential,
             "is_gc": self.is_gc,
             "is_sub": self.is_sub,
+            "has_om_capability": self.has_om_capability,
+            "is_mep_r_contractor": self.is_mep_r_contractor,
             "oem_certifications": list(self.oem_certifications),
             "generator_oems": list(self.generator_oems),
             "battery_oems": list(self.battery_oems),
@@ -125,6 +133,46 @@ class DealerCapabilities:
         if self.has_roofing: trades.append("Roofing")
         if self.has_plumbing: trades.append("Plumbing")
         return trades
+
+    def detect_high_value_contractor_types(self, dealer_name: str, certifications: List[str], tier: str) -> None:
+        """
+        Detect O&M and MEP+R contractor types from dealer data.
+
+        **O&M (Operations & Maintenance)** contractors manage complex energy portfolios:
+        - Keywords: "operations", "maintenance", "service", "monitoring", "O&M"
+        - High value: They manage ongoing systems, perfect for Coperniq's monitoring platform
+
+        **MEP+R (Mechanical, Electrical, Plumbing, Roofing)** self-performing contractors:
+        - Have ALL four trade capabilities: electrical + HVAC + plumbing + roofing
+        - OR keywords: "MEP", "mechanical contractor", "full-service"
+        - 10x value: Can handle complex installations end-to-end without subcontractors
+
+        Args:
+            dealer_name: Company name
+            certifications: List of certifications
+            tier: OEM tier (Premier, Platinum, etc.)
+        """
+        # Convert to lowercase for case-insensitive matching
+        search_text = f"{dealer_name} {' '.join(certifications)} {tier}".lower()
+
+        # O&M Detection
+        om_keywords = ["operations", "maintenance", "service", "monitoring", "o&m", "o & m"]
+        self.has_om_capability = any(keyword in search_text for keyword in om_keywords)
+
+        # MEP+R Detection (two methods)
+        # Method 1: Has all four trade capabilities
+        has_all_mep_r_trades = (
+            self.has_electrical and
+            self.has_hvac and
+            self.has_plumbing and
+            self.has_roofing
+        )
+
+        # Method 2: Has MEP keywords
+        mep_keywords = ["mep", "mechanical contractor", "full-service", "multi-trade"]
+        has_mep_keywords = any(keyword in search_text for keyword in mep_keywords)
+
+        self.is_mep_r_contractor = has_all_mep_r_trades or has_mep_keywords
 
 
 @dataclass
