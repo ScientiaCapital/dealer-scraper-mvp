@@ -16,3 +16,8 @@ playwright>=1.35.0
 # Install browser: patchright install chromium
 # Required for STEALTH mode (Tesla, Enphase, and other OEMs with bot detection)
 patchright>=1.55.0
+
+# Browserbase Python SDK for cloud browser automation
+# Official SDK with better debugging and session management
+# Install with: pip install browserbase (or --break-system-packages on macOS)
+browserbase>=1.0.0

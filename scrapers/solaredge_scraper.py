@@ -96,7 +96,7 @@ class SolarEdgeScraper(BaseDealerScraper):
                     // Extract phone
                     const phoneElement = element.querySelector('[href^="tel:"], .phone, .contact-phone');
                     let phone = phoneElement?.textContent?.trim() || phoneElement?.href?.replace('tel:', '') || '';
-                    phone = phone.replace(/[^\d]/g, ''); // Normalize to digits only
+                    phone = phone.replace(/[^\\d]/g, ''); // Normalize to digits only
 
                     // Extract website
                     const websiteElement = element.querySelector('a[href*="http"], .website, .dealer-website');
@@ -113,7 +113,7 @@ class SolarEdgeScraper(BaseDealerScraper):
                         if (parts.length >= 2) {
                             street = parts[0];
                             const lastPart = parts[parts.length - 1];
-                            const stateZipMatch = lastPart.match(/([A-Z]{2})\s+(\d{5})/);
+                            const stateZipMatch = lastPart.match(/([A-Z]{2})\\s+(\\d{5})/);
                             if (stateZipMatch) {
                                 state = stateZipMatch[1];
                                 zip = stateZipMatch[2];
@@ -166,7 +166,7 @@ class SolarEdgeScraper(BaseDealerScraper):
                     let review_count = 0;
                     if (reviewElement) {
                         const reviewText = reviewElement.textContent || '';
-                        const reviewMatch = reviewText.match(/(\d+)/);
+                        const reviewMatch = reviewText.match(/(\\d+)/);
                         review_count = reviewMatch ? parseInt(reviewMatch[1]) : 0;
                     }
 
