@@ -44,7 +44,7 @@ from config import WEALTHY_ZIPS_NATIONWIDE
 
 # Load environment variables
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(override=True)  # Override shell environment with .env file
 
 # Browserbase credentials
 BROWSERBASE_API_KEY = os.getenv("BROWSERBASE_API_KEY")
@@ -180,6 +180,16 @@ def scrape_tesla_zip(page: Page, zip_code: str) -> List[Dict]:
         # Simulate human scrolling
         page.evaluate("window.scrollBy(0, 100)")
         time.sleep(random.uniform(0.5, 1.0))
+
+        # Select United States region if selector appears
+        try:
+            us_button = page.locator('button:has-text("United States")')
+            if us_button.is_visible(timeout=3000):
+                print(f"    Selecting United States region...")
+                us_button.click()
+                time.sleep(random.uniform(1.0, 2.0))
+        except:
+            pass  # Region selector may not appear every time
 
         # Wait for ZIP input
         print(f"    Waiting for ZIP input...")
