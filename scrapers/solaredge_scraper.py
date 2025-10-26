@@ -437,6 +437,12 @@ class SolarEdgeScraper(BaseDealerScraper):
         except json.JSONDecodeError:
             raise Exception("Failed to parse RunPod API response as JSON")
 
+    def _scrape_with_patchright(self, zip_code: str) -> List[StandardizedDealer]:
+        """
+        PATCHRIGHT mode: Not implemented yet.
+        """
+        raise NotImplementedError("Patchright mode not yet implemented for SolarEdge")
+
     def parse_results(self, results_json: List[Dict], zip_code: str) -> List[StandardizedDealer]:
         """
         Helper method to parse manual PLAYWRIGHT results.
