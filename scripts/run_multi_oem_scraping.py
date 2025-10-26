@@ -50,7 +50,8 @@ from targeting.coperniq_lead_scorer import CoperniqLeadScorer
 from targeting.icp_filter import ICPFilter
 from config import (
     ZIP_CODES_CALIFORNIA, ZIP_CODES_TEXAS, ZIP_CODES_PENNSYLVANIA,
-    ZIP_CODES_MASSACHUSETTS, ZIP_CODES_NEW_JERSEY, ZIP_CODES_FLORIDA
+    ZIP_CODES_MASSACHUSETTS, ZIP_CODES_NEW_JERSEY, ZIP_CODES_FLORIDA,
+    WEALTHY_ZIPS_NATIONWIDE, ZIP_CODES_NATIONWIDE_WEALTHY
 )
 
 
@@ -426,27 +427,48 @@ def scrape_solaredge_zip(page, zip_code: str) -> list:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Multi-OEM Lead Generation")
+    parser = argparse.ArgumentParser(description="Multi-OEM Lead Generation - Nationwide Wealthy ZIP Targeting")
     parser.add_argument("--oems", nargs="+", default=["Generac"],
                         help="OEMs to scrape (default: Generac only - add more as ready)")
-    parser.add_argument("--states", nargs="+", default=["CA", "TX", "PA", "MA", "NJ", "FL"],
-                        help="States to scrape (default: HIGH priority SREC states)")
+    parser.add_argument("--states", nargs="+", default=None,
+                        help="States to scrape (default: ALL 50 states with wealthy ZIP targeting)")
     parser.add_argument("--limit-zips", type=int, default=None,
                         help="Limit number of ZIPs per state (for testing)")
+    parser.add_argument("--nationwide", action="store_true", default=True,
+                        help="Use nationwide wealthy ZIP targeting (179 ZIPs across all 50 states)")
     args = parser.parse_args()
 
     # Build ZIP code list
-    state_zips = {
-        "CA": ZIP_CODES_CALIFORNIA,
-        "TX": ZIP_CODES_TEXAS,
-        "PA": ZIP_CODES_PENNSYLVANIA,
-        "MA": ZIP_CODES_MASSACHUSETTS,
-        "NJ": ZIP_CODES_NEW_JERSEY,
-        "FL": ZIP_CODES_FLORIDA
-    }
+    if args.nationwide or args.states is None:
+        # USE NATIONWIDE WEALTHY ZIP TARGETING (default)
+        print("=" * 70)
+        print("NATIONWIDE WEALTHY ZIP TARGETING ENABLED")
+        print("=" * 70)
+        print(f"Coverage: 179 ZIPs across all 50 US states")
+        print(f"Criteria: $150K-$250K+ median household income")
+        print(f"Target: Affluent solar/battery/generator buyers")
+        print()
 
+        state_zips = WEALTHY_ZIPS_NATIONWIDE
+        if args.states:
+            # Filter to specified states
+            state_zips = {state: state_zips[state] for state in args.states if state in state_zips}
+    else:
+        # Legacy SREC state targeting (for backwards compatibility)
+        state_zips = {
+            "CA": ZIP_CODES_CALIFORNIA,
+            "TX": ZIP_CODES_TEXAS,
+            "PA": ZIP_CODES_PENNSYLVANIA,
+            "MA": ZIP_CODES_MASSACHUSETTS,
+            "NJ": ZIP_CODES_NEW_JERSEY,
+            "FL": ZIP_CODES_FLORIDA
+        }
+
+    # Build final ZIP list
     zip_codes = []
-    for state in args.states:
+    states_to_scrape = args.states if args.states else list(state_zips.keys())
+
+    for state in states_to_scrape:
         if state in state_zips:
             zips = state_zips[state]
             if args.limit_zips:
@@ -457,8 +479,9 @@ def main():
     print("🚀 COPERNIQ MULTI-OEM LEAD GENERATION")
     print("="*70)
     print(f"OEMs: {', '.join(args.oems)}")
-    print(f"States: {', '.join(args.states)}")
+    print(f"States: {', '.join(states_to_scrape)}")
     print(f"Total ZIPs: {len(zip_codes)}")
+    print(f"Total scrapes: {len(zip_codes)} ZIPs × {len(args.oems)} OEMs = {len(zip_codes) * len(args.oems):,}")
     print("="*70)
     print()
 
