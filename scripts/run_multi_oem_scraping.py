@@ -22,10 +22,28 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from playwright.sync_api import sync_playwright
 from scrapers.base_scraper import StandardizedDealer
+from scrapers.scraper_factory import ScraperFactory
+
+# Import ALL scrapers so they register with the factory
+# This ensures all 17 OEMs are available for scraping
 from scrapers.generac_scraper import GeneracScraper
 from scrapers.tesla_scraper import TeslaScraper
 from scrapers.enphase_scraper import EnphaseScraper
 from scrapers.solaredge_scraper import SolarEdgeScraper
+from scrapers.briggs_scraper import BriggsStrattonScraper
+from scrapers.cummins_scraper import CumminsScraper
+from scrapers.kohler_scraper import KohlerScraper
+from scrapers.fronius_scraper import FroniusScraper
+from scrapers.sma_scraper import SMAScraper
+from scrapers.solark_scraper import SolArkScraper
+from scrapers.goodwe_scraper import GoodWeScraper
+from scrapers.growatt_scraper import GrowattScraper
+from scrapers.sungrow_scraper import SungrowScraper
+from scrapers.abb_scraper import ABBScraper
+from scrapers.delta_scraper import DeltaScraper
+from scrapers.tigo_scraper import TigoScraper
+from scrapers.simpliphi_scraper import SimpliPhiScraper
+
 from analysis.multi_oem_detector import MultiOEMDetector, MultiOEMMatch
 from targeting.srec_itc_filter import SRECITCFilter
 from targeting.coperniq_lead_scorer import CoperniqLeadScorer
@@ -145,13 +163,61 @@ GENERAC_EXTRACTION_SCRIPT = """
 """
 
 
+def scrape_generic_oem_zip(page, oem_name: str, zip_code: str) -> list:
+    """
+    Generic scraper for OEMs that don't have custom navigation logic yet.
+
+    Uses the scraper's extraction script and makes a best-effort attempt at navigation.
+    Falls back to simple pattern: navigate, fill ZIP, wait, extract.
+    """
+    try:
+        # Get scraper instance from factory
+        scraper = ScraperFactory.create(oem_name)
+        extraction_script = scraper.get_extraction_script()
+
+        # Navigate to dealer locator URL (if scraper has it)
+        if hasattr(scraper, 'DEALER_LOCATOR_URL') and scraper.DEALER_LOCATOR_URL:
+            page.goto(scraper.DEALER_LOCATOR_URL, timeout=30000)
+            page.wait_for_timeout(2000)
+        else:
+            print(f"    ⚠ No DEALER_LOCATOR_URL for {oem_name}, skipping...")
+            return []
+
+        # Try generic ZIP input patterns
+        try:
+            # Pattern 1: Look for input with "zip" in placeholder/name
+            zip_input = page.locator('input[placeholder*="zip" i], input[placeholder*="ZIP" i], input[name*="zip" i]').first
+            zip_input.fill(zip_code)
+            zip_input.press('Enter')
+        except:
+            try:
+                # Pattern 2: Look for input with "postal" or "location"
+                zip_input = page.locator('input[placeholder*="postal" i], input[placeholder*="location" i]').first
+                zip_input.fill(zip_code)
+                zip_input.press('Enter')
+            except:
+                print(f"    ⚠ Could not find ZIP input for {oem_name}")
+                return []
+
+        # Wait for results to load
+        page.wait_for_timeout(5000)
+
+        # Extract dealers using OEM's extraction script
+        dealers = page.evaluate(extraction_script)
+        return dealers if dealers else []
+
+    except Exception as e:
+        print(f"    Error in generic {oem_name} scraper: {e}")
+        return []
+
+
 def scrape_oem_dealers(page, oem_name: str, zip_codes: list) -> list:
     """
     Scrape dealers from a specific OEM across multiple ZIP codes.
 
     Args:
         page: Playwright page object
-        oem_name: "Generac", "Tesla", "Enphase", or "SolarEdge"
+        oem_name: Any registered OEM name (Generac, Tesla, Briggs & Stratton, etc.)
         zip_codes: List of ZIP codes to scrape
 
     Returns:
@@ -165,21 +231,24 @@ def scrape_oem_dealers(page, oem_name: str, zip_codes: list) -> list:
     print(f"ZIP codes: {len(zip_codes)}")
     print()
 
+    # Mapping of OEM names to their custom scraper functions
+    # OEMs with custom navigation logic go here, others use generic scraper
+    OEM_SCRAPER_FUNCTIONS = {
+        "Generac": scrape_generac_zip,
+        "Tesla": scrape_tesla_zip,
+        "Enphase": scrape_enphase_zip,
+        "SolarEdge": scrape_solaredge_zip,
+    }
+
     for i, zip_code in enumerate(zip_codes, 1):
         print(f"[{i}/{len(zip_codes)}] Scraping {oem_name} - ZIP {zip_code}...")
 
         try:
-            if oem_name == "Generac":
-                dealers = scrape_generac_zip(page, zip_code)
-            elif oem_name == "Tesla":
-                dealers = scrape_tesla_zip(page, zip_code)
-            elif oem_name == "Enphase":
-                dealers = scrape_enphase_zip(page, zip_code)
-            elif oem_name == "SolarEdge":
-                dealers = scrape_solaredge_zip(page, zip_code)
+            # Use custom function if available, otherwise use generic scraper
+            if oem_name in OEM_SCRAPER_FUNCTIONS:
+                dealers = OEM_SCRAPER_FUNCTIONS[oem_name](page, zip_code)
             else:
-                print(f"  ✗ Unknown OEM: {oem_name}")
-                continue
+                dealers = scrape_generic_oem_zip(page, oem_name, zip_code)
 
             # Convert to StandardizedDealer objects
             for dealer in dealers:
