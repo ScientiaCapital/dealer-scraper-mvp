@@ -340,29 +340,43 @@ def scrape_tesla_zip(page, zip_code: str) -> list:
         scraper = TeslaScraper()
         extraction_script = scraper.get_extraction_script()
 
-        page.goto("https://www.tesla.com/support/certified-installers-powerwall", timeout=30000)
+        # Navigate directly to final URL (avoid redirect delay)
+        page.goto("https://www.tesla.com/support/certified-installers?productType=powerwall", timeout=30000)
         page.wait_for_timeout(3000)
         page.wait_for_load_state("networkidle", timeout=30000)
         page.wait_for_timeout(2000)
 
-        # Fill ZIP code
-        page.wait_for_selector('input[role="combobox"]', state='visible', timeout=30000)
-        zip_input = page.locator('input[role="combobox"]')
-        zip_input.fill(zip_code)
-        print(f"    Filled ZIP code: {zip_code}")
+        # Wait for and click combobox (triggers lazy loading)
+        try:
+            page.wait_for_selector('input[role="combobox"]', state='visible', timeout=45000)
+            zip_input = page.locator('input[role="combobox"]')
+            zip_input.click()  # Click to focus (helps with lazy loading)
+            page.wait_for_timeout(500)
+            zip_input.fill(zip_code)
+            print(f"    Filled ZIP code: {zip_code}")
+        except Exception as e:
+            print(f"    ⚠ Could not find ZIP input for Tesla: {e}")
+            return []
 
         # Try autocomplete or press Enter
         try:
-            page.wait_for_selector('div[role="listbox"]', state='visible', timeout=3000)
+            page.wait_for_selector('div[role="listbox"]', state='visible', timeout=5000)
             page.wait_for_timeout(500)
+            # Click first option that matches the ZIP code
             page.click('div[role="listbox"] div[role="option"]:first-child')
+            print(f"    Clicked autocomplete option")
         except:
+            print(f"    Autocomplete not appearing, pressing Enter")
             zip_input.press('Enter')
             page.wait_for_timeout(1000)
 
+        # Wait for results to load
         page.wait_for_timeout(4000)
+
+        # Extract dealers
         dealers = page.evaluate(extraction_script)
-        return dealers
+        print(f"    Extracted {len(dealers) if dealers else 0} installers")
+        return dealers if dealers else []
 
     except Exception as e:
         print(f"    Error in Tesla scraper: {e}")
@@ -378,14 +392,17 @@ def scrape_enphase_zip(page, zip_code: str) -> list:
         page.goto("https://enphase.com/installer-locator", timeout=30000)
         page.wait_for_timeout(2000)
 
-        # Find and fill ZIP input (Enphase uses address autocomplete)
-        # Try multiple selectors
+        # Find and fill ZIP input
         try:
-            zip_input = page.locator('input[placeholder*="zip" i], input[placeholder*="address" i], input[type="text"]').first
+            # Enphase uses a textbox with label "Enter your ZIP"
+            zip_input = page.get_by_role("textbox", name="Enter your ZIP")
             zip_input.fill(zip_code)
-            zip_input.press('Enter')
-        except:
-            print(f"    Could not find Enphase ZIP input")
+            
+            # Click the "Find an installer" button
+            search_button = page.get_by_role("button", name="Find an installer")
+            search_button.click()
+        except Exception as e:
+            print(f"    Could not find Enphase ZIP input: {e}")
             return []
 
         page.wait_for_timeout(5000)
@@ -408,18 +425,36 @@ def scrape_solaredge_zip(page, zip_code: str) -> list:
 
         # Find and fill ZIP input
         try:
-            zip_input = page.locator('input[placeholder*="zip" i]').first
+            zip_input = page.locator('input[placeholder*="zip" i], input[placeholder*="Zip" i], input[placeholder*="ZIP" i]').first
             zip_input.fill(zip_code)
-
-            search_button = page.locator('button[type="submit"]').first
-            search_button.click()
-        except:
-            print(f"    Could not find SolarEdge ZIP input")
+            page.wait_for_timeout(1000)  # Wait for Google autocomplete to load
+            
+            # Google Places autocomplete appears - try to select first option
+            try:
+                # Wait for autocomplete dropdown
+                page.wait_for_selector('.pac-container:not(:empty)', state='visible', timeout=5000)
+                page.wait_for_timeout(500)
+                
+                # Click first autocomplete option
+                page.click('.pac-container .pac-item:first-child')
+                print(f"    Selected autocomplete option")
+            except:
+                # Autocomplete didn't appear, try pressing Enter or Arrow Down + Enter
+                print(f"    Autocomplete not appearing, trying keyboard navigation")
+                page.keyboard.press('ArrowDown')
+                page.wait_for_timeout(300)
+                page.keyboard.press('Enter')
+                page.wait_for_timeout(1000)
+        except Exception as input_error:
+            print(f"    Could not find or fill SolarEdge ZIP input: {input_error}")
             return []
 
+        # Wait for results to load
         page.wait_for_timeout(5000)
+        
+        # Extract dealers
         dealers = page.evaluate(extraction_script)
-        return dealers
+        return dealers if dealers else []
 
     except Exception as e:
         print(f"    Error in SolarEdge scraper: {e}")
@@ -485,19 +520,43 @@ def main():
     print("="*70)
     print()
 
-    # Launch browser
-    print("Launching headless browser...")
+    # Launch browser in HEADED mode (visible windows) to bypass Tesla bot detection
+    # Tesla, Enphase, and SolarEdge all detect headless browsers
+    print("Launching VISIBLE browser (headed mode to bypass bot detection)...")
+    print("NOTE: Browser windows will appear - this is normal and required for Tesla/Enphase/SolarEdge")
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
-
-        # Scrape all OEMs
+        browser = p.chromium.launch(
+            headless=False,  # VISIBLE browser windows - required for Tesla
+            args=[
+                '--disable-blink-features=AutomationControlled',  # Hide automation
+                '--disable-dev-shm-usage',  # Overcome limited resource problems
+            ]
+        )
+        # Scrape all OEMs (fresh context for each to avoid bot detection)
         all_dealers_by_oem = {}
         start_time = time.time()
 
         for oem_name in args.oems:
-            dealers = scrape_oem_dealers(page, oem_name, zip_codes)
+            # Create fresh context for each OEM to avoid cross-contamination
+            # (Tesla/Enphase/SolarEdge detect reused browser sessions)
+            fresh_context = browser.new_context(
+                user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                viewport={'width': 1920, 'height': 1080},
+                locale='en-US',
+            )
+            fresh_context.add_init_script("""
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                });
+            """)
+            fresh_page = fresh_context.new_page()
+
+            # Scrape with fresh page
+            dealers = scrape_oem_dealers(fresh_page, oem_name, zip_codes)
             all_dealers_by_oem[oem_name] = dealers
+
+            # Close context after OEM completes
+            fresh_context.close()
 
         browser.close()
 
