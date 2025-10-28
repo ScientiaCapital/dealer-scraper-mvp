@@ -112,61 +112,139 @@ class SMAScraper(BaseDealerScraper):
 
     def get_extraction_script(self) -> str:
         """
-        JavaScript extraction script for SMA installer data.
-
-        **STATUS**: NOT IMPLEMENTED - Requires manual site inspection
-
-        **TASK**: Use Playwright MCP tools to:
-        1. Navigate to https://www.sma-america.com/powerupplus/homeowner
-        2. Open DevTools Network tab
-        3. Search for a test ZIP code (e.g., 94102)
-        4. Look for API calls that return installer data
-        5. Inspect window object for installer data: console.log(Object.keys(window))
-        6. Check Google Maps markers: google.maps markers or similar
-
-        **EXPECTED DATA STRUCTURE** (based on typical installer locators):
+        JavaScript extraction script for SMA POWERUP+ installer data.
+        
+        Extracts installer data from the SMA installer locator page.
+        Data is rendered to DOM in .address-wrapper containers (not Google Maps API markers).
+        
+        Returns array of installer objects with:
         - name: Company name
-        - phone: Phone number
+        - phone: Phone number  
         - website: Website URL
         - street: Street address
         - city: City
-        - state: State
+        - state: State abbreviation
         - zip: ZIP code
-        - distance: Distance from search location
-        - certifications: SMA certifications/tier
-        - rating: Google/SMA rating (if available)
-
-        **PLACEHOLDER** (will be replaced with actual extraction script):
+        - distance: Distance string (e.g., "21 mi")
+        - distance_miles: Distance as float
         """
         return """
         () => {
-            // TODO: Implement SMA-specific extraction logic
-            // This placeholder returns empty array
-
-            console.log("WARNING: SMA extraction script not implemented yet");
-            console.log("Next steps:");
-            console.log("1. Inspect Network tab for API calls");
-            console.log("2. Check window object for installer data");
-            console.log("3. Look for Google Maps markers");
-            console.log("4. Update this script with actual extraction logic");
-
-            // Check if Google Maps data is available
-            if (typeof google !== 'undefined' && google.maps) {
-                console.log("Google Maps detected - may need to extract from map markers");
+          // Extract SMA POWERUP+ installers - only those with address-wrapper
+          const installers = [];
+          const seen = new Set();
+          
+          // Find containers with address-wrapper (actual installer results)
+          const addressWrappers = document.querySelectorAll('.address-wrapper');
+          
+          addressWrappers.forEach(wrapper => {
+            // Find the parent container that has all installer data
+            const container = wrapper.closest('.ng-scope');
+            if (!container) return;
+            
+            // Get company name from H3
+            const nameEl = container.querySelector('h3');
+            if (!nameEl) return;
+            const name = nameEl.textContent.trim();
+            if (!name) return;
+            
+            // Get address
+            const addressDiv = wrapper.querySelector('.address');
+            let street = '';
+            let city = '';
+            let state = '';
+            let zip = '';
+            
+            if (addressDiv) {
+              // Address format: "40 La Barthe Ln<br>San Carlos, CA 94070"
+              const addressHTML = addressDiv.innerHTML;
+              const parts = addressHTML.split('<br>');
+              
+              if (parts.length >= 2) {
+                street = parts[0].trim();
+                
+                // Parse "San Carlos, CA 94070"
+                const cityStateZip = parts[1].trim();
+                const match = cityStateZip.match(/^(.+?),\\s+([A-Z]{2})\\s+(\\d{5})$/);
+                if (match) {
+                  city = match[1];
+                  state = match[2];
+                  zip = match[3];
+                }
+              }
             }
-
-            // Check for common installer data patterns in window object
-            const potentialDataKeys = Object.keys(window).filter(key =>
-                key.toLowerCase().includes('installer') ||
-                key.toLowerCase().includes('dealer') ||
-                key.toLowerCase().includes('partner')
-            );
-
-            if (potentialDataKeys.length > 0) {
-                console.log("Potential installer data found in window object:", potentialDataKeys);
+            
+            // Get distance
+            const distanceEl = wrapper.querySelector('.distance-unit') || 
+                              container.querySelector('[class*="distance"]');
+            let distance = '';
+            let distance_miles = 0;
+            
+            if (distanceEl) {
+              distance = distanceEl.textContent.trim();
+              const milesMatch = distance.match(/(\\d+(?:\\.\\d+)?)\\s*mi/);
+              if (milesMatch) {
+                distance_miles = parseFloat(milesMatch[1]);
+              }
             }
-
-            return [];  // Return empty array until extraction logic is implemented
+            
+            // Get phone
+            let phone = '';
+            const phoneLink = container.querySelector('a[href^="tel:"]');
+            if (phoneLink) {
+              phone = phoneLink.href.replace('tel:', '').replace(/[^0-9]/g, '');
+              // Normalize: remove country code if present
+              if (phone.length === 11 && phone.startsWith('1')) {
+                phone = phone.substring(1);
+              }
+            }
+            
+            // Get website
+            let website = '';
+            const links = container.querySelectorAll('a[href]');
+            for (const link of links) {
+              const href = link.href;
+              // Skip tel links, Google Maps links, and SMA's own domain
+              if (href && !href.includes('tel:') && 
+                  !href.includes('google') && 
+                  !href.includes('sma-america.com') &&
+                  (href.startsWith('http://') || href.startsWith('https://'))) {
+                website = href;
+                break;
+              }
+            }
+            
+            // Extract domain from website
+            let domain = '';
+            if (website) {
+              try {
+                const url = new URL(website);
+                domain = url.hostname.replace(/^www\\./, '');
+              } catch (e) {
+                // Invalid URL, skip domain extraction
+              }
+            }
+            
+            // Deduplicate by phone (primary) or name (fallback)
+            const key = phone || name;
+            if (seen.has(key)) return;
+            seen.add(key);
+            
+            installers.push({
+              name,
+              phone,
+              domain,
+              website,
+              street,
+              city,
+              state,
+              zip,
+              distance,
+              distance_miles
+            });
+          });
+          
+          return installers;
         }
         """
 
@@ -269,84 +347,93 @@ class SMAScraper(BaseDealerScraper):
 
     def _scrape_with_playwright(self, zip_code: str) -> List[StandardizedDealer]:
         """
-        PLAYWRIGHT mode: Print manual MCP Playwright inspection instructions.
-
-        **IMPORTANT**: This mode is for MANUAL INSPECTION to develop extraction logic.
-        The extraction script is NOT YET IMPLEMENTED.
-
-        Use this mode to:
-        1. Inspect the SMA installer map
-        2. Identify how installer data is loaded (API? JavaScript? Google Maps?)
-        3. Develop extraction script
-        4. Test extraction on 1-2 ZIP codes
+        PLAYWRIGHT mode: Execute automated scraping using local Playwright.
+        
+        Workflow:
+        1. Navigate to SMA POWERUP+ installer map
+        2. Wait for map to load (JavaScript initialization)
+        3. Fill ZIP code in search input
+        4. Press Enter to trigger search (Google autocomplete)
+        5. Wait for results to load (.address-wrapper elements)
+        6. Execute JavaScript extraction
+        7. Parse results into StandardizedDealer objects
         """
+        from playwright.sync_api import sync_playwright
+        import time
+        
         print(f"\n{'='*60}")
         print(f"SMA Solar Installer Scraper - PLAYWRIGHT Mode")
         print(f"ZIP Code: {zip_code}")
         print(f"{'='*60}\n")
-
-        print("⚠️  EXTRACTION SCRIPT NOT IMPLEMENTED - MANUAL INSPECTION REQUIRED\n")
-
-        print("🔍 STEP 1: Navigate and Inspect Site Structure\n")
-        print("1. Navigate to SMA installer map:")
-        print(f'   mcp__playwright__browser_navigate({{"url": "{self.DEALER_LOCATOR_URL}"}})\n')
-
-        print("2. Take snapshot to see page structure:")
-        print('   mcp__playwright__browser_snapshot({})\n')
-
-        print("3. Open DevTools and inspect Network tab:")
-        print("   (Look for API calls when searching for installers)\n")
-
-        print("4. Try entering a ZIP code:")
-        print(f'   - Type "{zip_code}" in the location input')
-        print(f'   - Click search')
-        print(f'   - Watch Network tab for XHR/Fetch requests\n')
-
-        print("🔍 STEP 2: Identify Data Source\n")
-        print("Use browser_evaluate to inspect JavaScript environment:")
-        print("""
-   mcp__playwright__browser_evaluate({
-       "function": "() => {
-           // Check for Google Maps
-           console.log('Has Google Maps:', typeof google !== 'undefined');
-
-           // Check window object for installer data
-           const installerKeys = Object.keys(window).filter(k =>
-               k.toLowerCase().includes('installer') ||
-               k.toLowerCase().includes('dealer')
-           );
-           console.log('Potential data keys:', installerKeys);
-
-           // Return results
-           return {
-               hasGoogleMaps: typeof google !== 'undefined',
-               potentialDataKeys: installerKeys
-           };
-       }"
-   })
-        """)
-
-        print("\n🔍 STEP 3: Develop Extraction Logic\n")
-        print("Based on findings from Step 2:")
-        print("- If data is in Google Maps markers: Extract from map.markers or similar")
-        print("- If data is in window object: Access the data structure directly")
-        print("- If data comes from API: Capture the API endpoint and reverse-engineer")
-        print("- If data is in HTML: Use DOM traversal (like Generac scraper)\n")
-
-        print("🔍 STEP 4: Update Extraction Script\n")
-        print("Once you identify the data source:")
-        print("1. Edit scrapers/sma_scraper.py")
-        print("2. Update get_extraction_script() method")
-        print("3. Test on 1-2 ZIP codes")
-        print("4. Validate data structure matches StandardizedDealer format\n")
-
-        print(f"{'='*60}\n")
-        print("❌ Extraction script is NOT IMPLEMENTED")
-        print("✅ Use PLAYWRIGHT mode to develop extraction logic")
-        print("✅ Once working, test with RUNPOD mode for production")
-        print(f"{'='*60}\n")
-
-        return []
+        
+        try:
+            with sync_playwright() as p:
+                print(f"  → Launching Playwright browser...")
+                browser = p.chromium.launch(headless=True)
+                page = browser.new_page()
+                
+                # Navigate to SMA installer map
+                print(f"  → Navigating to {self.DEALER_LOCATOR_URL}")
+                page.goto(self.DEALER_LOCATOR_URL, timeout=30000, wait_until='networkidle')
+                
+                # Wait for map region to load (indicates JavaScript is initialized)
+                print(f"  → Waiting for map to initialize...")
+                page.wait_for_selector('region[role="region"][aria-label="Map"]', timeout=15000)
+                time.sleep(2)  # Extra wait for JS initialization
+                
+                # Fill ZIP code in location input
+                print(f"  → Filling ZIP code: {zip_code}")
+                location_input = page.locator(self.SELECTORS["zip_input"]).first
+                location_input.fill(zip_code)
+                time.sleep(1)  # Wait for Google autocomplete to appear
+                
+                # Press Enter to select first autocomplete suggestion and trigger search
+                print(f"  → Submitting search (Enter key)...")
+                location_input.press('Enter')
+                time.sleep(3)  # Wait for search to process
+                
+                # Wait for results to load - check for address-wrapper elements
+                print(f"  → Waiting for results...")
+                try:
+                    # Wait for at least one address-wrapper to appear (actual installer results)
+                    page.wait_for_selector('.address-wrapper', timeout=15000)
+                    print(f"     ✓ Results loaded successfully")
+                except Exception as e:
+                    print(f"     Warning: Results not found")
+                    print(f"     Current URL: {page.url}")
+                    # Check if any results loaded
+                    address_count = page.evaluate('() => document.querySelectorAll(".address-wrapper").length')
+                    print(f"     Address wrappers found: {address_count}")
+                    
+                    if address_count == 0:
+                        print(f"     No installers found for ZIP {zip_code}")
+                        browser.close()
+                        return []
+                
+                # Extract installer data using JavaScript
+                print(f"  → Extracting installer data...")
+                extraction_script = self.get_extraction_script()
+                installers_data = page.evaluate(extraction_script)
+                
+                print(f"  → Found {len(installers_data)} POWERUP+ installers")
+                
+                # Parse into StandardizedDealer objects
+                dealers = self.parse_results(installers_data, zip_code)
+                
+                browser.close()
+                
+                return dealers
+                
+        except Exception as e:
+            print(f"  ✗ Error scraping with Playwright: {e}")
+            import traceback
+            traceback.print_exc()
+            try:
+                if 'browser' in locals():
+                    browser.close()
+            except:
+                pass  # Ignore browser close errors
+            return []
 
     def _scrape_with_runpod(self, zip_code: str) -> List[StandardizedDealer]:
         """
