@@ -85,96 +85,122 @@ class MitsubishiScraper(BaseDealerScraper):
 () => {
   const contractors = [];
   const seen = new Set();
-  const nameElements = document.querySelectorAll('h3');
-  
-  nameElements.forEach(h3 => {
+
+  // Find all h3 contractor names
+  const h3Elements = document.querySelectorAll('h3');
+
+  h3Elements.forEach(h3 => {
     const name = h3.textContent.trim();
-    
-    // Skip non-contractor h3 elements
-    if (name.toLowerCase().includes('training') || 
+
+    // Skip non-contractor headings
+    if (name.toLowerCase().includes('training') ||
         name.toLowerCase().includes('warranty') ||
-        name.toLowerCase().includes('hire with confidence') ||
-        name.toLowerCase().includes('advanced training') ||
-        name.toLowerCase().includes('extended warranty') ||
+        name.toLowerCase().includes('hire with') ||
         name.toLowerCase().includes('manage consent') ||
-        name.toLowerCase().includes('cookie list') ||
-        name.length < 5) {
+        name.toLowerCase().includes('cookie') ||
+        name.length < 3) {
       return;
     }
-    
-    // Find container with phone link (Card_contractorCard class)
-    let container = h3.parentElement;
-    let iterations = 0;
-    while (container && !container.querySelector('a[href^="tel:"]') && iterations < 10) {
-      container = container.parentElement;
-      iterations++;
-      if (container === document.body) {
-        container = null;
-        break;
-      }
-    }
-    
+
+    // Get the parent container that has all the info
+    const container = h3.closest('div[class*="Card"]') ||
+                     h3.parentElement?.parentElement ||
+                     h3.parentElement;
+
     if (!container) return;
-    
-    // Extract phone
+
+    // Extract phone from tel: link
     let phone = '';
     const phoneLink = container.querySelector('a[href^="tel:"]');
     if (phoneLink) {
-      phone = phoneLink.href.replace(/[^0-9]/g, '');
-      // Remove leading 1 (country code)
-      if (phone.length === 11 && phone[0] === '1') {
+      // Extract just digits from the href
+      phone = phoneLink.href.replace('tel:', '').replace(/\\D/g, '');
+      // Remove country code if present
+      if (phone.length === 11 && phone.startsWith('1')) {
         phone = phone.substring(1);
       }
     }
 
-    // Extract location - look for the first occurrence of City, ST ZIP pattern
+    // Extract location from text containing "miles away"
     let city = '', state = '', zip = '';
-    const containerText = container.innerText || container.textContent || '';
-    // Match "City, ST ZIP" where city starts after word boundary or newline
-    const locationMatch = containerText.match(/(?:^|[\\n\\r])([A-Za-z][A-Za-z ]+?), *([A-Z]{2}) +([0-9]{5})/);
-    if (locationMatch) {
-      city = locationMatch[1].trim();
-      state = locationMatch[2];
-      zip = locationMatch[3];
-    }
-    
-    // Extract website
-    let website = '';
-    const links = container.querySelectorAll('a[href^="http"]');
-    for (const link of links) {
-      const href = link.href;
-      if (!href.includes('tel:') && 
-          !href.includes('google.com') && 
-          !href.includes('mitsubishicomfort.com') &&
-          !href.includes('policies.google')) {
-        website = href;
-        break;
+    const locationEl = container.querySelector('[class*="miles away"]') ||
+                      container.querySelector('div:has(img[alt*="location"]) + div') ||
+                      Array.from(container.querySelectorAll('div')).find(el =>
+                        el.textContent.includes('miles away'));
+
+    if (locationEl) {
+      // Remove the "X.X miles away" part and extract location
+      const locationText = locationEl.textContent
+        .replace(/\\d+(\\.\\d+)?\\s*miles?\\s*away/gi, '')
+        .trim();
+
+      // Parse "City, ST ZIP" format
+      const parts = locationText.split(',').map(s => s.trim());
+      if (parts.length >= 2) {
+        city = parts[0];
+        const stateZip = parts[1].trim().split(/\\s+/);
+        if (stateZip.length >= 2) {
+          state = stateZip[0];
+          zip = stateZip[1];
+        }
       }
     }
-    
-    // Only add if we have required fields
-    const key = `${name}|${phone}|${city}|${state}|${zip}`;
-    if (!seen.has(key) && phone && city && state && zip) {
+
+    // Alternative: look for pattern in container text
+    if (!city && container.textContent) {
+      const match = container.textContent.match(/([A-Za-z][A-Za-z\\s-]+),\\s*([A-Z]{2})\\s+(\\d{5})/);
+      if (match) {
+        city = match[1].trim();
+        state = match[2];
+        zip = match[3];
+      }
+    }
+
+    // Extract website from "Visit website" link (hover reveals actual URL)
+    let website = '';
+    let domain = '';
+
+    // Look for links with text containing "website" or external links
+    const websiteLink = container.querySelector('a[href*="//"][href*="."]:not([href*="tel:"]):not([href*="mitsubishicomfort"]):not([href*="google"])');
+    if (websiteLink) {
+      website = websiteLink.href;
+      // Extract domain from URL
+      try {
+        const url = new URL(website);
+        domain = url.hostname.replace('www.', '');
+      } catch (e) {
+        domain = '';
+      }
+    }
+
+    // Create unique key to avoid duplicates
+    const key = `${phone}|${name}`;
+
+    // Only add if we have minimum required fields and not seen before
+    if (!seen.has(key) && name && phone) {
       seen.add(key);
+
       contractors.push({
         name: name,
         phone: phone,
-        website: website || '',
+        domain: domain,
+        website: website,
         street: '',  // Not available in results
-        city: city,
-        state: state,
-        zip: zip,
-        address_full: `${city}, ${state} ${zip}`,
+        city: city || '',
+        state: state || '',
+        zip: zip || '',
+        address_full: city && state ? `${city}, ${state} ${zip}`.trim() : '',
         rating: 0.0,
         review_count: 0,
         tier: 'Diamond Commercial',
-        certifications: ['Diamond Commercial Contractor', 'VRF Certified', '12-Year Warranty Eligible'],
-        distance: '',  // Will be calculated if needed
-        distance_miles: 0.0
+        certifications: ['Diamond Commercial', 'VRF Certified', '12-Year Warranty'],
+        distance: '',
+        distance_miles: 0.0,
+        oem_source: 'Mitsubishi'
       });
     }
   });
-  
+
   return contractors;
 }
 """
