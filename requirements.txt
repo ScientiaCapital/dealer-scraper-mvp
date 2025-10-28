@@ -21,3 +21,7 @@ patchright>=1.55.0
 # Official SDK with better debugging and session management
 # Install with: pip install browserbase (or --break-system-packages on macOS)
 browserbase>=1.0.0
+
+# Dashboard
+streamlit==1.28.0
+plotly==5.17.0

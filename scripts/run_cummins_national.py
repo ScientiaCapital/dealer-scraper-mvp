@@ -102,8 +102,8 @@ def main():
     csv_file = f"output/cummins_national_{timestamp}.csv"
     json_file = f"output/cummins_national_{timestamp}.json"
 
-    scraper.save_to_csv(csv_file)
-    scraper.save_to_json(json_file)
+    scraper.save_csv(csv_file)
+    scraper.save_json(json_file)
 
     print(f"\n✅ Cummins national run complete!")
     print(f"   📁 CSV: {csv_file}")
