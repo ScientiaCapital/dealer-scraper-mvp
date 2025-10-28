@@ -28,6 +28,7 @@ from scrapers import kohler_scraper
 from scrapers import fronius_scraper
 from scrapers import solark_scraper
 from scrapers import simpliphi_scraper
+from scrapers import mitsubishi_scraper
 
 __all__ = [
     "BaseDealerScraper",

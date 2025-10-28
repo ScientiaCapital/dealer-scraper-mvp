@@ -51,7 +51,7 @@ class MitsubishiScraper(BaseDealerScraper):
     """
 
     OEM_NAME = "Mitsubishi Electric"
-    DEALER_LOCATOR_URL = "https://www.mitsubishicomfort.com/find-a-diamond-commercial-contractor"
+    DEALER_LOCATOR_URL = "https://www.mitsubishicomfort.com/get-started"
     PRODUCT_LINES = ["VRF Systems", "CITY MULTI®", "Commercial HVAC", "Heat Pumps"]
 
     # CSS Selectors (modern React/Next.js site)
@@ -86,39 +86,41 @@ class MitsubishiScraper(BaseDealerScraper):
   const contractors = [];
   const seen = new Set();
 
-  // Find all h3 contractor names
-  const h3Elements = document.querySelectorAll('h3');
+  // Start from phone links (we know these exist!) and work backwards
+  const phoneLinks = document.querySelectorAll('a[href^="tel:"]');
 
-  h3Elements.forEach(h3 => {
-    const name = h3.textContent.trim();
+  phoneLinks.forEach(phoneLink => {
+    // Extract phone number
+    let phone = phoneLink.href.replace('tel:', '').replace(/[^0-9]/g, '');
+    // Remove country code if present
+    if (phone.length === 11 && phone.startsWith('1')) {
+      phone = phone.substring(1);
+    }
 
-    // Skip non-contractor headings
+    if (!phone || phone.length !== 10) return;  // Skip invalid phones
+
+    // Find the contractor card container (2 levels up: A -> SPAN -> DIV.Card)
+    const container = phoneLink.parentElement?.parentElement;
+    if (!container) return;
+
+    // Find the contractor name - look for any heading in the card
+    const nameEl = container.querySelector('h3') ||
+                   container.querySelector('[role="heading"]') ||
+                   container.querySelector('h2') ||
+                   container.querySelector('h4');
+
+    if (!nameEl) return;
+
+    const name = nameEl.textContent.trim();
+
+    // Skip non-contractor names
     if (name.toLowerCase().includes('training') ||
         name.toLowerCase().includes('warranty') ||
         name.toLowerCase().includes('hire with') ||
-        name.toLowerCase().includes('manage consent') ||
-        name.toLowerCase().includes('cookie') ||
+        name.toLowerCase().includes('search') ||
+        name.toLowerCase().includes('support') ||
         name.length < 3) {
       return;
-    }
-
-    // Get the parent container that has all the info
-    const container = h3.closest('div[class*="Card"]') ||
-                     h3.parentElement?.parentElement ||
-                     h3.parentElement;
-
-    if (!container) return;
-
-    // Extract phone from tel: link
-    let phone = '';
-    const phoneLink = container.querySelector('a[href^="tel:"]');
-    if (phoneLink) {
-      // Extract just digits from the href
-      phone = phoneLink.href.replace('tel:', '').replace(/\\D/g, '');
-      // Remove country code if present
-      if (phone.length === 11 && phone.startsWith('1')) {
-        phone = phone.substring(1);
-      }
     }
 
     // Extract location from text containing "miles away"
@@ -349,60 +351,31 @@ class MitsubishiScraper(BaseDealerScraper):
                     print(f"     Warning: Could not click Commercial tab: {e}")
                     raise Exception("Could not find/click Commercial building tab")
 
-                # Fill ZIP code
+                # Fill ZIP code and submit form
                 print(f"  → Filling ZIP code: {zip_code}")
-                zip_input_selectors = [
-                    'input[placeholder*="Zip" i]',
-                    'textbox[name*="Zip" i]',
-                    'input[type="text"]',
-                ]
+                time.sleep(2)  # Wait for tab transition
+                
+                # Fill the ZIP input and press Enter to submit
+                zip_input = page.locator('input[name="zipCode"]').last
+                zip_input.fill(zip_code)
+                time.sleep(0.5)
+                print(f"  → Submitting search...")
+                zip_input.press('Enter')  # Press Enter to submit the form
+                time.sleep(1)
 
-                zip_filled = False
-                for selector in zip_input_selectors:
-                    try:
-                        zip_input = page.locator(selector)
-                        # Get the one that's actually visible (commercial form, not residential)
-                        visible_inputs = [zip_input.nth(i) for i in range(zip_input.count()) if zip_input.nth(i).is_visible()]
-                        if visible_inputs:
-                            visible_inputs[0].fill(zip_code)
-                            time.sleep(1)
-                            zip_filled = True
-                            break
-                    except Exception:
-                        continue
-
-                if not zip_filled:
-                    raise Exception("Could not find ZIP code input")
-
-                # Click search button
-                print(f"  → Clicking search button...")
-                button_selectors = [
-                    'button:has-text("Search")',
-                    'button[type="submit"]',
-                ]
-
-                button_clicked = False
-                for selector in button_selectors:
-                    try:
-                        btns = page.locator(selector)
-                        # Get visible search button (commercial form)
-                        for i in range(btns.count()):
-                            btn = btns.nth(i)
-                            if btn.is_visible():
-                                btn.click(timeout=5000)
-                                button_clicked = True
-                                break
-                        if button_clicked:
-                            break
-                    except Exception:
-                        continue
-
-                if not button_clicked:
-                    raise Exception("Could not find/click search button")
-
-                # Wait for AJAX results to load
+                # Wait for AJAX results to load - wait for the results heading to appear
                 print(f"  → Waiting for results...")
-                time.sleep(5)
+                try:
+                    # Wait for results heading like "Found 23 Diamond Commercial Contractors servicing 10001"
+                    page.wait_for_selector('h2:has-text("Diamond Commercial Contractors")', timeout=15000)
+                    print(f"     ✓ Results loaded successfully")
+                except Exception as e:
+                    print(f"     Warning: Results heading not found, checking page state...")
+                    # Debug: Check page state
+                    current_url = page.url
+                    phone_count = page.evaluate('() => document.querySelectorAll(\'a[href^="tel:"]\').length')
+                    print(f"     Current URL: {current_url}")
+                    print(f"     Phone links on page: {phone_count}")
 
                 # Extract dealers using JavaScript
                 print(f"  → Extracting dealer data...")

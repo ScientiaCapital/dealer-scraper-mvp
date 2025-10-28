@@ -478,71 +478,71 @@ for state_zips in WEALTHY_ZIPS_NATIONWIDE.values():
 
 MAJOR_METRO_ZIPS = {
     # NORTHEAST
-    "MA": ["02101", "01608", "01103"],  # Boston, Worcester, Springfield
-    "CT": ["06103", "06510", "06901"],  # Hartford, New Haven, Stamford
-    "NY": ["10001", "14201", "14604", "12207"],  # NYC, Buffalo, Rochester, Albany
-    "NJ": ["07102", "07302", "07501"],  # Newark, Jersey City, Paterson
-    "PA": ["19019", "15201", "17101"],  # Philadelphia, Pittsburgh, Harrisburg
-    "RI": ["02901", "02886"],  # Providence, Warwick
+    "MA": ["02101", "01608", "01103", "02138", "02141"],  # Boston, Worcester, Springfield, Cambridge, Somerville
+    "CT": ["06103", "06510", "06901", "06604"],  # Hartford, New Haven, Stamford, Bridgeport
+    "NY": ["10001", "14201", "14604", "12207", "13202", "11201"],  # NYC, Buffalo, Rochester, Albany, Syracuse, Brooklyn
+    "NJ": ["07102", "07302", "07501", "08901", "07001"],  # Newark, Jersey City, Paterson, New Brunswick, Trenton
+    "PA": ["19019", "15201", "17101", "18015", "16501"],  # Philadelphia, Pittsburgh, Harrisburg, Bethlehem, Erie
+    "RI": ["02901", "02886", "02840"],  # Providence, Warwick, Newport
     "NH": ["03101", "03060", "03301"],  # Manchester, Nashua, Concord
     "VT": ["05401", "05602"],  # Burlington, Montpelier
-    "ME": ["04101", "04401"],  # Portland, Bangor
+    "ME": ["04101", "04401", "04330"],  # Portland, Bangor, Augusta
 
     # MID-ATLANTIC
-    "MD": ["21201", "21401"],  # Baltimore, Annapolis
-    "DC": ["20001"],  # Washington DC
-    "DE": ["19801", "19901"],  # Wilmington, Dover
-    "VA": ["23451", "23510", "23219"],  # Virginia Beach, Norfolk, Richmond
-    "WV": ["25301", "25701"],  # Charleston, Huntington
+    "MD": ["21201", "21401", "20850", "21740"],  # Baltimore, Annapolis, Rockville, Hagerstown
+    "DC": ["20001", "20020"],  # Washington DC (multiple zones)
+    "DE": ["19801", "19901", "19702"],  # Wilmington, Dover, Newark
+    "VA": ["23451", "23510", "23219", "22201", "24011"],  # Virginia Beach, Norfolk, Richmond, Arlington, Roanoke
+    "WV": ["25301", "25701", "26501"],  # Charleston, Huntington, Morgantown
 
     # SOUTHEAST
-    "FL": ["33101", "33601", "32801", "32202"],  # Miami, Tampa, Orlando, Jacksonville
-    "GA": ["30301", "31401", "30901"],  # Atlanta, Savannah, Augusta
-    "NC": ["28202", "27601", "27401"],  # Charlotte, Raleigh, Greensboro
-    "SC": ["29401", "29201", "29601"],  # Charleston, Columbia, Greenville
-    "TN": ["37201", "38101", "37901"],  # Nashville, Memphis, Knoxville
-    "KY": ["40202", "40502"],  # Louisville, Lexington
-    "AL": ["35201", "36601", "36101"],  # Birmingham, Mobile, Montgomery
-    "MS": ["39201", "39501"],  # Jackson, Gulfport
-    "LA": ["70112", "70801", "71101"],  # New Orleans, Baton Rouge, Shreveport
-    "AR": ["72201", "72701"],  # Little Rock, Fayetteville
+    "FL": ["33101", "33601", "32801", "32202", "33301", "33401"],  # Miami, Tampa, Orlando, Jacksonville, Fort Lauderdale, West Palm Beach
+    "GA": ["30301", "31401", "30901", "30060", "31501"],  # Atlanta, Savannah, Augusta, Marietta, Waycross
+    "NC": ["28202", "27601", "27401", "28801", "27834"],  # Charlotte, Raleigh, Greensboro, Asheville, Greenville
+    "SC": ["29401", "29201", "29601", "29501"],  # Charleston, Columbia, Greenville, Florence
+    "TN": ["37201", "38101", "37901", "37601"],  # Nashville, Memphis, Knoxville, Johnson City
+    "KY": ["40202", "40502", "42001"],  # Louisville, Lexington, Paducah
+    "AL": ["35201", "36601", "36101", "35801"],  # Birmingham, Mobile, Montgomery, Huntsville
+    "MS": ["39201", "39501", "39701"],  # Jackson, Gulfport, Meridian
+    "LA": ["70112", "70801", "71101", "70501"],  # New Orleans, Baton Rouge, Shreveport, Lafayette
+    "AR": ["72201", "72701", "72601"],  # Little Rock, Fayetteville, Harrison
 
     # MIDWEST
-    "IL": ["60601", "62701", "61601"],  # Chicago, Springfield, Peoria
-    "OH": ["43201", "44101", "45201", "43601"],  # Columbus, Cleveland, Cincinnati, Toledo
-    "MI": ["48201", "49501", "48103"],  # Detroit, Grand Rapids, Ann Arbor
-    "IN": ["46201", "46801", "47701"],  # Indianapolis, Fort Wayne, Evansville
-    "WI": ["53201", "53701", "54301"],  # Milwaukee, Madison, Green Bay
-    "MN": ["55401", "55101", "55801"],  # Minneapolis, St. Paul, Duluth
-    "MO": ["63101", "64101", "65801"],  # St. Louis, Kansas City, Springfield
-    "IA": ["50301", "52401"],  # Des Moines, Cedar Rapids
+    "IL": ["60601", "62701", "61601", "61801", "60540"],  # Chicago, Springfield, Peoria, Champaign, Naperville
+    "OH": ["43201", "44101", "45201", "43601", "44312"],  # Columbus, Cleveland, Cincinnati, Toledo, Akron
+    "MI": ["48201", "49501", "48103", "48601", "49001"],  # Detroit, Grand Rapids, Ann Arbor, Saginaw, Kalamazoo
+    "IN": ["46201", "46801", "47701", "47901"],  # Indianapolis, Fort Wayne, Evansville, Lafayette
+    "WI": ["53201", "53701", "54301", "53081"],  # Milwaukee, Madison, Green Bay, Sheboygan
+    "MN": ["55401", "55101", "55801", "55901"],  # Minneapolis, St. Paul, Duluth, Rochester
+    "MO": ["63101", "64101", "65801", "63301"],  # St. Louis, Kansas City, Springfield, St. Charles
+    "IA": ["50301", "52401", "52801"],  # Des Moines, Cedar Rapids, Davenport
 
     # GREAT PLAINS
-    "KS": ["67201", "66101", "66601"],  # Wichita, Kansas City, Topeka
-    "NE": ["68101", "68501"],  # Omaha, Lincoln
-    "SD": ["57101", "57701"],  # Sioux Falls, Rapid City
-    "ND": ["58102", "58501"],  # Fargo, Bismarck
-    "OK": ["73101", "74101"],  # Oklahoma City, Tulsa
+    "KS": ["67201", "66101", "66601", "66502"],  # Wichita, Kansas City, Topeka, Manhattan
+    "NE": ["68101", "68501", "69361"],  # Omaha, Lincoln, Scottsbluff
+    "SD": ["57101", "57701", "57401"],  # Sioux Falls, Rapid City, Aberdeen
+    "ND": ["58102", "58501", "58801"],  # Fargo, Bismarck, Minot
+    "OK": ["73101", "74101", "73069"],  # Oklahoma City, Tulsa, Norman
 
     # SOUTH
-    "TX": ["77001", "75201", "78701", "78201", "76101"],  # Houston, Dallas, Austin, San Antonio, Fort Worth
+    "TX": ["77001", "75201", "78701", "78201", "76101", "79901", "79901", "76541"],  # Houston, Dallas, Austin, San Antonio, Fort Worth, El Paso, Corpus Christi, Killeen
 
     # MOUNTAIN WEST
-    "CO": ["80201", "80901", "80010"],  # Denver, Colorado Springs, Aurora
-    "WY": ["82001", "82601"],  # Cheyenne, Casper
-    "MT": ["59101", "59801"],  # Billings, Missoula
-    "ID": ["83701", "83401"],  # Boise, Idaho Falls
-    "UT": ["84101", "84601"],  # Salt Lake City, Provo
-    "NV": ["89101", "89501", "89002"],  # Las Vegas, Reno, Henderson
-    "AZ": ["85001", "85701", "85250"],  # Phoenix, Tucson, Scottsdale
-    "NM": ["87101", "87501"],  # Albuquerque, Santa Fe
+    "CO": ["80201", "80901", "80010", "80526", "81501"],  # Denver, Colorado Springs, Aurora, Fort Collins, Grand Junction
+    "WY": ["82001", "82601", "82801"],  # Cheyenne, Casper, Sheridan
+    "MT": ["59101", "59801", "59601"],  # Billings, Missoula, Helena
+    "ID": ["83701", "83401", "83201"],  # Boise, Idaho Falls, Pocatello
+    "UT": ["84101", "84601", "84401"],  # Salt Lake City, Provo, Ogden
+    "NV": ["89101", "89501", "89002", "89701"],  # Las Vegas, Reno, Henderson, Carson City
+    "AZ": ["85001", "85701", "85250", "85201"],  # Phoenix, Tucson, Scottsdale, Mesa
+    "NM": ["87101", "87501", "88001"],  # Albuquerque, Santa Fe, Las Cruces
 
     # PACIFIC
-    "CA": ["90001", "94102", "92101", "95814", "95101"],  # LA, SF, San Diego, Sacramento, San Jose
-    "WA": ["98101", "99201", "98401"],  # Seattle, Spokane, Tacoma
-    "OR": ["97201", "97401", "97301"],  # Portland, Eugene, Salem
-    "AK": ["99501", "99701"],  # Anchorage, Fairbanks
-    "HI": ["96801", "96720"],  # Honolulu, Hilo
+    "CA": ["90001", "94102", "92101", "95814", "95101", "92612", "93101", "94550"],  # LA, SF, San Diego, Sacramento, San Jose, Irvine, Santa Barbara, Livermore
+    "WA": ["98101", "99201", "98401", "99301", "98661"],  # Seattle, Spokane, Tacoma, Pasco, Vancouver
+    "OR": ["97201", "97401", "97301", "97701"],  # Portland, Eugene, Salem, Bend
+    "AK": ["99501", "99701", "99901"],  # Anchorage, Fairbanks, Ketchikan
+    "HI": ["96801", "96720", "96753"],  # Honolulu, Hilo, Kihei
 }
 
 # Flatten major metro ZIPs into single list
