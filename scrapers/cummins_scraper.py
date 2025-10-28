@@ -72,109 +72,124 @@ class CumminsScraper(BaseDealerScraper):
     def get_extraction_script(self) -> str:
         """
         JavaScript extraction script for Cummins dealer data.
-
-        ⚠️ PLACEHOLDER - Needs manual DOM inspection ⚠️
-
-        To complete this script:
-        1. Run this scraper in PLAYWRIGHT mode
-        2. Navigate to dealer locator and search a ZIP code
-        3. Inspect the dealer cards in browser DevTools
-        4. Identify selectors for: name, address, phone, website, tier, distance
-        5. Update this script with correct DOM traversal logic
-
-        Expected return format:
-        [
-          {
-            name: "DEALER NAME",
-            phone: "(555) 555-5555",
-            website: "https://example.com",
-            domain: "example.com",
-            street: "123 Main St",
-            city: "City",
-            state: "ST",
-            zip: "12345",
-            address_full: "123 Main St, City, ST 12345",
-            rating: 4.5,
-            review_count: 42,
-            tier: "Authorized Dealer",
-            certifications: ["Certified Installer"],
-            distance: "5.2 mi",
-            distance_miles: 5.2
-          }
-        ]
+        
+        Tested on: https://www.cummins.com/na/generators/home-standby/find-a-dealer
+        Structure: Dealers in `.dealer-listing-col.com_locator_entry` elements
         """
         return """
 () => {
-  // TODO: Inspect Cummins dealer locator DOM structure
-  // This is a PLACEHOLDER extraction script
-
-  console.warn("Cummins extraction script needs manual DOM inspection");
-
-  // Example pattern (update based on actual site structure):
-  const dealerCards = Array.from(document.querySelectorAll('.dealer-card, [class*="dealer"]'));
-
+  // Find all dealer cards
+  const dealerCards = Array.from(document.querySelectorAll('.dealer-listing-col.com_locator_entry'));
+  
+  console.log(`Found ${dealerCards.length} Cummins dealer cards`);
+  
   const dealers = dealerCards.map(card => {
-    // Extract dealer name
-    const nameEl = card.querySelector('h3, h4, .dealer-name, [class*="name"]');
-    const name = nameEl ? nameEl.textContent.trim() : '';
-
-    // Extract phone
-    const phoneLink = card.querySelector('a[href^="tel:"]');
-    const phone = phoneLink ? phoneLink.textContent.trim() : '';
-
-    // Extract address
-    const addressEl = card.querySelector('.address, [class*="address"]');
-    const addressText = addressEl ? addressEl.textContent.trim() : '';
-
-    // Parse address components (adjust regex based on format)
-    const streetMatch = addressText.match(/(\\d+\\s+[^,\\n]+)/);
-    const street = streetMatch ? streetMatch[1].trim() : '';
-
-    const cityStateZip = addressText.match(/([^,]+),\\s*([A-Z]{2})\\s+(\\d{5})/);
-    const city = cityStateZip ? cityStateZip[1].trim() : '';
-    const state = cityStateZip ? cityStateZip[2] : '';
-    const zip = cityStateZip ? cityStateZip[3] : '';
-
-    // Extract website
-    const websiteLink = card.querySelector('a[href^="http"]:not([href*="tel:"]):not([href*="google"])');
-    const website = websiteLink ? websiteLink.href : '';
-
-    let domain = '';
-    if (website) {
-      try {
-        const url = new URL(website);
-        domain = url.hostname.replace('www.', '');
-      } catch (e) {}
+    try {
+      // Extract dealer name
+      const nameLink = card.querySelector('.title .info h3 a.marker-link');
+      const name = nameLink ? nameLink.textContent.trim() : '';
+      
+      // Extract tier (e.g., "Dealer")
+      const tierSpan = card.querySelector('.title .info .location');
+      const tier = tierSpan ? tierSpan.textContent.trim() : 'Authorized Dealer';
+      
+      // Extract phone
+      const phoneLink = card.querySelector('.phone a[href^="tel:"]');
+      const phone = phoneLink ? phoneLink.textContent.trim() : '';
+      
+      // Extract website
+      const websiteLink = card.querySelector('.website a');
+      const website = websiteLink ? websiteLink.href : '';
+      
+      // Extract domain from website
+      let domain = '';
+      if (website) {
+        try {
+          const url = new URL(website);
+          domain = url.hostname.replace('www.', '');
+        } catch (e) {}
+      }
+      
+      // Extract address (contains <br> tags)
+      const addressDiv = card.querySelector('.address .address-info');
+      let street = '';
+      let city = '';
+      let state = '';
+      let zip = '';
+      let address_full = '';
+      
+      if (addressDiv) {
+        // Get innerHTML to preserve <br> structure
+        const addressHTML = addressDiv.innerHTML;
+        
+        // Split by <br> tag
+        const addressParts = addressHTML.split(/<br\\s*\/?>/i).map(p => p.trim()).filter(p => p);
+        
+        if (addressParts.length >= 2) {
+          // First part: street address
+          street = addressParts[0].trim();
+          
+          // Second part: "City, STATE ZIP"
+          const cityStateZip = addressParts[1].trim();
+          const match = cityStateZip.match(/^([^,]+),\\s*([A-Z]{2,})\\s+(\\d{5})/);
+          
+          if (match) {
+            city = match[1].trim();
+            state = match[2].trim();
+            zip = match[3].trim();
+          } else {
+            // Fallback: just use the text as-is
+            city = cityStateZip;
+          }
+        }
+        
+        address_full = addressDiv.textContent.trim().replace(/\\s+/g, ' ');
+      }
+      
+      // Extract distance
+      const distanceP = card.querySelector('p');
+      let distance = '';
+      let distance_miles = 0;
+      
+      if (distanceP) {
+        const distanceText = distanceP.textContent.trim();
+        // Format: "Approximately 26.26 Mi from 94102"
+        const milesMatch = distanceText.match(/([\\d.]+)\\s*Mi/i);
+        if (milesMatch) {
+          distance_miles = parseFloat(milesMatch[1]);
+          distance = `${distance_miles} mi`;
+        }
+      }
+      
+      return {
+        name: name,
+        phone: phone,
+        website: website,
+        domain: domain,
+        street: street,
+        city: city,
+        state: state,
+        zip: zip,
+        address_full: address_full,
+        rating: 0,  // Cummins doesn't show ratings
+        review_count: 0,
+        tier: tier,
+        certifications: [tier],
+        distance: distance,
+        distance_miles: distance_miles
+      };
+    } catch (e) {
+      console.error('Error extracting dealer card:', e);
+      return null;
     }
-
-    // Extract distance
-    const distanceEl = card.querySelector('.distance, [class*="distance"]');
-    const distance = distanceEl ? distanceEl.textContent.trim() : '';
-    const distanceMiles = parseFloat(distance) || 0;
-
-    // Extract tier (may not be shown on Cummins site)
-    const tier = 'Authorized Dealer';
-
-    return {
-      name: name,
-      phone: phone,
-      website: website,
-      domain: domain,
-      street: street,
-      city: city,
-      state: state,
-      zip: zip,
-      address_full: street && city ? `${street}, ${city}, ${state} ${zip}` : '',
-      rating: 0,  // Cummins may not show ratings
-      review_count: 0,
-      tier: tier,
-      certifications: [tier],
-      distance: distance,
-      distance_miles: distanceMiles
-    };
   });
-
-  return dealers.filter(d => d && d.name && d.phone);
+  
+  // Filter out null/invalid dealers
+  const validDealers = dealers.filter(d => d && d.name && d.phone);
+  
+  console.log(`Extracted ${validDealers.length} valid Cummins dealers`);
+  
+  return validDealers;
 }
 """
 
@@ -260,70 +275,162 @@ class CumminsScraper(BaseDealerScraper):
 
     def _scrape_with_playwright(self, zip_code: str) -> List[StandardizedDealer]:
         """
-        PLAYWRIGHT mode: Print manual MCP Playwright instructions.
-
-        ⚠️ IMPORTANT: Extraction script is incomplete. You must:
-        1. Follow these steps to navigate the site
-        2. Inspect the dealer card DOM structure
-        3. Update get_extraction_script() with correct selectors
-        4. Test the extraction script before using RUNPOD mode
+        PLAYWRIGHT mode: Automated scraping using local Playwright.
+        
+        Handles Cummins' complex cascading form in iframe:
+        1. Navigate to dealer locator
+        2. Fill cascading form (PRODUCT → MARKET APPLICATION → SERVICE LEVEL → COUNTRY → LOCATION → DISTANCE)
+        3. Submit search
+        4. Extract dealers using JavaScript
+        5. Parse and return StandardizedDealer objects
         """
-        print(f"\n{'='*60}")
-        print(f"Cummins Dealer Scraper - PLAYWRIGHT Mode")
-        print(f"ZIP Code: {zip_code}")
-        print(f"{'='*60}\n")
+        from playwright.sync_api import sync_playwright
+        import time
 
-        print("⚠️  EXTRACTION SCRIPT INCOMPLETE - MANUAL DOM INSPECTION REQUIRED\n")
-        print("⚠️  MANUAL WORKFLOW - Execute these steps:\n")
+        dealers = []
 
-        print("1. Navigate to Cummins dealer locator:")
-        print(f'   mcp__playwright__browser_navigate({{"url": "{self.DEALER_LOCATOR_URL}"}})\n')
+        with sync_playwright() as p:
+            try:
+                # Launch browser
+                browser = p.chromium.launch(headless=True)
+                context = browser.new_context(
+                    viewport={'width': 1920, 'height': 1080},
+                    user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+                )
+                page = context.new_page()
 
-        print("2. Take snapshot to inspect page structure:")
-        print('   mcp__playwright__browser_snapshot({})\n')
+                # Navigate to dealer locator
+                print(f"  → Navigating to Cummins dealer locator...")
+                page.goto(self.DEALER_LOCATOR_URL, timeout=60000, wait_until='domcontentloaded')
+                time.sleep(3)
 
-        print("3. If cookie dialog appears, click Accept:")
-        print('   mcp__playwright__browser_click({"element": "Accept/I Agree button", "ref": "[from snapshot]"})\n')
+                # Handle cookie consent dialog if it appears
+                print(f"  → Checking for cookie consent dialog...")
+                try:
+                    # Try to find and dismiss cookie consent
+                    # OneTrust common selectors
+                    cookie_selectors = [
+                        '#onetrust-accept-btn-handler',
+                        'button:has-text("Accept All")',
+                        'button:has-text("Accept")',
+                        '.onetrust-close-btn-handler',
+                        '#onetrust-reject-all-handler',
+                    ]
+                    
+                    for selector in cookie_selectors:
+                        try:
+                            cookie_btn = page.locator(selector)
+                            if cookie_btn.count() > 0 and cookie_btn.first.is_visible():
+                                print(f"     Found cookie dialog, dismissing...")
+                                cookie_btn.first.click(timeout=2000)
+                                time.sleep(2)
+                                break
+                        except Exception:
+                            continue
+                except Exception:
+                    pass  # No cookie dialog found, continue
 
-        print("4. Fill ZIP code input (find selector in snapshot):")
-        print(f'   mcp__playwright__browser_type({{')
-        print(f'       "element": "ZIP code input",')
-        print(f'       "ref": "[from snapshot]",')
-        print(f'       "text": "{zip_code}",')
-        print(f'       "submit": False')
-        print(f'   }})\n')
+                # Find iframe
+                print(f"  → Finding form iframe...")
+                iframe = page.frame_locator('iframe[title="Find dealer locations form"]')
 
-        print("5. Click search button:")
-        print('   mcp__playwright__browser_click({"element": "Search button", "ref": "[from snapshot]"})\n')
+                # Fill cascading form
+                print(f"  → Filling form for ZIP {zip_code}...")
 
-        print("6. Wait for results to load:")
-        print('   mcp__playwright__browser_wait_for({"time": 3})\n')
+                # PRODUCT: Power Generation
+                iframe.locator('select').first.select_option(label='Power Generation')
+                time.sleep(1)
 
-        print("7. Take another snapshot to see dealer cards:")
-        print('   mcp__playwright__browser_snapshot({})\n')
+                # MARKET APPLICATION: Home And Small Business
+                iframe.locator('select').nth(1).select_option(label='Home And Small Business')
+                time.sleep(1)
 
-        print("8. Inspect dealer card structure and update get_extraction_script()")
-        print("   Look for:")
-        print("   - Dealer name element (h3, h4, .dealer-name)")
-        print("   - Phone link (a[href^='tel:'])")
-        print("   - Address element (.address, [class*='address'])")
-        print("   - Distance element (.distance, [class*='distance'])")
-        print("   - Website link (a[href^='http'])")
-        print("   - Tier/certification badges (if any)\n")
+                # SERVICE LEVEL: Installation (first non-empty option)
+                service_select = iframe.locator('select').nth(2)
+                options = service_select.locator('option').all()
+                if len(options) > 1:
+                    first_value = options[1].get_attribute('value')
+                    service_select.select_option(value=first_value)
+                    time.sleep(2)
 
-        print("9. After updating extraction script, test it:")
-        extraction_script = self.get_extraction_script()
-        print(f'   mcp__playwright__browser_evaluate({{"function": """{extraction_script}"""}})\n')
+                # COUNTRY: United States
+                country_select = iframe.locator('select').nth(3)
+                country_select.select_option(label='United States')
+                time.sleep(2)
 
-        print("10. Parse results:")
-        print(f'   cummins_scraper.parse_results(results_json, "{zip_code}")\n')
+                # LOCATION: ZIP code
+                postal_input = iframe.locator('input[name="postal_code"]')
+                postal_input.wait_for(state='visible', timeout=5000)
+                postal_input.fill(zip_code)
+                time.sleep(1)
 
-        print(f"{'='*60}\n")
-        print("❌ Extraction script is INCOMPLETE")
-        print("⚠️  Must inspect DOM and update get_extraction_script() before production use")
-        print(f"{'='*60}\n")
+                # DISTANCE: 100 Miles
+                iframe.locator('input[value="100"]').check()
+                time.sleep(1)
 
-        return []
+                # Click SEARCH button
+                print(f"  → Submitting search...")
+                button_selectors = [
+                    'input[type="submit"]',
+                    'button[type="submit"]',
+                    'input[value*="SEARCH" i]',
+                    'button:has-text("SEARCH")',
+                    '.form-submit',
+                ]
+
+                button_clicked = False
+                for selector in button_selectors:
+                    try:
+                        btn = iframe.locator(selector)
+                        if btn.count() > 0:
+                            btn.first.click(timeout=5000)
+                            button_clicked = True
+                            break
+                    except Exception:
+                        continue
+
+                if not button_clicked:
+                    raise Exception("Could not find/click SEARCH button")
+
+                # Wait for results to load
+                print(f"  → Waiting for results...")
+                time.sleep(10)
+
+                # Extract dealers using JavaScript
+                print(f"  → Extracting dealer data...")
+                extraction_script = self.get_extraction_script()
+
+                # Get the iframe frame (it's usually the second frame on the page)
+                iframe_frame = None
+                for frame in page.frames:
+                    # Check if this is the dealer locator iframe
+                    frame_url = frame.url
+                    if 'locator-interface' in frame_url or frame != page.main_frame:
+                        iframe_frame = frame
+                        break
+
+                if not iframe_frame:
+                    raise Exception("Could not find dealer locator iframe")
+
+                # Execute extraction script in iframe context
+                dealers_data = iframe_frame.evaluate(extraction_script)
+
+                print(f"  → Found {len(dealers_data)} dealers")
+
+                # Parse into StandardizedDealer objects
+                dealers = self.parse_results(dealers_data, zip_code)
+
+                browser.close()
+
+                return dealers
+
+            except Exception as e:
+                print(f"  ✗ Error scraping with Playwright: {e}")
+                import traceback
+                traceback.print_exc()
+                if 'browser' in locals():
+                    browser.close()
+                return []
 
     def _scrape_with_runpod(self, zip_code: str) -> List[StandardizedDealer]:
         """

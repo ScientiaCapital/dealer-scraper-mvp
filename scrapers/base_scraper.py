@@ -261,7 +261,7 @@ class StandardizedDealer:
             "certifications": self.certifications,
             "distance": self.distance,
             "distance_miles": self.distance_miles,
-            "capabilities": self.capabilities.to_dict(),
+            "capabilities": self.capabilities.to_dict() if hasattr(self.capabilities, 'to_dict') else self.capabilities,
             "oem_source": self.oem_source,
             "scraped_from_zip": self.scraped_from_zip,
             "apollo_enriched": self.apollo_enriched,
