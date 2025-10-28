@@ -71,69 +71,88 @@ class BriggsStrattonScraper(BaseDealerScraper):
         """
         JavaScript extraction script for Briggs & Stratton dealer data.
 
-        Briggs uses a different DOM structure than Generac:
-        - Dealer cards are in generic containers (not using phone links as anchors)
-        - Tier badges show as images with alt text ("PLATINUM PRO DEALER", "ELITE IQ INSTALLER")
-        - Product type shown as separate badges (Standby Generators, Battery Storage)
-        - Distance shown in h5 heading (e.g., "10.46 Miles")
+        Briggs uses a two-column dealer card layout:
+        - Left column: Name, address, phone
+        - Right column: Distance, tier badges, product type badges
+        - Uses phone links as anchor points to find dealer cards
+        - Address is split across two text nodes with <br> tags
+        - Tier badges shown in paragraphs (e.g., "ELITE IQ INSTALLER")
+        - Product types shown as img alt text ("Battery Storage", "Standby Generators")
         """
         return """
 () => {
-  // Find all dealer cards by looking for headings with dealer names
-  const dealerHeadings = Array.from(document.querySelectorAll('h5')).filter(h5 => {
-    const text = h5.textContent.trim();
-    // Filter for dealer names (all caps or title case, not "Miles" or other system text)
-    return text.length > 3 &&
-           !text.includes('Miles') &&
-           !text.includes('Filters') &&
-           !text.includes('Distance');
-  });
+  const dealers = [];
+  const phoneLinks = document.querySelectorAll('a[href^="tel:"]');
 
-  const dealers = dealerHeadings.map(heading => {
-    // Find the dealer card container (go up to parent generic elements)
-    let container = heading;
-    for (let i = 0; i < 10; i++) {
+  phoneLinks.forEach(phoneLink => {
+    // Find the dealer card container (has both left and right columns)
+    let container = phoneLink.closest('div');
+    while (container && !container.querySelector('h5')) {
       container = container.parentElement;
-      if (!container) break;
-
-      // Look for container that has both dealer info and distance
-      const hasDistance = container.textContent.includes('Miles');
-      const hasPhone = container.querySelector('a[href^="tel:"]');
-      if (hasDistance && hasPhone) break;
     }
 
-    if (!container) return null;
+    if (!container) return;
 
-    const fullText = container.textContent;
-    const dealerName = heading.textContent.trim();
+    // Go up one more level to get the full dealer card with both columns
+    const dealerCard = container.parentElement;
 
-    // Extract phone from tel: link
-    const phoneLink = container.querySelector('a[href^="tel:"]');
-    const phoneText = phoneLink ? phoneLink.textContent.trim() : '';
+    const nameEl = container.querySelector('h5');
+    const phone = phoneLink.href.replace('tel:', '').replace(/\\D/g, '');
 
-    // Extract address from paragraph after heading
-    const addressPara = heading.nextElementSibling;
-    let street = '';
-    let city = '';
-    let state = '';
-    let zip = '';
+    // Get address from paragraph in left column - it has two text nodes split by <br>
+    const addressPara = Array.from(container.querySelectorAll('p'))
+      .find(p => {
+        const text = p.textContent.trim();
+        return text && /\\d+.*[A-Z]{2}\\s+\\d{5}/.test(text);
+      });
 
-    if (addressPara && addressPara.tagName === 'P') {
-      const addressLines = addressPara.textContent.trim().split('\\n').map(l => l.trim()).filter(l => l);
-      if (addressLines.length >= 2) {
-        street = addressLines[0];
-        // Second line is "CITY, ST ZIP"
-        const cityStateZip = addressLines[1].match(/([^,]+),\\s*([A-Z]{2})\\s+(\\d{5})/);
-        if (cityStateZip) {
-          city = cityStateZip[1].trim();
-          state = cityStateZip[2];
-          zip = cityStateZip[3];
+    let street = '', city = '', state = '', zip = '', addressFull = '';
+
+    if (addressPara) {
+      const lines = addressPara.innerHTML.split(/<br\\s*\\/?>/i)
+        .map(line => line.replace(/<[^>]*>/g, '').trim())
+        .filter(line => line);
+
+      if (lines.length >= 2) {
+        street = lines[0];
+        // Parse second line: "OAKLAND, CA 94608"
+        const cityStateZipMatch = lines[1].match(/^([^,]+),\\s*([A-Z]{2})\\s+(\\d{5})/);
+        if (cityStateZipMatch) {
+          city = cityStateZipMatch[1].trim();
+          state = cityStateZipMatch[2].trim();
+          zip = cityStateZipMatch[3].trim();
         }
       }
+
+      addressFull = addressPara.textContent.trim().replace(/\\s+/g, ' ');
     }
 
+    // Extract distance from h5 in right column (within dealerCard, not just container)
+    const distanceHeading = Array.from(dealerCard.querySelectorAll('h5'))
+      .find(h => h.textContent.includes('Miles'));
+    const distanceMiles = distanceHeading ?
+      parseFloat(distanceHeading.textContent.replace(/[^\\d.]/g, '')) : 0;
+    const distance = distanceMiles ? `${distanceMiles} mi` : '';
+
+    // Extract tier badge from all paragraphs in dealerCard
+    const tierPara = Array.from(dealerCard.querySelectorAll('p'))
+      .find(p => {
+        const text = p.textContent.trim();
+        return (text.includes('ELITE') || text.includes('IQ')) && text.includes('INSTALLER');
+      });
+    let tier = tierPara ? tierPara.textContent.trim() : 'Standard';
+
+    // Extract products from img alt text in dealerCard
+    const productImgs = Array.from(dealerCard.querySelectorAll('img'))
+      .filter(img => img.alt && (img.alt.includes('Battery') || img.alt.includes('Generator')));
+    const products = productImgs.map(img => img.alt);
+
+    // Determine product type flags
+    const hasStandbyGenerators = products.some(p => p.includes('Standby') || p.includes('Generator'));
+    const hasBatteryStorage = products.some(p => p.includes('Battery') || p.includes('Storage'));
+
     // Extract website from non-phone links
-    const websiteLink = container.querySelector('a[href^="http"]:not([href*="tel:"]):not([href*="google"]):not([href*="facebook"])');
+    const websiteLink = dealerCard.querySelector('a[href^="http"]:not([href*="tel:"]):not([href*="google"]):not([href*="facebook"])');
     const website = websiteLink?.href || '';
 
     let domain = '';
@@ -146,69 +165,28 @@ class BriggsStrattonScraper(BaseDealerScraper):
       }
     }
 
-    // Extract distance from h5 heading with "Miles"
-    const distanceHeadings = Array.from(container.querySelectorAll('h5'));
-    const distanceH5 = distanceHeadings.find(h => h.textContent.includes('Miles'));
-    const distance = distanceH5 ? distanceH5.textContent.trim() : '';
-    const distanceMiles = parseFloat(distance) || 0;
-
-    // Extract tier from badge images
-    let tier = 'Standard';
-    const tierImages = Array.from(container.querySelectorAll('img'));
-    for (const img of tierImages) {
-      const alt = img.alt || '';
-      const src = img.src || '';
-
-      if (alt.includes('PLATINUM PRO') || src.includes('Platinum_Pro')) {
-        tier = 'Platinum Pro Dealer';
-        break;
-      } else if (alt.includes('PLATINUM') || src.includes('Platinum_Dealer')) {
-        tier = 'Platinum Dealer';
-        break;
-      } else if (alt.includes('ELITE IQ') || src.includes('Elite_IQ')) {
-        tier = 'Elite IQ Installer';
-        break;
-      }
-    }
-
-    // Extract product types from badge images
-    const hasStandbyGenerators = fullText.includes('Standby Generators');
-    const hasBatteryStorage = fullText.includes('Battery Storage');
-
     // Briggs doesn't show ratings/reviews in dealer locator
     const rating = 0;
     const reviewCount = 0;
 
-    // Build certifications array
-    const certifications = [];
-    if (tier !== 'Standard') {
-      certifications.push(tier);
-    }
-    if (hasStandbyGenerators) {
-      certifications.push('Standby Generators Certified');
-    }
-    if (hasBatteryStorage) {
-      certifications.push('Battery Storage Certified');
-    }
-
-    return {
-      name: dealerName,
-      rating: rating,
-      review_count: reviewCount,
-      tier: tier,
-      has_standby_generators: hasStandbyGenerators,
-      has_battery_storage: hasBatteryStorage,
+    dealers.push({
+      name: nameEl ? nameEl.textContent.trim() : '',
+      phone: phone,
       street: street,
       city: city,
       state: state,
       zip: zip,
-      address_full: street && city ? `${street}, ${city}, ${state} ${zip}` : '',
-      phone: phoneText,
-      website: website,
-      domain: domain,
+      address_full: addressFull,
       distance: distance,
-      distance_miles: distanceMiles
-    };
+      distance_miles: distanceMiles,
+      tier: tier,
+      has_standby_generators: hasStandbyGenerators,
+      has_battery_storage: hasBatteryStorage,
+      rating: rating,
+      review_count: reviewCount,
+      website: website,
+      domain: domain
+    });
   });
 
   return dealers.filter(d => d && d.name && d.phone);
@@ -251,15 +229,16 @@ class BriggsStrattonScraper(BaseDealerScraper):
         tier = raw_dealer_data.get("tier", "Standard")
 
         # Platinum Pro and Elite IQ indicate higher capability
-        if tier in ["Platinum Pro Dealer", "Elite IQ Installer"]:
+        tier_upper = tier.upper()
+        if "PLATINUM PRO" in tier_upper or "ELITE IQ" in tier_upper:
             caps.is_residential = True
             # Elite IQ specifically for battery storage
-            if tier == "Elite IQ Installer":
+            if "ELITE IQ" in tier_upper:
                 caps.has_battery = True
                 caps.battery_oems.add("Briggs & Stratton")
 
         # Platinum dealers indicate solid residential service
-        if "Platinum" in tier:
+        if "PLATINUM" in tier_upper:
             caps.is_residential = True
 
         # Add Briggs & Stratton OEM certification
@@ -326,53 +305,136 @@ class BriggsStrattonScraper(BaseDealerScraper):
 
     def _scrape_with_playwright(self, zip_code: str) -> List[StandardizedDealer]:
         """
-        PLAYWRIGHT mode: Print manual MCP Playwright instructions.
-
-        Returns empty list and prints workflow instructions for manual execution.
+        PLAYWRIGHT mode: Automated scraping using local Playwright.
+        
+        Briggs & Stratton has a simple form (no iframe, no cascading dropdowns).
         """
-        print(f"\n{'='*60}")
-        print(f"Briggs & Stratton Dealer Scraper - PLAYWRIGHT Mode")
-        print(f"ZIP Code: {zip_code}")
-        print(f"{'='*60}\n")
+        from playwright.sync_api import sync_playwright
+        import time
 
-        print("⚠️  MANUAL WORKFLOW - Execute these MCP Playwright tools in order:\n")
+        dealers = []
 
-        print("1. Navigate to Briggs & Stratton dealer locator:")
-        print(f'   mcp__playwright__browser_navigate({{"url": "{self.DEALER_LOCATOR_URL}"}})\n')
+        with sync_playwright() as p:
+            try:
+                # Launch browser
+                browser = p.chromium.launch(headless=True)
+                context = browser.new_context(
+                    viewport={'width': 1920, 'height': 1080},
+                    user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+                )
+                page = context.new_page()
 
-        print("2. Take snapshot to get current element refs:")
-        print('   mcp__playwright__browser_snapshot({})\n')
+                # Navigate to dealer locator
+                print(f"  → Navigating to Briggs & Stratton dealer locator...")
+                page.goto(self.DEALER_LOCATOR_URL, timeout=60000, wait_until='domcontentloaded')
+                time.sleep(3)
 
-        print("3. Click Accept All cookies button:")
-        print('   mcp__playwright__browser_click({"element": "Accept All", "ref": "[from snapshot]"})\n')
+                # Handle cookie consent dialog if it appears
+                print(f"  → Checking for cookie consent dialog...")
+                try:
+                    cookie_selectors = [
+                        'button:has-text("Accept All")',
+                        'button:has-text("Accept")',
+                        '#onetrust-accept-btn-handler',
+                        '.onetrust-close-btn-handler',
+                    ]
 
-        print("4. Fill ZIP code input:")
-        print(f'   mcp__playwright__browser_type({{')
-        print(f'       "element": "ZIP code search input",')
-        print(f'       "ref": "[from snapshot]",')
-        print(f'       "text": "{zip_code}",')
-        print(f'       "submit": False')
-        print(f'   }})\n')
+                    for selector in cookie_selectors:
+                        try:
+                            cookie_btn = page.locator(selector)
+                            if cookie_btn.count() > 0 and cookie_btn.first.is_visible():
+                                print(f"     Found cookie dialog, dismissing...")
+                                cookie_btn.first.click(timeout=2000)
+                                time.sleep(2)
+                                break
+                        except Exception:
+                            continue
+                except Exception:
+                    pass  # No cookie dialog found, continue
 
-        print("5. Click search button:")
-        print('   mcp__playwright__browser_click({"element": "Search button", "ref": "[from snapshot]"})\n')
+                # Select "United States" in country dropdown (defaults to Mexico)
+                print(f"  → Setting country to United States...")
+                try:
+                    country_select = page.locator('#dealer-country')
+                    if country_select.count() > 0 and country_select.first.is_visible():
+                        country_select.first.select_option('United States')
+                        time.sleep(1)
+                except Exception as e:
+                    print(f"     Warning: Could not find country dropdown: {e}")
 
-        print("6. Wait for AJAX results to load (3 seconds):")
-        print('   mcp__playwright__browser_wait_for({"time": 3})\n')
+                # Fill ZIP code
+                print(f"  → Filling ZIP code: {zip_code}")
+                zip_input_selectors = [
+                    'input[placeholder*="Zip" i]',
+                    'input[placeholder*="City" i]',
+                    'input[type="text"]',
+                    'input[name*="zip" i]',
+                ]
 
-        print("7. Extract dealer data using tested extraction script:")
-        extraction_script = self.get_extraction_script()
-        print(f'   mcp__playwright__browser_evaluate({{"function": """{extraction_script}"""}})\n')
+                zip_filled = False
+                for selector in zip_input_selectors:
+                    try:
+                        zip_input = page.locator(selector)
+                        if zip_input.count() > 0 and zip_input.first.is_visible():
+                            zip_input.first.fill(zip_code)
+                            time.sleep(1)
+                            zip_filled = True
+                            break
+                    except Exception:
+                        continue
 
-        print("8. Copy the results JSON and pass to parse_results():")
-        print(f'   briggs_scraper.parse_results(results_json, "{zip_code}")\n')
+                if not zip_filled:
+                    raise Exception("Could not find ZIP code input")
 
-        print(f"{'='*60}\n")
-        print("✅ Extraction script is ready for testing")
-        print("⚠️  Element refs change between page loads - always take fresh snapshot")
-        print(f"{'='*60}\n")
+                # Click search button
+                print(f"  → Clicking search button...")
+                button_selectors = [
+                    '#dealer-form button',
+                    'button:has-text("Search")',
+                    'button:has-text("Find")',
+                    'button[type="submit"]',
+                    'input[type="submit"]',
+                ]
 
-        return []
+                button_clicked = False
+                for selector in button_selectors:
+                    try:
+                        btn = page.locator(selector)
+                        if btn.count() > 0 and btn.first.is_visible():
+                            btn.first.click(timeout=5000)
+                            button_clicked = True
+                            break
+                    except Exception:
+                        continue
+
+                if not button_clicked:
+                    raise Exception("Could not find/click search button")
+
+                # Wait for AJAX results
+                print(f"  → Waiting for results...")
+                time.sleep(5)
+
+                # Extract dealers using JavaScript
+                print(f"  → Extracting dealer data...")
+                extraction_script = self.get_extraction_script()
+                dealers_data = page.evaluate(extraction_script)
+
+                print(f"  → Found {len(dealers_data)} dealers")
+
+                # Parse into StandardizedDealer objects
+                dealers = self.parse_results(dealers_data, zip_code)
+
+                browser.close()
+
+                return dealers
+
+            except Exception as e:
+                print(f"  ✗ Error scraping with Playwright: {e}")
+                import traceback
+                traceback.print_exc()
+                if 'browser' in locals():
+                    browser.close()
+                return []
 
     def _scrape_with_runpod(self, zip_code: str) -> List[StandardizedDealer]:
         """
