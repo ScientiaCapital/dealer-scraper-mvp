@@ -187,10 +187,12 @@ git push origin main
 ## Project-Specific Context
 
 ### Current Development State
-- **Tesla**: 70 Premier installers collected (COMPLETE ✅)
-- **Enphase**: 28 Platinum/Gold installers from 3 ZIPs (IN PROGRESS ⏳)
-- **Manual Collection Method**: 1-ZIP-at-a-time using MCP Playwright
-- **Target**: 40 ZIPs total (matching Tesla collection)
+- **18 OEM Scrapers**: All production-ready (Generators, Solar, Batteries, HVAC)
+- **Latest Addition**: Mitsubishi Diamond Commercial VRF contractors (resimercial HVAC signal)
+- **HVAC Expansion**: 4 brands planned (Mitsubishi, Lennox, Trane, Carrier)
+- **Multi-OEM Detection**: Enhanced fuzzy matching + phone/domain deduplication
+- **Production Mode**: Playwright local automation (140 SREC state ZIPs per OEM)
+- **Next Step**: Test Mitsubishi scraper → National run (140 ZIPs, ~2-3 hours)
 
 ### Active Memories
 Check `mcp__serena__list_memories()` at session start:
