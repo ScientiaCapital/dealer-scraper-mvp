@@ -121,9 +121,9 @@ def main():
     oem_files = [
         ('output/tesla_premier_deduped_20251026.csv', 'Tesla'),
         ('output/enphase_platinum_gold_deduped_20251026.csv', 'Enphase'),
-        ('output/generac_dealers_20251027_103612.csv', 'Generac'),
-        ('output/cummins_dealers_20251027.csv', 'Cummins'),
-        ('output/briggs_dealers_20251028.csv', 'Briggs & Stratton'),
+        ('output/generac_national_20251028.csv', 'Generac'),
+        ('output/cummins_dealers_20251028.csv', 'Cummins'),
+        ('output/briggs_national_20251028.csv', 'Briggs & Stratton'),
     ]
 
     all_dealers = []
@@ -189,8 +189,12 @@ def main():
                 'oem_source', 'scraped_from_zip'
             ]
 
+            # Get all unique fields from ALL contractors (not just the first one)
+            all_fields = set()
+            for contractor in unique_contractors.values():
+                all_fields.update(contractor.keys())
+
             # Add any remaining fields (exclude empty fieldnames)
-            all_fields = set(sample.keys())
             remaining = [f for f in all_fields if f not in priority_fields
                         and not f.endswith('_normalized')
                         and f.strip() != '']  # Exclude empty fieldnames

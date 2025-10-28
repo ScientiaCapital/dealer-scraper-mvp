@@ -62,7 +62,7 @@ def main():
         print(f"\n[{i}/{len(ZIP_CODES_MAJOR_METROS_ALL)}] Scraping ZIP {zip_code}...")
 
         try:
-            dealers = scraper.scrape_zip_code(zip_code)
+            dealers = scraper.scrape_zip(zip_code)
             all_dealers.extend(dealers)
             print(f"   ✓ Found {len(dealers)} dealers (Total: {len(all_dealers)})")
 
@@ -86,7 +86,7 @@ def main():
 
     scraper.dealers = all_dealers
     before_count = len(scraper.dealers)
-    scraper.deduplicate(key="phone")
+    scraper.deduplicate_by_phone()
     after_count = len(scraper.dealers)
 
     duplicate_count = before_count - after_count

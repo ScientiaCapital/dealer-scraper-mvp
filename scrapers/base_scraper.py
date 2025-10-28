@@ -11,6 +11,8 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Dict, List, Optional, Set
 from dataclasses import dataclass, field
+from difflib import SequenceMatcher
+import re
 
 
 class ScraperMode(Enum):
@@ -440,7 +442,123 @@ class BaseDealerScraper(ABC):
         removed = len(self.dealers) - len(unique_dealers)
         print(f"Removed {removed} duplicate dealers (by {key})")
         self.dealers = unique_dealers
-    
+
+    @staticmethod
+    def _normalize_company_name(name: str) -> str:
+        """
+        Normalize company name for fuzzy matching.
+        Removes common suffixes (LLC, Inc, Corp, etc.), lowercases, strips whitespace.
+        """
+        if not name:
+            return ""
+
+        # Convert to lowercase
+        normalized = name.lower().strip()
+
+        # Remove common business suffixes
+        suffixes = [
+            r'\s+llc\s*$', r'\s+inc\.?\s*$', r'\s+corp\.?\s*$',
+            r'\s+ltd\.?\s*$', r'\s+co\.?\s*$', r'\s+company\s*$',
+            r'\s+incorporated\s*$', r'\s+corporation\s*$',
+            r'\s+limited\s*$', r'\s+l\.?l\.?c\.?\s*$'
+        ]
+
+        for suffix in suffixes:
+            normalized = re.sub(suffix, '', normalized)
+
+        # Remove extra whitespace
+        normalized = ' '.join(normalized.split())
+
+        return normalized
+
+    def deduplicate_by_phone(self) -> None:
+        """
+        Multi-signal deduplication using phone, name fuzzy matching, domain, and location.
+
+        This catches duplicates missed by phone-only matching, like:
+        - Same company with multiple locations/phone numbers
+        - Name variations (e.g., "TRI-STATE POWER & PUMP" vs "TRI-STATE POWER & PUMP LLC")
+        - Same domain but different phone numbers
+
+        Deduplication signals (in order of precedence):
+        1. Phone number (exact match after normalization)
+        2. Domain (exact match)
+        3. Fuzzy name match (>=85% similar) + same state
+        """
+        seen_phones = set()
+        seen_domains = set()
+        seen_names_by_state = {}  # {state: [(normalized_name, dealer), ...]}
+        unique_dealers = []
+        duplicates = []
+
+        for dealer in self.dealers:
+            is_duplicate = False
+            duplicate_reason = ""
+
+            # Signal 1: Phone match
+            if dealer.phone and dealer.phone in seen_phones:
+                is_duplicate = True
+                duplicate_reason = f"phone={dealer.phone}"
+
+            # Signal 2: Domain match (if not already marked duplicate)
+            elif dealer.domain and dealer.domain in seen_domains:
+                is_duplicate = True
+                duplicate_reason = f"domain={dealer.domain}"
+
+            # Signal 3: Fuzzy name + same state
+            elif dealer.name and dealer.state:
+                normalized_name = self._normalize_company_name(dealer.name)
+
+                # Check against existing names in same state
+                if dealer.state in seen_names_by_state:
+                    for existing_norm_name, existing_dealer in seen_names_by_state[dealer.state]:
+                        similarity = SequenceMatcher(None, normalized_name, existing_norm_name).ratio()
+
+                        # 85% similarity threshold for same state
+                        if similarity >= 0.85:
+                            is_duplicate = True
+                            duplicate_reason = f"fuzzy_name={similarity:.2f} ('{dealer.name}' ≈ '{existing_dealer.name}')"
+                            break
+
+            if is_duplicate:
+                duplicates.append((dealer, duplicate_reason))
+            else:
+                # Add to unique list and tracking sets
+                unique_dealers.append(dealer)
+
+                if dealer.phone:
+                    seen_phones.add(dealer.phone)
+
+                if dealer.domain:
+                    seen_domains.add(dealer.domain)
+
+                if dealer.name and dealer.state:
+                    normalized_name = self._normalize_company_name(dealer.name)
+                    if dealer.state not in seen_names_by_state:
+                        seen_names_by_state[dealer.state] = []
+                    seen_names_by_state[dealer.state].append((normalized_name, dealer))
+
+        removed = len(self.dealers) - len(unique_dealers)
+
+        # Show breakdown of deduplication signals
+        print(f"\nRemoved {removed} duplicate dealers (multi-signal deduplication):")
+        phone_dupes = len([d for d, reason in duplicates if reason.startswith("phone=")])
+        domain_dupes = len([d for d, reason in duplicates if reason.startswith("domain=")])
+        fuzzy_dupes = len([d for d, reason in duplicates if reason.startswith("fuzzy_name=")])
+
+        print(f"  • Phone matches: {phone_dupes}")
+        print(f"  • Domain matches: {domain_dupes}")
+        print(f"  • Fuzzy name + state matches: {fuzzy_dupes}")
+
+        # Show examples of fuzzy matches (up to 5)
+        if fuzzy_dupes > 0:
+            print(f"\n  Examples of fuzzy name matches:")
+            fuzzy_examples = [d for d, reason in duplicates if reason.startswith("fuzzy_name=")][:5]
+            for dealer, reason in [(d, r) for d, r in duplicates if r.startswith("fuzzy_name=")][:5]:
+                print(f"    - {reason}")
+
+        self.dealers = unique_dealers
+
     def filter_by_state(self, states: List[str]) -> List[StandardizedDealer]:
         """
         Filter dealers to specific states (useful for SREC targeting).
@@ -552,6 +670,11 @@ class BaseDealerScraper(ABC):
             "apollo_enriched", "employee_count", "estimated_revenue", "linkedin_url",
             "coperniq_score", "multi_oem_score",
             "srec_state_priority", "itc_urgency",
+            # ICP & Marketing enrichment fields
+            "is_resimercial", "is_mep_contractor", "is_mep_r_contractor", "is_self_performing",
+            "has_ops_maintenance", "has_om_capability", "mep_score",
+            "linkedin_search_query", "meta_custom_audience", "meta_ads_targeting",
+            "seo_keywords", "adwords_keywords",
         ]
         
         with open(filepath, "w", newline="") as f:
