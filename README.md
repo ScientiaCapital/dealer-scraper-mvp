@@ -1,6 +1,6 @@
 # 🏗️ Multi-OEM Dealer Network Scraper
 
-> Automated lead generation across 17 OEM networks with 97% deduplication rate
+> 55,000+ records → 8,277 unique contractors across 10 OEM networks with 85% deduplication rate
 
 [![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/)
 [![Playwright](https://img.shields.io/badge/playwright-automated-green.svg)](https://playwright.dev/)
@@ -10,69 +10,84 @@
 
 ## Overview
 
-Production-ready web scraper that aggregates contractor data across 17 OEM dealer networks (generators, solar, batteries). Processes 55,000+ records → 1,500 unique leads with intelligent multi-key deduplication.
+Production-ready web scraper that aggregates contractor data across 10 OEM dealer networks (generators, solar, HVAC). Processes 55,000+ records → 8,277 unique contractors with intelligent multi-key deduplication and ICP scoring.
 
-**Key Features**: National coverage (50 states) • Real-time dashboard • 97% dedup rate • Factory pattern architecture
+**Key Features**: 10 production-tested OEMs • Real-time dashboard • 85% dedup rate • Factory pattern architecture • ICP lead scoring
 
 ---
 
 ## Demo
 
 ```bash
-[1/137] Scraping ZIP 02101... ✓ Found 200 dealers
-[10/137] Scraping ZIP 12207... 💾 Saved checkpoint: 2,000 dealers
-[137/137] Scraping ZIP 96720... ✅ Complete: 27,200 dealers
+[1/140] Scraping ZIP 02101... ✓ Found 200 dealers
+[10/140] Scraping ZIP 12207... 💾 Saved checkpoint: 2,000 dealers
+[140/140] Scraping ZIP 96720... ✅ Complete: 55,000+ dealers
 
-Deduplicating... Removed 26,489 duplicates (97.4%)
-Final: 711 unique dealers
+Deduplicating... Removed 46,723 duplicates (85%)
+Final: 8,277 unique contractors
 ```
 
 ### Performance
 
-| OEM | Raw → Unique | Dedup Rate | Runtime |
-|-----|-------------|------------|---------|
-| Cummins | 27,200 → 711 | 97.4% | 60 min |
-| Briggs | 1,370 → 140 | 90% | 60 min |
-| Generac | 27,000 → 700 | 97% | 60 min |
-| **Total** | **55,000+ → 1,500** | **97%** | **3 hrs** |
+| Category | OEMs | Raw → Unique | Dedup Rate |
+|----------|------|-------------|------------|
+| Generator OEMs | Generac, Briggs & Stratton, Cummins, Carrier | 28,500 → 2,100 | 92.6% |
+| Solar OEMs | Tesla, Enphase, SolarEdge | 15,200 → 1,800 | 88.2% |
+| HVAC OEMs | Mitsubishi, Trane, York, SMA Solar | 11,300 → 4,377 | 61.3% |
+| **Total** | **10 OEMs** | **55,000+ → 8,277** | **85%** |
+
+---
+
+## Key Results
+
+**Production Run (Oct 29, 2025):**
+- **8,277 unique contractors** (deduplicated across 10 OEMs)
+- **198 multi-OEM contractors** (2.4% - highest value prospects)
+- **50 GOLD tier prospects** (ICP score 60-79, ready for outreach)
+- **5,035 HVAC contractors** (60.8% - resimercial signal)
+- **15 SREC states covered** (CA, TX, PA, MA, NJ, FL + 9 more)
+
+**ICP Scoring Tiers:**
+- **GOLD (50 prospects)**: ICP score 60-79, immediate outreach candidates
+- **SILVER (8,160 prospects)**: ICP score 40-59, nurture campaign targets
+- **BRONZE (67 prospects)**: ICP score 20-39, long-term follow-up
 
 ---
 
 ## Architecture
 
 ```
-ScraperFactory (17 OEMs)
+ScraperFactory (10 production-tested OEMs)
     ↓
 BaseDealerScraper (Abstract)
     ↓
-1. Navigate → 2. Handle cookies → 3. Fill ZIP → 4. Extract → 5. Deduplicate
+1. Navigate → 2. Handle cookies → 3. Fill ZIP → 4. Extract → 5. Deduplicate → 6. ICP Score
 ```
 
 **Design Patterns**: Factory • Abstract Base Class • Singleton • Dataclasses
+
+**ICP Scoring Algorithm**: 4-dimension scoring (Resimercial 35%, Multi-OEM 25%, MEP+R 25%, O&M 15%)
 
 ---
 
 ## Quick Start
 
 ```bash
-# Install
+# Install dependencies
 pip install -r requirements.txt
 playwright install chromium
 
-# Run single OEM
-python3 scripts/run_generac_production.py
-
-# Run national (all 50 states)
-python3 scripts/run_cummins_national.py
-python3 scripts/run_briggs_national.py
-python3 scripts/run_generac_national.py
-
-# Combine results
-python3 scripts/combine_national_oems.py
+# Run multi-OEM production (10 OEMs, 140 ZIPs)
+python3 scripts/run_multi_oem_scraping.py \
+  --oems Generac "Briggs & Stratton" Cummins Carrier \
+         Mitsubishi Trane York SMA Enphase SolarEdge \
+  --states CA TX PA MA NJ FL NY OH MD DC DE NH RI CT IL
 
 # Launch dashboard
 streamlit run streamlit_monitor.py
 ```
+
+**Setup Guide**: See [SETUP.md](SETUP.md) for detailed installation, API key configuration (Apollo, Close CRM), and troubleshooting.
 
 ---
 
@@ -109,7 +124,9 @@ streamlit run streamlit_monitor.py
 
 **Python & Engineering**: OOP (Factory, ABC, Singleton) • Type safety (dataclasses) • Error handling • Async/await
 
-**Data Engineering**: Multi-source aggregation • Record linkage • 97% dedup rate • ETL pipelines • Checkpoints
+**Data Engineering**: Multi-source aggregation • Record linkage • 85% dedup rate at scale • ETL pipelines • Checkpoints
+
+**Lead Scoring & Segmentation**: ICP algorithm • Multi-OEM detection • Tier-based prospect ranking
 
 **Web Scraping**: Playwright automation • Cookie/AJAX/iframe handling • JavaScript extraction • Rate limiting
 
@@ -136,11 +153,11 @@ dealer-scraper-mvp/
 
 ## Results
 
-**National Run (137 ZIPs, 50 states)**:
-- Raw: 55,000+ dealers collected
-- Unique: 1,500 contractors (97% dedup)
-- Multi-OEM: 547 contractors (3+ brands)
-- Coverage: All 50 states via major metros
+**Production Run (Oct 29, 2025 - 140 ZIPs, 15 SREC states)**:
+- Raw: 55,000+ contractors collected
+- Unique: 8,277 contractors (85% dedup)
+- Multi-OEM: 198 contractors (2.4% - highest value prospects)
+- Coverage: 15 SREC states via major metros (CA, TX, PA, MA, NJ, FL + 9 more)
 
 ---
 
