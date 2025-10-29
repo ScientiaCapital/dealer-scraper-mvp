@@ -30,6 +30,11 @@ from scrapers import solark_scraper
 from scrapers import simpliphi_scraper
 from scrapers import mitsubishi_scraper
 from scrapers import sma_scraper
+from scrapers import lennox_scraper
+from scrapers import carrier_scraper
+from scrapers import rheem_scraper
+from scrapers import trane_scraper
+from scrapers import york_scraper
 
 __all__ = [
     "BaseDealerScraper",
