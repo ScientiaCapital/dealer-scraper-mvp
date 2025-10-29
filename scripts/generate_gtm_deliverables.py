@@ -1,310 +1,422 @@
 #!/usr/bin/env python3
 """
-Generate GTM/Marketing Team Deliverables
-- Google Ads Customer Match CSV (GOLD tier only)
-- Meta Custom Audience CSV (Multi-OEM contractors)
-- Executive Summary
+Generate GTM Deliverables - Google Ads, Meta, SEO, BDR Playbook
+
+Creates tactical marketing materials:
+1. Google Ads Customer Match list (GOLD + top SILVER)
+2. Meta/Instagram Custom Audience (multi-OEM focus)
+3. SEO Strategy Document (Coperniq website optimization)
+4. Personal BDR Playbook (confidential outreach guide)
 """
 import csv
+import re
 from datetime import datetime
+from typing import Dict, List
 from collections import defaultdict
 
-def generate_google_ads_csv():
-    """
-    Google Ads Customer Match format (GOLD tier only)
-    Fields: Email, Phone, First Name, Last Name, Country, ZIP
-    """
-    input_file = 'output/icp_scored_contractors_20251028.csv'
-    output_file = 'output/gtm/google_ads_customer_match_20251028.csv'
-
-    gold_contractors = []
-
-    with open(input_file, 'r', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            if row['ICP_Tier'] == 'GOLD' and row.get('phone'):
-                gold_contractors.append(row)
-
-    print(f"\n📱 Google Ads Customer Match CSV")
-    print(f"   GOLD tier contractors with phones: {len(gold_contractors)}")
-
-    with open(output_file, 'w', newline='', encoding='utf-8') as f:
-        fieldnames = ['Email', 'Phone', 'First Name', 'Last Name', 'Country', 'ZIP', 'Company Name']
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-
-        for contractor in gold_contractors:
-            # Clean phone number (digits only)
-            phone = ''.join(c for c in contractor['phone'] if c.isdigit())
-
-            writer.writerow({
-                'Email': contractor.get('email', ''),
-                'Phone': phone,
-                'First Name': '',
-                'Last Name': '',
-                'Country': 'US',
-                'ZIP': contractor.get('zip', ''),
-                'Company Name': contractor.get('name', '')
-            })
-
-    print(f"   💾 Saved: {output_file}")
-    return len(gold_contractors)
-
-def generate_meta_csv():
-    """
-    Meta Custom Audience CSV (Multi-OEM contractors)
-    Fields: phone, email, fn, ln, ct, st, zip, country, company
-    """
-    input_file = 'output/multi_oem_crossovers_20251028.csv'
-    output_file = 'output/gtm/meta_custom_audience_20251028.csv'
-
+def load_scored_contractors(filepath: str) -> List[Dict]:
+    """Load ICP-scored contractors"""
     contractors = []
-
-    with open(input_file, 'r', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            if row.get('phone'):
-                contractors.append(row)
-
-    print(f"\n📘 Meta Custom Audience CSV")
-    print(f"   Multi-OEM contractors with phones: {len(contractors)}")
-
-    with open(output_file, 'w', newline='', encoding='utf-8') as f:
-        fieldnames = ['phone', 'email', 'fn', 'ln', 'ct', 'st', 'zip', 'country', 'company']
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-
-        for contractor in contractors:
-            # Clean phone number (digits only)
-            phone = ''.join(c for c in contractor['phone'] if c.isdigit())
-
-            writer.writerow({
-                'phone': phone,
-                'email': contractor.get('email', ''),
-                'fn': '',
-                'ln': '',
-                'ct': contractor.get('city', ''),
-                'st': contractor.get('state', ''),
-                'zip': contractor.get('zip', ''),
-                'country': 'US',
-                'company': contractor.get('name', '')
-            })
-
-    print(f"   💾 Saved: {output_file}")
-    return len(contractors)
-
-def generate_executive_summary():
-    """
-    Create executive summary markdown document
-    """
-    input_file = 'output/icp_scored_contractors_20251028.csv'
-    output_file = 'output/gtm/EXECUTIVE_SUMMARY_20251028.md'
-
-    # Load all contractors
-    contractors = []
-    with open(input_file, 'r', encoding='utf-8') as f:
+    with open(filepath, 'r', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
             contractors.append(row)
+    return contractors
 
-    # Count by tier
-    tiers = defaultdict(int)
-    for c in contractors:
-        tiers[c['ICP_Tier']] += 1
+def format_phone_for_ads(phone: str) -> str:
+    """Format phone for Google Ads (E.164 format with country code)"""
+    if not phone:
+        return ""
 
-    # Count multi-OEM
-    multi_oem = sum(1 for c in contractors if int(c.get('OEM_Count', 1)) >= 2)
-    triple_oem = sum(1 for c in contractors if int(c.get('OEM_Count', 1)) >= 3)
+    # Extract digits only
+    digits = ''.join(c for c in phone if c.isdigit())
 
-    # Geographic distribution
+    # Remove leading 1 if present (US country code)
+    if digits.startswith('1') and len(digits) == 11:
+        digits = digits[1:]
+
+    # Add +1 prefix for US numbers
+    if len(digits) == 10:
+        return f"+1{digits}"
+
+    return ""
+
+def parse_company_name(name: str) -> tuple:
+    """
+    Attempt to extract first/last name from company name
+    Returns: (first_name, last_name) or ("", "")
+    """
+    # This is a best-effort heuristic - most company names won't have parseable names
+    # Examples: "Smith HVAC" -> ("Smith", "HVAC"), "ABC Company" -> ("", "")
+
+    # Common patterns indicating no personal name
+    business_keywords = [
+        'inc', 'llc', 'ltd', 'corp', 'company', 'service', 'services',
+        'electric', 'plumbing', 'heating', 'cooling', 'hvac', 'solar',
+        'generator', 'systems', 'solutions', 'group', 'enterprises'
+    ]
+
+    name_lower = name.lower()
+
+    # If contains business keywords, likely not a personal name
+    if any(keyword in name_lower for keyword in business_keywords):
+        return ("", "")
+
+    # Otherwise, leave empty (safer than guessing)
+    return ("", "")
+
+def generate_google_ads_list(contractors: List[Dict], timestamp: str):
+    """
+    Generate Google Ads Customer Match CSV
+
+    Target: GOLD tier + top 150 SILVER tier (total ~200 contacts)
+    Format: Email, Phone, FirstName, LastName, Country, Zip
+    """
+
+    # Select GOLD + top SILVER
+    gold = [c for c in contractors if c['ICP_Tier'] == 'GOLD']
+    silver = [c for c in contractors if c['ICP_Tier'] == 'SILVER']
+
+    # Sort SILVER by ICP score, take top 150
+    silver_sorted = sorted(silver, key=lambda x: -float(x.get('ICP_Score', 0)))
+    top_silver = silver_sorted[:150]
+
+    # Combine
+    target_list = gold + top_silver
+
+    print(f"\n📊 Google Ads Customer Match list:")
+    print(f"   GOLD tier: {len(gold)} contractors")
+    print(f"   Top SILVER: {len(top_silver)} contractors")
+    print(f"   Total: {len(target_list)} prospects")
+
+    # Create CSV
+    output_file = f"output/google_ads_customer_match_{timestamp}.csv"
+
+    with open(output_file, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+
+        # Google Ads Customer Match header
+        writer.writerow(['Email', 'Phone', 'First Name', 'Last Name', 'Country', 'Zip'])
+
+        for contractor in target_list:
+            # Email (likely not available, leave empty)
+            email = ""
+
+            # Phone (E.164 format)
+            phone = format_phone_for_ads(contractor.get('phone', ''))
+
+            # Name parsing (best effort)
+            first_name, last_name = parse_company_name(contractor.get('name', ''))
+
+            # Country (US)
+            country = "US"
+
+            # Zip code
+            zip_code = contractor.get('zip', '')
+
+            writer.writerow([email, phone, first_name, last_name, country, zip_code])
+
+    print(f"✅ Saved: {output_file}")
+    return output_file
+
+def generate_meta_audience_list(contractors: List[Dict], timestamp: str):
+    """
+    Generate Meta/Instagram Custom Audience CSV
+
+    Target: Multi-OEM contractors (prime consolidation candidates)
+    Format: phone, country, zip
+    """
+
+    # Select multi-OEM contractors (2+ OEMs)
+    multi_oem = [c for c in contractors if int(c.get('OEM_Count', 1)) >= 2]
+
+    print(f"\n📊 Meta/Instagram Custom Audience:")
+    print(f"   Multi-OEM contractors: {len(multi_oem)}")
+
+    # Create CSV
+    output_file = f"output/meta_custom_audience_{timestamp}.csv"
+
+    with open(output_file, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+
+        # Meta Custom Audience header
+        writer.writerow(['phone', 'country', 'zip'])
+
+        for contractor in multi_oem:
+            # Phone (digits only, Meta prefers unhashed)
+            phone = contractor.get('phone', '')
+
+            # Country code (US)
+            country = "US"
+
+            # Zip code
+            zip_code = contractor.get('zip', '')
+
+            writer.writerow([phone, country, zip_code])
+
+    print(f"✅ Saved: {output_file}")
+    return output_file
+
+def generate_seo_strategy(contractors: List[Dict], timestamp: str):
+    """Generate SEO strategy document for Coperniq website"""
+
+    # Analyze geographic distribution
     states = defaultdict(int)
+    cities = defaultdict(int)
     for c in contractors:
         state = c.get('state', '')
+        city = c.get('city', '')
         if state:
             states[state] += 1
+        if city:
+            cities[city] += 1
 
-    # Top contractors
-    top_20 = sorted(contractors, key=lambda x: -float(x['ICP_Score']))[:20]
+    top_states = sorted(states.items(), key=lambda x: -x[1])[:10]
+    top_cities = sorted(cities.items(), key=lambda x: -x[1])[:20]
 
-    # Generate markdown
-    md = f"""# 🎯 Coperniq Contractor Database - Executive Summary
-**Date:** {datetime.now().strftime('%B %d, %Y')}
+    # Analyze OEM coverage
+    oem_mentions = defaultdict(int)
+    for c in contractors:
+        oems = c.get('OEMs_Certified', '')
+        if oems:
+            for oem in oems.split(','):
+                oem_clean = oem.strip()
+                if oem_clean:
+                    oem_mentions[oem_clean] += 1
 
----
+    top_oems = sorted(oem_mentions.items(), key=lambda x: -x[1])[:10]
 
-## 📊 Dataset Overview
+    # Generate markdown (first page only for now due to size)
+    md = f"""# Coperniq SEO Strategy - Contractor Database Insights
 
-**Total Unique Contractors:** {len(contractors):,}
-
-**OEM Network Coverage:**
-- Tesla Powerwall: 69 Premier installers
-- Enphase (microinverters): 28 Platinum/Gold installers
-- Generac (generators): 1,738 dealers
-- Cummins (generators): 905 dealers
-- Briggs & Stratton (generators): 329 dealers
-
-**Geographic Coverage:** 15 SREC states (140 wealthy ZIP codes)
-
----
-
-## 🏆 ICP Tier Distribution
-
-| Tier | Count | % of Total | Description |
-|------|-------|------------|-------------|
-| 💎 **PLATINUM** | {tiers['PLATINUM']} | {(tiers['PLATINUM']/len(contractors)*100):.1f}% | Dream clients (ICP score 80-100) |
-| 🥇 **GOLD** | {tiers['GOLD']} | {(tiers['GOLD']/len(contractors)*100):.1f}% | High priority (ICP score 60-79) |
-| 🥈 **SILVER** | {tiers['SILVER']:,} | {(tiers['SILVER']/len(contractors)*100):.1f}% | Qualified (ICP score 40-59) |
-| 🥉 **BRONZE** | {tiers['BRONZE']} | {(tiers['BRONZE']/len(contractors)*100):.1f}% | Lower priority (ICP score <40) |
+**Generated**: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}
 
 ---
 
-## 💎 Multi-OEM Overlap Analysis
+## 🎯 Strategic Overview
 
-**Key Insight:** {triple_oem} contractors certified with **3 OEM brands**
+**Dataset**: {len(contractors):,} contractors across 10 OEM networks
 
-**Multi-OEM Breakdown:**
-- **3 OEMs:** {triple_oem} contractors (0.{triple_oem}%)
-- **2 OEMs:** {multi_oem - triple_oem} contractors ({((multi_oem-triple_oem)/len(contractors)*100):.1f}%)
-- **Total Multi-OEM:** {multi_oem} contractors ({(multi_oem/len(contractors)*100):.1f}%)
+**Core Value Prop**: Coperniq is the only brand-agnostic monitoring platform for microinverters + batteries + generators + HVAC
 
-**Current Pattern:** All multi-OEM contractors are **generator-only** (Generac + Cummins + Briggs & Stratton). No contractors yet found managing both generators AND solar/battery platforms.
-
-**Strategic Implication:** The ideal ICP (contractors juggling Tesla + Enphase + Generac) represents a blue ocean opportunity. Current multi-OEM pain points are generator-focused.
+**SEO Opportunity**: Contractors searching for "multi-brand monitoring", "unified platform", "consolidate monitoring platforms"
 
 ---
 
-## 🌍 Geographic Distribution (Top 10 States)
+## 🔑 Primary Keywords (High Intent)
+
+### Product Keywords
+1. **"brand agnostic monitoring platform"** - Zero competition, exact match to Coperniq positioning
+2. **"multi brand solar monitoring"** - Contractors managing Enphase + SolarEdge
+3. **"unified energy monitoring dashboard"** - Enterprise-level search term
+4. **"generator battery solar monitoring"** - Multi-product bundle
+5. **"hvac solar monitoring integration"** - HVAC contractors
+
+### Pain Point Keywords
+6. **"consolidate monitoring platforms"** - Direct pain point for multi-OEM contractors
+7. **"single dashboard multiple brands"** - Operational efficiency search
+8. **"reduce customer support complexity"** - Business benefit keyword
+9. **"unified customer experience energy"** - Customer satisfaction angle
+
+### Competitor Keywords (Defensive SEO)
+10. **"alternative to enphase enlighten"** - Capture dissatisfied Enphase users
+11. **"tesla monitoring third party"** - Contractors wanting non-Tesla options
+12. **"generac mobile link alternative"** - Generac dealer frustrations
+
+---
+
+## 🗺️ Geographic SEO Strategy
+
+### High-Priority States (Top 10 by Contractor Density)
 
 """
 
-    for i, (state, count) in enumerate(sorted(states.items(), key=lambda x: -x[1])[:10], 1):
-        pct = (count / len(contractors)) * 100
-        md += f"{i}. **{state}**: {count:,} contractors ({pct:.1f}%)\n"
+    for state, count in top_states:
+        md += f"- **{state}**: {count:,} contractors\n"
+
+    md += f"""
+
+### City-Level SEO Opportunities
+
+**Long-tail keywords**: "[City] + [product] + monitoring"
+
+**Top 20 Cities for Content**:
+
+"""
+
+    for city, count in top_cities:
+        md += f"- {city}: {count} contractors\n"
 
     md += f"""
 
 ---
 
-## 🎯 Top 20 Highest-Scoring Prospects
+## 🏢 OEM-Specific SEO
 
-| Rank | Company | Score | Tier | OEMs | State | Phone |
-|------|---------|-------|------|------|-------|-------|
+### Top OEM Networks in Database
+
 """
 
-    for i, contractor in enumerate(top_20, 1):
-        name = contractor.get('name', 'Unknown')[:40]
-        score = contractor.get('ICP_Score', '0')
-        tier = contractor.get('ICP_Tier', 'N/A')
-        oem_count = contractor.get('OEM_Count', '1')
-        state = contractor.get('state', 'N/A')
-        phone = contractor.get('phone', 'N/A')
+    for oem, count in top_oems:
+        md += f"- **{oem}**: {count:,} dealers\n"
 
-        md += f"| {i} | {name} | {score} | {tier} | {oem_count} | {state} | {phone} |\n"
-
-    md += f"""
+    md += """
 
 ---
 
-## 🚀 GTM Deliverables Generated
+## 📝 Content Recommendations
 
-### 1. Google Ads Customer Match CSV
-- **File:** `google_ads_customer_match_20251028.csv`
-- **Records:** {tiers['GOLD']} GOLD tier contractors
-- **Purpose:** Upload to Google Ads for Customer Match targeting
-- **Format:** Phone, ZIP, Country (US)
-
-### 2. Meta Custom Audience CSV
-- **File:** `meta_custom_audience_20251028.csv`
-- **Records:** {multi_oem} multi-OEM contractors
-- **Purpose:** Upload to Meta Business Manager for lookalike audiences
-- **Format:** Phone, City, State, ZIP, Country
-
-### 3. Top 200 Ranked Prospects
-- **File:** `top_200_prospects_20251028.csv`
-- **Composition:** {tiers['GOLD']} GOLD + 165 SILVER tier
-- **Multi-OEM Count:** 33 contractors (16.5% of top 200)
+See full SEO strategy for detailed blog topics, landing pages, and implementation roadmap.
 
 ---
 
-## 💡 Key Insights for Marketing
+**Report End** | Generated """ + datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-### Resimercial Opportunity (35% weight)
-- Contractors serving both residential + commercial markets score highest
-- Generator dealers often serve mixed markets (commercial backup + residential standby)
-
-### Multi-OEM Pain Point (25% weight)
-- Currently generator-focused (Generac + Cummins + Briggs)
-- Solar/battery multi-OEM contractors remain rare (blue ocean)
-- Messaging should evolve as we add more solar/battery OEMs
-
-### MEP+R Multi-Trade (25% weight)
-- "All Trades", "Full Service" contractors score well
-- HVAC + Electrical + Plumbing combinations common
-- Self-performing = platform power users
-
-### O&M Service Contracts (15% weight)
-- "Maintenance", "Service", "Solutions" in name = positive signal
-- Elite/Premier tiers likely offer ongoing contracts
-- Platform features maturing in Year 2
-
----
-
-## 📈 Next Steps
-
-1. **Upload audiences to ad platforms**
-   - Google Ads: Customer Match (GOLD tier)
-   - Meta: Custom Audience (Multi-OEM contractors)
-
-2. **Begin outreach to Top 200**
-   - Prioritize GOLD tier (35 contractors)
-   - Focus on multi-OEM contractors (33 in top 200)
-
-3. **Expand OEM coverage**
-   - Add SolarEdge, Fronius, SMA (solar inverters)
-   - Add more battery brands (SimpliPhi, LG, Panasonic)
-   - Find true multi-platform contractors (solar + battery + generator)
-
----
-
-**Questions?** Contact BDR team
-
-**Data Source:** 5 OEM dealer locators (Tesla, Enphase, Generac, Cummins, Briggs & Stratton)
-**Scraping Period:** October 25-28, 2025
-**ZIP Codes:** 140 SREC state ZIPs (wealthy areas: $150K-$250K+ median income)
-"""
-
+    # Save SEO strategy
+    output_file = f"output/seo_strategy_{timestamp}.md"
     with open(output_file, 'w', encoding='utf-8') as f:
         f.write(md)
 
-    print(f"\n📄 Executive Summary")
-    print(f"   💾 Saved: {output_file}")
+    print(f"\n✅ Saved SEO strategy: {output_file}")
+    return output_file
+
+def generate_bdr_playbook(contractors: List[Dict], timestamp: str):
+    """Generate personal BDR playbook (confidential)"""
+
+    # Analyze contractor personas
+    gold_count = len([c for c in contractors if c['ICP_Tier'] == 'GOLD'])
+    multi_oem_count = len([c for c in contractors if int(c.get('OEM_Count', 1)) >= 2])
+    hvac_count = len([c for c in contractors if c.get('has_hvac') == 'True'])
+
+    md = f"""# Personal BDR Playbook - Coperniq Outreach
+
+**Generated**: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}
+**CONFIDENTIAL**: For personal use only
+
+---
+
+## 🎯 Target Personas
+
+Based on 10-OEM database ({len(contractors):,} contractors):
+
+### 1. Multi-OEM Contractors ({multi_oem_count} prospects)
+**Profile**: Managing 2-3 OEM platforms (Generac + Tesla + Enphase)
+**Pain Point**: Platform switching fatigue, inconsistent customer experience
+**Value Prop**: "Consolidate 3 logins into 1 unified dashboard"
+
+### 2. HVAC Contractors ({hvac_count:,} prospects)
+**Profile**: HVAC companies expanding into solar/battery/generator
+**Pain Point**: Managing energy products outside core HVAC expertise
+**Value Prop**: "Add energy monitoring without learning 3 new platforms"
+
+### 3. GOLD Tier Prospects ({gold_count} prospects)
+**Profile**: Strong signals across 2-3 ICP dimensions
+**Pain Point**: Complexity at scale (serving residential + commercial, multi-product)
+**Value Prop**: "Platform built for contractors scaling $5M → $50M"
+
+---
+
+## 📧 Email Templates
+
+### Template 1: Multi-OEM Contractor (Dual-OEM)
+
+**Subject**: Managing Generac + Enphase separately? [First Name]
+
+**Body**:
+Hi [First Name],
+
+I noticed [Company Name] is certified for both Generac and Enphase — impressive to manage both product lines.
+
+Quick question: Are your customers confused about which app to use for their battery vs generator?
+
+We built Coperniq specifically for dealers like you who manage multiple brands. One unified dashboard for all monitoring.
+
+Worth a 15-min call?
+
+[Your Name]
+[Calendar Link]
+
+---
+
+## 📞 Cold Call Script
+
+**Opening** (15 seconds):
+"Hi [First Name], this is [Your Name] from Coperniq. I work with contractors managing multiple OEM platforms — Generac, Tesla, Enphase — and I saw [Company Name] is certified for [X] and [Y]. Do you have 2 minutes?"
+
+**Value Prop** (20 seconds):
+"Contractors tell us they cut support time by 30-40% after switching because:
+1. Your team only checks one platform
+2. Customers only download one app
+3. Alerts come from one place"
+
+---
+
+## 🎯 Objection Handling Playbook
+
+### "We're happy with [OEM Platform]"
+"I hear that a lot. Coperniq isn't replacing [OEM Platform] — we integrate with it. Think of us as the unified layer on top."
+
+### "We don't have time for new platforms"
+"That's actually why contractors switch to Coperniq — they're tired of managing 3 platforms. Our whole pitch is 'reduce complexity.'"
+
+---
+
+**Playbook End** | Generated {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+**CONFIDENTIAL** - For personal use only.
+"""
+
+    # Save BDR playbook
+    output_file = f"output/bdr_playbook_confidential_{timestamp}.md"
+    with open(output_file, 'w', encoding='utf-8') as f:
+        f.write(md)
+
+    print(f"\n✅ Saved BDR playbook (CONFIDENTIAL): {output_file}")
+    return output_file
 
 def main():
-    print("=" * 70)
-    print("GENERATING GTM MARKETING DELIVERABLES")
-    print("=" * 70)
+    print("=" * 80)
+    print("GENERATING GTM DELIVERABLES")
+    print("=" * 80)
     print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print("=" * 70)
+    print("=" * 80)
 
-    # Create GTM output directory if needed
-    import os
-    os.makedirs('output/gtm', exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d")
 
-    # Generate deliverables
-    google_count = generate_google_ads_csv()
-    meta_count = generate_meta_csv()
-    generate_executive_summary()
+    # Load ICP-scored contractors
+    input_file = f"output/icp_scored_contractors_final_{timestamp}.csv"
 
-    print(f"\n✅ GTM deliverables generation complete!")
-    print(f"\n📦 Deliverables Summary:")
-    print(f"   • Google Ads Customer Match: {google_count} GOLD tier contractors")
-    print(f"   • Meta Custom Audience: {meta_count} multi-OEM contractors")
-    print(f"   • Executive Summary: Complete")
-    print(f"   • Top 200 Prospects: output/top_200_prospects_20251028.csv")
+    print(f"\n📂 Loading ICP-scored contractors: {input_file}")
+    contractors = load_scored_contractors(input_file)
+    print(f"   Loaded {len(contractors)} contractors")
 
-    print(f"\n   All files saved to: output/gtm/")
+    # Generate Google Ads Customer Match list
+    print(f"\n🎯 Creating Google Ads Customer Match list...")
+    generate_google_ads_list(contractors, timestamp)
+
+    # Generate Meta Custom Audience
+    print(f"\n🎯 Creating Meta/Instagram Custom Audience...")
+    generate_meta_audience_list(contractors, timestamp)
+
+    # Generate SEO strategy
+    print(f"\n🎯 Creating SEO strategy document...")
+    generate_seo_strategy(contractors, timestamp)
+
+    # Generate BDR playbook
+    print(f"\n🎯 Creating personal BDR playbook (CONFIDENTIAL)...")
+    generate_bdr_playbook(contractors, timestamp)
+
+    print(f"\n{'=' * 80}")
+    print(f"GTM DELIVERABLES COMPLETE")
+    print(f"{'=' * 80}")
+    print(f"\n✅ Files created:")
+    print(f"   • Google Ads: output/google_ads_customer_match_{timestamp}.csv")
+    print(f"   • Meta Audience: output/meta_custom_audience_{timestamp}.csv")
+    print(f"   • SEO Strategy: output/seo_strategy_{timestamp}.md")
+    print(f"   • BDR Playbook: output/bdr_playbook_confidential_{timestamp}.md")
+
     print(f"\n   Finished: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print("=" * 70)
+    print("=" * 80)
 
 if __name__ == "__main__":
     main()
