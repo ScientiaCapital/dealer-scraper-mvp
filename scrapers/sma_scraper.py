@@ -369,28 +369,80 @@ class SMAScraper(BaseDealerScraper):
         try:
             with sync_playwright() as p:
                 print(f"  → Launching Playwright browser...")
-                browser = p.chromium.launch(headless=True)
-                page = browser.new_page()
+                # Launch with stealth settings to bypass bot detection
+                browser = p.chromium.launch(
+                    headless=True,
+                    args=[
+                        '--disable-blink-features=AutomationControlled',
+                        '--disable-dev-shm-usage',
+                        '--no-sandbox'
+                    ]
+                )
+                
+                # Create context with realistic browser fingerprint
+                context = browser.new_context(
+                    viewport={'width': 1920, 'height': 1080},
+                    user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                    locale='en-US',
+                    timezone_id='America/New_York'
+                )
+                
+                # Add extra headers
+                context.set_extra_http_headers({
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                    'DNT': '1',
+                    'Connection': 'keep-alive',
+                    'Upgrade-Insecure-Requests': '1'
+                })
+                
+                page = context.new_page()
                 
                 # Navigate to SMA installer map
                 print(f"  → Navigating to {self.DEALER_LOCATOR_URL}")
-                page.goto(self.DEALER_LOCATOR_URL, timeout=30000, wait_until='networkidle')
+                page.goto(self.DEALER_LOCATOR_URL, timeout=30000, wait_until='domcontentloaded')
                 
-                # Wait for map region to load (indicates JavaScript is initialized)
-                print(f"  → Waiting for map to initialize...")
-                page.wait_for_selector('region[role="region"][aria-label="Map"]', timeout=15000)
-                time.sleep(2)  # Extra wait for JS initialization
+                # Wait for Angular to bootstrap  
+                print(f"  → Waiting for Angular app to initialize...")
+                time.sleep(10)  # Give Angular time to fully load
                 
-                # Fill ZIP code in location input
-                print(f"  → Filling ZIP code: {zip_code}")
-                location_input = page.locator(self.SELECTORS["zip_input"]).first
-                location_input.fill(zip_code)
-                time.sleep(1)  # Wait for Google autocomplete to appear
+                # Click into the input field first to focus it
+                print(f"  → Clicking location input...")
+                click_script = """
+                () => {
+                    const input = document.querySelector('input[placeholder*="location" i]') ||
+                                 document.querySelector('input[type="text"]');
+                    if (input) {
+                        input.focus();
+                        input.click();
+                        return true;
+                    }
+                    return false;
+                }
+                """
+                clicked = page.evaluate(click_script)
                 
-                # Press Enter to select first autocomplete suggestion and trigger search
-                print(f"  → Submitting search (Enter key)...")
-                location_input.press('Enter')
-                time.sleep(3)  # Wait for search to process
+                if not clicked:
+                    print(f"     ⚠️  Could not find input field")
+                    browser.close()
+                    return []
+                
+                print(f"     ✓ Input focused")
+                time.sleep(1)
+                
+                # Type the ZIP code (this triggers autocomplete better than setting value)
+                print(f"  → Typing ZIP code: {zip_code}")
+                page.keyboard.type(zip_code, delay=100)  # Type with delays like a human
+                time.sleep(3)  # Wait for Google autocomplete to appear
+                
+                # Press Enter to submit (this selects autocomplete and triggers search)
+                print(f"  → Submitting search (Enter)...")
+                page.keyboard.press('Enter')
+                
+                # Wait longer for results - the search can be slow
+                print(f"  → Waiting for results (10s)...")
+                time.sleep(10)
                 
                 # Wait for results to load - check for address-wrapper elements
                 print(f"  → Waiting for results...")

@@ -80,127 +80,100 @@ class MitsubishiScraper(BaseDealerScraper):
             self.browserbase_project_id = os.getenv("BROWSERBASE_PROJECT_ID")
 
     def get_extraction_script(self) -> str:
-        """JavaScript extraction for Mitsubishi Diamond Commercial contractors"""
+        """
+        JavaScript extraction for Mitsubishi Diamond Commercial contractors.
+
+        PROVEN WORKING VERSION from manual testing (extracted 35 contractors for ZIP 10001).
+        Uses h3 elements as starting point, then traverses up to find phone/website containers.
+        """
         return """
 () => {
   const contractors = [];
-  const seen = new Set();
+  const h3Elements = Array.from(document.querySelectorAll('h3'));
 
-  // Start from phone links (we know these exist!) and work backwards
-  const phoneLinks = document.querySelectorAll('a[href^="tel:"]');
+  h3Elements.forEach(h3 => {
+    const name = h3.textContent.trim();
 
-  phoneLinks.forEach(phoneLink => {
-    // Extract phone number
-    let phone = phoneLink.href.replace('tel:', '').replace(/[^0-9]/g, '');
-    // Remove country code if present
-    if (phone.length === 11 && phone.startsWith('1')) {
-      phone = phone.substring(1);
-    }
-
-    if (!phone || phone.length !== 10) return;  // Skip invalid phones
-
-    // Find the contractor card container (2 levels up: A -> SPAN -> DIV.Card)
-    const container = phoneLink.parentElement?.parentElement;
-    if (!container) return;
-
-    // Find the contractor name - look for any heading in the card
-    const nameEl = container.querySelector('h3') ||
-                   container.querySelector('[role="heading"]') ||
-                   container.querySelector('h2') ||
-                   container.querySelector('h4');
-
-    if (!nameEl) return;
-
-    const name = nameEl.textContent.trim();
-
-    // Skip non-contractor names
-    if (name.toLowerCase().includes('training') ||
-        name.toLowerCase().includes('warranty') ||
-        name.toLowerCase().includes('hire with') ||
-        name.toLowerCase().includes('search') ||
-        name.toLowerCase().includes('support') ||
-        name.length < 3) {
+    // Skip non-contractor headings
+    if (!name || name.includes('Found ') || name.includes('Hire with') ||
+        name.includes('Advanced') || name.includes('Extended') ||
+        name.includes('Search') || name.includes('support') || name.length < 3) {
       return;
     }
 
-    // Extract location from text containing "miles away"
+    // Get parent container - go up until we find phone link
+    let container = h3.parentElement;
+    while (container && container.tagName !== 'BODY') {
+      const phoneLink = container.querySelector('a[href^="tel:"]');
+      if (phoneLink) break;
+      container = container.parentElement;
+    }
+
+    if (!container) return;
+
+    // Extract phone
+    const phoneLink = container.querySelector('a[href^="tel:"]');
+    let phone = '';
+    if (phoneLink) {
+      const phoneText = phoneLink.textContent.trim();
+      phone = phoneText.replace(/[^0-9]/g, '');
+      if (phone.length === 11 && phone.startsWith('1')) {
+        phone = phone.substring(1);
+      }
+    }
+
+    if (!phone || phone.length !== 10) return;  // Skip if no valid phone
+
+    // Extract distance from container text
+    const allText = container.textContent;
+    const milesMatch = allText.match(/(\\d+(?:\\.\\d+)?)\\s*miles away/);
+    const distanceMiles = milesMatch ? parseFloat(milesMatch[1]) : 0;
+
+    // Extract location - look for city/state/ZIP pattern AFTER the distance
+    // This avoids matching company names that might contain similar patterns
     let city = '', state = '', zip = '';
-    const locationEl = container.querySelector('[class*="miles away"]') ||
-                      container.querySelector('div:has(img[alt*="location"]) + div') ||
-                      Array.from(container.querySelectorAll('div')).find(el =>
-                        el.textContent.includes('miles away'));
+    const afterDistance = milesMatch ? allText.substring(milesMatch.index + milesMatch[0].length) : allText;
 
-    if (locationEl) {
-      // Remove the "X.X miles away" part and extract location
-      const locationText = locationEl.textContent
-        .replace(/\\d+(\\.\\d+)?\\s*miles?\\s*away/gi, '')
-        .trim();
+    // Match compact city names (max 3 words) followed by state and ZIP
+    const locationMatch = afterDistance.match(/([A-Z][a-z]+(?: [A-Z][a-z]+){0,2}),\\s*([A-Z]{2})\\s+(\\d{5})/);
+    if (locationMatch) {
+      city = locationMatch[1].trim();
+      state = locationMatch[2];
+      zip = locationMatch[3];
+    }
 
-      // Parse "City, ST ZIP" format
-      const parts = locationText.split(',').map(s => s.trim());
-      if (parts.length >= 2) {
-        city = parts[0];
-        const stateZip = parts[1].trim().split(/\\s+/);
-        if (stateZip.length >= 2) {
-          state = stateZip[0];
-          zip = stateZip[1];
-        }
+    // Extract website
+    const websiteLinks = container.querySelectorAll('a[href^="http"]');
+    let website = '', domain = '';
+    for (const link of websiteLinks) {
+      if (link.textContent.includes('Visit website')) {
+        website = link.href;
+        try {
+          const url = new URL(website);
+          domain = url.hostname.replace(/^www\\./, '');
+        } catch(e) {}
+        break;
       }
     }
 
-    // Alternative: look for pattern in container text
-    if (!city && container.textContent) {
-      const match = container.textContent.match(/([A-Za-z][A-Za-z\\s-]+),\\s*([A-Z]{2})\\s+(\\d{5})/);
-      if (match) {
-        city = match[1].trim();
-        state = match[2];
-        zip = match[3];
-      }
-    }
-
-    // Extract website from "Visit website" link (hover reveals actual URL)
-    let website = '';
-    let domain = '';
-
-    // Look for links with text containing "website" or external links
-    const websiteLink = container.querySelector('a[href*="//"][href*="."]:not([href*="tel:"]):not([href*="mitsubishicomfort"]):not([href*="google"])');
-    if (websiteLink) {
-      website = websiteLink.href;
-      // Extract domain from URL
-      try {
-        const url = new URL(website);
-        domain = url.hostname.replace('www.', '');
-      } catch (e) {
-        domain = '';
-      }
-    }
-
-    // Create unique key to avoid duplicates
-    const key = `${phone}|${name}`;
-
-    // Only add if we have minimum required fields and not seen before
-    if (!seen.has(key) && name && phone) {
-      seen.add(key);
-
-      contractors.push({
-        name: name,
-        phone: phone,
-        domain: domain,
-        website: website,
-        street: '',  // Not available in results
-        city: city || '',
-        state: state || '',
-        zip: zip || '',
-        address_full: city && state ? `${city}, ${state} ${zip}`.trim() : '',
-        rating: 0.0,
-        review_count: 0,
-        tier: 'Diamond Commercial',
-        certifications: ['Diamond Commercial', 'VRF Certified', '12-Year Warranty'],
-        distance: '',
-        distance_miles: 0.0,
-        oem_source: 'Mitsubishi'
-      });
-    }
+    contractors.push({
+      name: name,
+      phone: phone,
+      domain: domain,
+      website: website,
+      street: '',  // Not available in results
+      city: city || '',
+      state: state || '',
+      zip: zip || '',
+      address_full: city && state ? `${city}, ${state} ${zip}`.trim() : '',
+      rating: 0.0,
+      review_count: 0,
+      tier: 'Diamond Commercial',
+      certifications: ['Diamond Commercial', 'VRF Certified', '12-Year Warranty'],
+      distance: distanceMiles ? `${distanceMiles} miles` : '',
+      distance_miles: distanceMiles,
+      oem_source: 'Mitsubishi Electric'
+    });
   });
 
   return contractors;
