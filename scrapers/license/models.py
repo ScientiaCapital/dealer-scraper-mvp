@@ -1,6 +1,13 @@
 from dataclasses import dataclass, field
 from datetime import datetime, date
 from typing import Optional, List
+from enum import Enum
+
+class ScraperMode(Enum):
+    """Execution modes for scrapers"""
+    PLAYWRIGHT = "playwright"  # Local browser automation
+    RUNPOD = "runpod"          # Cloud serverless (pay-per-second)
+    BROWSERBASE = "browserbase"  # Cloud managed browsers (residential IPs)
 
 @dataclass
 class StandardizedLicensee:
