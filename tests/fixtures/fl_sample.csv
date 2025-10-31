@@ -1,0 +1,6 @@
+License Number,Name,License Type,Primary Status,Original License Date,Expiration Date,Address Line 1,City,State,Zip Code,County,Phone,Email
+ER0012345,Florida Electric Pro LLC,ER,Active,2018-05-10,2025-05-10,123 Palm Ave,Miami,FL,33101,Miami-Dade,305-555-1000,info@flelectricpro.com
+EL0056789,Low Voltage Systems Inc,EL,Active,2020-02-15,2026-02-15,456 Ocean Blvd,Tampa,FL,33601,Hillsborough,813-555-2000,contact@lowvoltagefl.com
+CAC0098765,AC Masters of Florida,CAC,Active,2017-09-22,2024-09-22,789 Sunshine Rd,Orlando,FL,32801,Orange,407-555-3000,sales@acmasters.com
+ER0011111,Inactive Electric Corp,ER,Inactive,2015-03-11,2023-03-11,321 Bay St,Jacksonville,FL,32201,Duval,904-555-4000,
+CAC0022222,Premier HVAC Solutions,CAC,Active,2019-11-08,2025-11-08,654 Gulf Dr,Fort Myers,FL,33901,Lee,239-555-5000,hello@premierhvacfl.com
