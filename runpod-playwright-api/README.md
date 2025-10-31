@@ -184,11 +184,14 @@ bash examples/test_curl.sh
 ### Python Integration (Recommended)
 
 ```python
-from scraper import DealerScraper, ScraperMode
+# Note: Legacy scraper.py has been archived to docs/archive/legacy_code/
+# Use scrapers/scraper_factory.py instead:
+from scrapers.scraper_factory import ScraperFactory
+from scrapers.base_scraper import ScraperMode
 from config import ZIP_CODES_TEST
 
 # Initialize with RunPod mode
-scraper = DealerScraper(mode=ScraperMode.RUNPOD)
+scraper = ScraperFactory.create("Generac", mode=ScraperMode.RUNPOD)
 
 # Scrape a single ZIP code
 dealers = scraper.scrape_zip_code("53202")

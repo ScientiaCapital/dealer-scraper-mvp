@@ -187,7 +187,8 @@ git push origin main
 ## Project-Specific Context
 
 ### Current Development State
-- **18 OEM Scrapers**: All production-ready (Generators, Solar, Batteries, HVAC)
+- **8,277 unique contractors from 10 OEMs** (as of Oct 29, 2025)
+- **198 multi-OEM contractors** (2.4% - highest value prospects)
 - **Latest Addition**: Mitsubishi Diamond Commercial VRF contractors (resimercial HVAC signal)
 - **HVAC Expansion**: 4 brands planned (Mitsubishi, Lennox, Trane, Carrier)
 - **Multi-OEM Detection**: Enhanced fuzzy matching + phone/domain deduplication

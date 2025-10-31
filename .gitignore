@@ -54,21 +54,34 @@ Thumbs.db
 
 # Logs
 *.log
+*.log.*
 
-# Proprietary implementations (secret sauce)
-extraction.js
-config.py
-analysis/
-targeting/
-scrapers/generac_scraper.py
-scrapers/tesla_scraper.py
-scrapers/enphase_scraper.py
-scraper.py
-scripts/generate_leads.py
-enrichment/
-crm/
-data/
-CLAUDE.md
-QUICKSTART.md
-FINDINGS.md
-API_KEYS_GUIDE.md
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/
+coverage.xml
+*.cover
+
+# Test artifacts
+.pytest_cache/
+.tox/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*.swp
+*~
+
+# Output files (keep structure, ignore data)
+output/*.csv
+output/*.json
+output/*.log
+output/debug/
+output/archive/
+!output/.gitkeep
+
+# Documentation backups (archived versions)
+docs/archive/
