@@ -1,0 +1,6 @@
+License Number,Business Name,License Type,License Status,Issue Date,Expiration Date,Business Address,City,State,ZIP Code,County,Business Phone,Email
+123456,ABC Electrical Services,C-10,Active,2020-01-15,2026-01-15,1234 Main St,Los Angeles,CA,90001,Los Angeles,323-555-0100,contact@abcelectrical.com
+789012,XYZ HVAC Corp,C-20,Active,2019-06-20,2025-06-20,5678 Oak Ave,San Francisco,CA,94102,San Francisco,415-555-0200,info@xyzhvac.com
+345678,Low Voltage Solutions LLC,C-7,Active,2021-03-10,2027-03-10,9012 Pine Blvd,San Diego,CA,92101,San Diego,619-555-0300,sales@lowvoltage.com
+901234,Inactive Electric Inc,C-10,Inactive,2015-08-05,2023-08-05,3456 Elm St,Sacramento,CA,95814,Sacramento,916-555-0400,
+567890,Premier HVAC & Electric,C-20,Active,2018-11-22,2024-11-22,7890 Maple Dr,Los Angeles,CA,90210,Los Angeles,310-555-0500,contact@premierhvac.com

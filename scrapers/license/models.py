@@ -29,21 +29,21 @@ class StandardizedLicensee:
     source_tier: str  # "BULK", "API", "SCRAPER"
 
     # Optional identity fields
-    business_name: Optional[str]
+    business_name: Optional[str] = None
 
     # License metadata (optional dates)
-    issue_date: Optional[date]
-    expiration_date: Optional[date]
-    original_issue_date: Optional[date]  # First licensed (growth signal)
+    issue_date: Optional[date] = None
+    expiration_date: Optional[date] = None
+    original_issue_date: Optional[date] = None  # First licensed (growth signal)
 
     # Contact information (optional)
-    phone: Optional[str]
-    email: Optional[str]
-    website: Optional[str]
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    website: Optional[str] = None
 
     # Location (optional)
-    street: Optional[str]
-    county: Optional[str]
+    street: Optional[str] = None
+    county: Optional[str] = None
 
     # Business details (optional - rich states only: CA, TX, FL)
     insurance_info: Optional[str] = None

@@ -18,13 +18,75 @@ class CaliforniaScraper(BulkDownloadScraper):
         """
         Parse California CSLB CSV file.
 
-        TODO: Implement CSV parsing with pandas
-        - Expected columns: License Number, Business Name, License Type, Status, etc.
-        - Map to StandardizedLicensee fields
-        - Filter by license_types from config (C-10, C-7, C-20)
+        Expected columns: License Number, Business Name, License Type, License Status,
+                         Issue Date, Expiration Date, Business Address, City, State,
+                         ZIP Code, County, Business Phone, Email
         """
-        # Placeholder until we implement CSV parsing
-        return []
+        import pandas as pd
+
+        # License type mapping: CA codes -> StandardizedLicensee types
+        LICENSE_TYPE_MAP = {
+            "C-10": "Electrical",
+            "C-7": "LowVoltage",
+            "C-20": "HVAC"
+        }
+
+        # Read CSV
+        df = pd.read_csv(file_path)
+
+        licensees = []
+        for _, row in df.iterrows():
+            # Map license type
+            ca_license_type = row.get("License Type", "")
+            license_type = LICENSE_TYPE_MAP.get(ca_license_type, ca_license_type)
+
+            # Parse dates
+            issue_date = None
+            if pd.notna(row.get("Issue Date")):
+                try:
+                    issue_date = pd.to_datetime(row["Issue Date"]).date()
+                except:
+                    pass
+
+            expiration_date = None
+            if pd.notna(row.get("Expiration Date")):
+                try:
+                    expiration_date = pd.to_datetime(row["Expiration Date"]).date()
+                except:
+                    pass
+
+            # Handle optional fields
+            email = row.get("Email")
+            if pd.isna(email) or email == "":
+                email = None
+
+            phone = row.get("Business Phone")
+            if pd.isna(phone):
+                phone = None
+
+            # Create StandardizedLicensee
+            licensee = StandardizedLicensee(
+                licensee_name=row.get("Business Name", ""),
+                license_number=str(row.get("License Number", "")),
+                license_type=license_type,
+                license_status=row.get("License Status", ""),
+                city=row.get("City", ""),
+                state=row.get("State", "CA"),
+                zip=str(row.get("ZIP Code", "")),
+                source_state="CA",
+                source_tier="BULK",
+                business_name=row.get("Business Name", ""),
+                issue_date=issue_date,
+                expiration_date=expiration_date,
+                phone=phone,
+                email=email,
+                street=row.get("Business Address"),
+                county=row.get("County")
+            )
+
+            licensees.append(licensee)
+
+        return licensees
 
 
 class FloridaScraper(BulkDownloadScraper):
