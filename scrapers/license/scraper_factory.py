@@ -184,13 +184,78 @@ class TexasScraper(BulkDownloadScraper):
         """
         Parse Texas TDLR Excel file.
 
-        TODO: Implement Excel parsing with openpyxl
-        - Expected columns: License Number, Business Name, License Type, Status, etc.
-        - Map to StandardizedLicensee fields
-        - Filter by license_types from config (Electrical, Low Voltage, Air Conditioning)
+        Expected columns: License Number, Company Name, License Type, License Status,
+                         Issue Date, Expiration Date, Street Address, City, State,
+                         ZIP, County, Phone Number, Email Address
         """
-        # Placeholder until we implement Excel parsing
-        return []
+        import pandas as pd
+
+        # License type mapping: TX descriptions -> StandardizedLicensee types
+        LICENSE_TYPE_MAP = {
+            "Electrical Contractor": "Electrical",
+            "Low Voltage Contractor": "LowVoltage",
+            "Air Conditioning Contractor": "HVAC"
+        }
+
+        # Read Excel or CSV (pandas handles both)
+        if file_path.endswith('.xlsx') or file_path.endswith('.xls'):
+            df = pd.read_excel(file_path)
+        else:
+            df = pd.read_csv(file_path)
+
+        licensees = []
+        for _, row in df.iterrows():
+            # Map license type
+            tx_license_type = row.get("License Type", "")
+            license_type = LICENSE_TYPE_MAP.get(tx_license_type, tx_license_type)
+
+            # Parse dates
+            issue_date = None
+            if pd.notna(row.get("Issue Date")):
+                try:
+                    issue_date = pd.to_datetime(row["Issue Date"]).date()
+                except:
+                    pass
+
+            expiration_date = None
+            if pd.notna(row.get("Expiration Date")):
+                try:
+                    expiration_date = pd.to_datetime(row["Expiration Date"]).date()
+                except:
+                    pass
+
+            # Handle optional fields
+            email = row.get("Email Address")
+            if pd.isna(email) or email == "":
+                email = None
+
+            phone = row.get("Phone Number")
+            if pd.isna(phone):
+                phone = None
+
+            # Create StandardizedLicensee
+            licensee = StandardizedLicensee(
+                licensee_name=row.get("Company Name", ""),
+                license_number=str(row.get("License Number", "")),
+                license_type=license_type,
+                license_status=row.get("License Status", ""),
+                city=row.get("City", ""),
+                state=row.get("State", "TX"),
+                zip=str(row.get("ZIP", "")),
+                source_state="TX",
+                source_tier="BULK",
+                business_name=row.get("Company Name", ""),
+                issue_date=issue_date,
+                expiration_date=expiration_date,
+                phone=phone,
+                email=email,
+                street=row.get("Street Address"),
+                county=row.get("County")
+            )
+
+            licensees.append(licensee)
+
+        return licensees
 
 
 # ==================== Factory ====================

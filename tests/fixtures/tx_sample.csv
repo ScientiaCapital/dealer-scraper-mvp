@@ -1,0 +1,6 @@
+License Number,Company Name,License Type,License Status,Issue Date,Expiration Date,Street Address,City,State,ZIP,County,Phone Number,Email Address
+EC123456,Texas Electric Services LLC,Electrical Contractor,Active,2019-03-15,2025-03-15,1234 Longhorn Dr,Austin,TX,78701,Travis,512-555-1000,info@txelectric.com
+LV456789,Low Voltage Specialists,Low Voltage Contractor,Active,2020-07-22,2026-07-22,5678 Bluebonnet Ave,Houston,TX,77002,Harris,713-555-2000,contact@lowvoltagetx.com
+AC789012,Cool Air HVAC Corp,Air Conditioning Contractor,Active,2018-11-05,2024-11-05,9012 Armadillo Blvd,Dallas,TX,75201,Dallas,214-555-3000,sales@coolairhvac.com
+EC111222,Inactive Electric Inc,Electrical Contractor,Inactive,2016-02-18,2023-02-18,3456 Rio Grande St,San Antonio,TX,78201,Bexar,210-555-4000,
+AC333444,Premier Climate Control,Air Conditioning Contractor,Active,2021-09-10,2027-09-10,7890 Mockingbird Ln,Fort Worth,TX,76102,Tarrant,817-555-5000,hello@premierclimate.com
