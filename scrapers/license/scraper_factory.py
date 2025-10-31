@@ -101,13 +101,75 @@ class FloridaScraper(BulkDownloadScraper):
         """
         Parse Florida MyFloridaLicense CSV file.
 
-        TODO: Implement CSV parsing with pandas
-        - Expected columns: License Number, Name, License Type, Status, etc.
-        - Map to StandardizedLicensee fields
-        - Filter by license_types from config (ER, EL, CAC)
+        Expected columns: License Number, Name, License Type, Primary Status,
+                         Original License Date, Expiration Date, Address Line 1,
+                         City, State, Zip Code, County, Phone, Email
         """
-        # Placeholder until we implement CSV parsing
-        return []
+        import pandas as pd
+
+        # License type mapping: FL codes -> StandardizedLicensee types
+        LICENSE_TYPE_MAP = {
+            "ER": "Electrical",
+            "EL": "LowVoltage",
+            "CAC": "HVAC"
+        }
+
+        # Read CSV
+        df = pd.read_csv(file_path)
+
+        licensees = []
+        for _, row in df.iterrows():
+            # Map license type
+            fl_license_type = row.get("License Type", "")
+            license_type = LICENSE_TYPE_MAP.get(fl_license_type, fl_license_type)
+
+            # Parse dates
+            original_issue_date = None
+            if pd.notna(row.get("Original License Date")):
+                try:
+                    original_issue_date = pd.to_datetime(row["Original License Date"]).date()
+                except:
+                    pass
+
+            expiration_date = None
+            if pd.notna(row.get("Expiration Date")):
+                try:
+                    expiration_date = pd.to_datetime(row["Expiration Date"]).date()
+                except:
+                    pass
+
+            # Handle optional fields
+            email = row.get("Email")
+            if pd.isna(email) or email == "":
+                email = None
+
+            phone = row.get("Phone")
+            if pd.isna(phone):
+                phone = None
+
+            # Create StandardizedLicensee
+            licensee = StandardizedLicensee(
+                licensee_name=row.get("Name", ""),
+                license_number=str(row.get("License Number", "")),
+                license_type=license_type,
+                license_status=row.get("Primary Status", ""),
+                city=row.get("City", ""),
+                state=row.get("State", "FL"),
+                zip=str(row.get("Zip Code", "")),
+                source_state="FL",
+                source_tier="BULK",
+                business_name=row.get("Name", ""),
+                original_issue_date=original_issue_date,
+                expiration_date=expiration_date,
+                phone=phone,
+                email=email,
+                street=row.get("Address Line 1"),
+                county=row.get("County")
+            )
+
+            licensees.append(licensee)
+
+        return licensees
 
 
 class TexasScraper(BulkDownloadScraper):
