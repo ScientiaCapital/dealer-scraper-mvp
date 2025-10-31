@@ -37,6 +37,7 @@ docker-compose.override.yml
 # Playwright and MCP tools
 .playwright-mcp/
 .serena/
+.worktrees/
 
 # Patchright stealth browser
 patchright-chrome-profile/
