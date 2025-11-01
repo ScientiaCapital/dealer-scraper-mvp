@@ -21,7 +21,7 @@ from scrapers.base_scraper import BaseDealerScraper, DealerCapabilities
 from scrapers.scraper_factory import ScraperFactory
 
 # Auto-import all OEM scrapers to self-register with factory
-from scrapers import generac_scraper
+# NOTE: generac_scraper removed - file doesn't exist yet
 from scrapers import briggs_scraper
 from scrapers import cummins_scraper
 from scrapers import kohler_scraper

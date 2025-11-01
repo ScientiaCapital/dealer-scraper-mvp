@@ -25,10 +25,11 @@ from scrapers.scraper_factory import ScraperFactory
 from scrapers.base_scraper import ScraperMode
 
 # Import all scrapers to trigger self-registration
-import scrapers.generac_scraper
-import scrapers.tesla_scraper
-import scrapers.enphase_scraper
-import scrapers.solaredge_scraper
+# NOTE: Only importing scrapers that exist - others need to be created
+# import scrapers.generac_scraper  # TODO: Create this file
+# import scrapers.tesla_scraper     # TODO: Create this file
+# import scrapers.enphase_scraper   # TODO: Create this file
+import scrapers.solaredge_scraper  # Exists
 
 # Test ZIPs for each OEM
 TEST_ZIPS = {
