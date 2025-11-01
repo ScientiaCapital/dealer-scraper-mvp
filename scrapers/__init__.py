@@ -7,7 +7,7 @@ Supports scraping installer/dealer networks across multiple OEM brands:
 - Cummins (generators) - NEEDS DOM INSPECTION
 - Kohler (generators) - NEEDS DOM INSPECTION
 - Tesla Powerwall (batteries + solar) - PRODUCTION READY ✅
-- Enphase (microinverters + batteries) - STRUCTURE READY
+- Enphase (microinverters + batteries) - PRODUCTION READY ✅
 - Fronius (string inverters + hybrid systems) - PRODUCTION READY
 - Sol-Ark (hybrid inverters + battery storage) - PRODUCTION READY
 - SimpliPhi (LFP batteries + energy storage) - PRODUCTION READY
@@ -23,6 +23,7 @@ from scrapers.scraper_factory import ScraperFactory
 # Auto-import all OEM scrapers to self-register with factory
 # NOTE: generac_scraper removed - file doesn't exist yet
 from scrapers import tesla_scraper
+from scrapers import enphase_scraper
 from scrapers import briggs_scraper
 from scrapers import cummins_scraper
 from scrapers import kohler_scraper
