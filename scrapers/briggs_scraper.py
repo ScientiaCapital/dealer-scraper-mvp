@@ -46,6 +46,7 @@ class BriggsStrattonScraper(BaseDealerScraper):
     # CSS Selectors
     SELECTORS = {
         "cookie_accept": "button:has-text('Accept All')",
+        "country_selector": "#dealer-country",
         "zip_input": "input[placeholder*='Zip' i], input[placeholder*='City' i]",
         "search_button": "#dealer-form button",
     }
@@ -447,10 +448,11 @@ class BriggsStrattonScraper(BaseDealerScraper):
                 "Missing RunPod credentials. Set RUNPOD_API_KEY and RUNPOD_ENDPOINT_ID in .env"
             )
 
-        # Build 6-step workflow for Briggs & Stratton
+        # Build 7-step workflow for Briggs & Stratton
         workflow = [
             {"action": "navigate", "url": self.DEALER_LOCATOR_URL},
             {"action": "click", "selector": self.SELECTORS["cookie_accept"]},
+            {"action": "select", "selector": self.SELECTORS["country_selector"], "value": "United States"},
             {"action": "fill", "selector": self.SELECTORS["zip_input"], "text": zip_code},
             {"action": "click", "selector": self.SELECTORS["search_button"]},
             {"action": "wait", "timeout": 3000},  # 3 seconds for AJAX
