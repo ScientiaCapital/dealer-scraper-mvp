@@ -3,10 +3,9 @@ Multi-OEM Dealer Network Scraper Framework
 
 Supports scraping installer/dealer networks across multiple OEM brands:
 - HVAC Systems: Carrier, Trane, Lennox, York, Rheem, Mitsubishi
-- Generators: Briggs & Stratton, Cummins, Kohler
-- Solar Inverters: Fronius, SMA, Sol-Ark, GoodWe, Growatt, Sungrow, ABB, Delta, Tigo, SolarEdge
-- Battery Storage: SimpliPhi
-- Future: Generac, Tesla, Enphase (need conversion to unified framework)
+- Generators: Generac, Briggs & Stratton, Cummins, Kohler
+- Solar Inverters: Tesla, Enphase, Fronius, SMA, Sol-Ark, SolarEdge, GoodWe, Growatt, Sungrow, ABB, Delta, Tigo
+- Battery Storage: Tesla Powerwall, SimpliPhi
 
 Used for Coperniq's partner prospecting system to identify
 multi-brand contractors who need brand-agnostic monitoring.
@@ -16,6 +15,7 @@ from scrapers.base_scraper import BaseDealerScraper, DealerCapabilities
 from scrapers.scraper_factory import ScraperFactory
 
 # Auto-import all OEM scrapers to self-register with factory
+from scrapers import tesla_scraper
 from scrapers import briggs_scraper
 from scrapers import cummins_scraper
 from scrapers import kohler_scraper
