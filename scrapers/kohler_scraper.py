@@ -74,108 +74,194 @@ class KohlerScraper(BaseDealerScraper):
         """
         JavaScript extraction script for Kohler dealer data.
 
-        ⚠️ PLACEHOLDER - Needs manual DOM inspection ⚠️
+        VALIDATED: Tested on https://www.kohlerhomeenergy.rehlko.com/find-a-dealer
+        ZIP 94102 (San Francisco) - 3 dealers extracted successfully
 
-        To complete this script:
-        1. Run this scraper in PLAYWRIGHT mode
-        2. Navigate to dealer locator and search a ZIP code
-        3. Inspect the dealer cards in browser DevTools
-        4. Identify selectors for: name, address, phone, website, tier, distance
-        5. Update this script with correct DOM traversal logic
-
-        Expected return format:
-        [
-          {
-            name: "DEALER NAME",
-            phone: "(555) 555-5555",
-            website: "https://example.com",
-            domain: "example.com",
-            street: "123 Main St",
-            city: "City",
-            state: "ST",
-            zip: "12345",
-            address_full: "123 Main St, City, ST 12345",
-            rating: 4.5,
-            review_count: 42,
-            tier: "Certified Installer",
-            certifications: ["Certified Installer"],
-            distance: "5.2 mi",
-            distance_miles: 5.2
-          }
-        ]
+        Data Pattern:
+        Kohler uses list-based dealer locator with dealer cards:
+        - Dealer cards: ul > li (list items, found by searching for ul with phone links)
+        - Name: First paragraph
+        - Distance: Second paragraph (format: "51.5 miles")
+        - Tier badges: Gold Dealer, Silver Dealer, Bronze Dealer, Titan Certified
+        - Address: Paragraph (format: "150 NARDI LANE, Martinez, CA 94553")
+        - Phone: a[href^="tel:"]
+        - Website: a with text "Website"
+        - Services: Paragraph with "Sales, Installation, and Service up to XkW"
         """
+
+        # Read the validated extraction.js script
+        extraction_script_path = os.path.join(
+            os.path.dirname(__file__),
+            "kohler",
+            "extraction.js"
+        )
+
+        # If extraction.js exists, read it; otherwise use inline version
+        if os.path.exists(extraction_script_path):
+            with open(extraction_script_path, 'r') as f:
+                # Extract just the function body (skip comments and function wrapper)
+                lines = f.readlines()
+                # Find the function definition and extract its body
+                in_function = False
+                function_lines = []
+                for line in lines:
+                    if 'function extractKohlerDealers()' in line:
+                        in_function = True
+                        continue
+                    if in_function:
+                        function_lines.append(line)
+
+                # Join and wrap in IIFE
+                return "() => {\n" + "".join(function_lines) + "\n}"
+
+        # Fallback inline version (validated)
         return """
 () => {
-  // TODO: Inspect Kohler dealer locator DOM structure
-  // This is a PLACEHOLDER extraction script
+  console.log('[Kohler] Starting dealer extraction...');
 
-  console.warn("Kohler extraction script needs manual DOM inspection");
+  // Find the dealer results list (contains phone links)
+  const allLists = Array.from(document.querySelectorAll('ul'));
+  let dealerList = null;
 
-  // Example pattern (update based on actual site structure):
-  const dealerCards = Array.from(document.querySelectorAll('.dealer, .location, [class*="dealer"], [class*="location"]'));
-
-  const dealers = dealerCards.map(card => {
-    // Extract dealer name
-    const nameEl = card.querySelector('h2, h3, h4, .dealer-name, .location-name, [class*="name"]');
-    const name = nameEl ? nameEl.textContent.trim() : '';
-
-    // Extract phone
-    const phoneLink = card.querySelector('a[href^="tel:"]');
-    const phone = phoneLink ? phoneLink.textContent.trim() : '';
-
-    // Extract address
-    const addressEl = card.querySelector('.address, [class*="address"]');
-    const addressText = addressEl ? addressEl.textContent.trim() : '';
-
-    // Parse address components (adjust regex based on format)
-    const streetMatch = addressText.match(/(\\d+\\s+[^,\\n]+)/);
-    const street = streetMatch ? streetMatch[1].trim() : '';
-
-    const cityStateZip = addressText.match(/([^,]+),\\s*([A-Z]{2})\\s+(\\d{5})/);
-    const city = cityStateZip ? cityStateZip[1].trim() : '';
-    const state = cityStateZip ? cityStateZip[2] : '';
-    const zip = cityStateZip ? cityStateZip[3] : '';
-
-    // Extract website
-    const websiteLink = card.querySelector('a[href^="http"]:not([href*="tel:"]):not([href*="google"]):not([href*="facebook"])');
-    const website = websiteLink ? websiteLink.href : '';
-
-    let domain = '';
-    if (website) {
-      try {
-        const url = new URL(website);
-        domain = url.hostname.replace('www.', '');
-      } catch (e) {}
+  for (const list of allLists) {
+    const phoneLinks = list.querySelectorAll('a[href^="tel:"]');
+    if (phoneLinks.length > 0) {
+      dealerList = list;
+      break;
     }
+  }
 
-    // Extract distance
-    const distanceEl = card.querySelector('.distance, [class*="distance"], [class*="miles"]');
-    const distance = distanceEl ? distanceEl.textContent.trim() : '';
-    const distanceMiles = parseFloat(distance) || 0;
+  if (!dealerList) {
+    console.log('[Kohler] No dealer list found');
+    return [];
+  }
 
-    // Extract tier (may not be shown on Kohler site)
-    const tier = 'Certified Installer';
+  const dealerCards = Array.from(dealerList.querySelectorAll('li'));
+  console.log(`[Kohler] Found ${dealerCards.length} dealer cards`);
 
-    return {
-      name: name,
-      phone: phone,
-      website: website,
-      domain: domain,
-      street: street,
-      city: city,
-      state: state,
-      zip: zip,
-      address_full: street && city ? `${street}, ${city}, ${state} ${zip}` : '',
-      rating: 0,  // Kohler may not show ratings
-      review_count: 0,
-      tier: tier,
-      certifications: [tier],
-      distance: distance,
-      distance_miles: distanceMiles
-    };
+  const dealers = dealerCards.map((card, index) => {
+    try {
+      const paragraphs = Array.from(card.querySelectorAll('p'));
+      const name = paragraphs[0] ? paragraphs[0].textContent.trim() : '';
+
+      let distance = '';
+      let distance_miles = 0;
+      if (paragraphs[1]) {
+        distance = paragraphs[1].textContent.trim();
+        const milesMatch = distance.match(/([\\d.]+)\\s*miles?/i);
+        if (milesMatch) {
+          distance_miles = parseFloat(milesMatch[1]);
+          distance = `${distance_miles} mi`;
+        }
+      }
+
+      const cardText = card.textContent;
+      let tier = 'Certified Installer';
+      const certifications = [];
+
+      if (cardText.includes('Gold Dealer')) {
+        tier = 'Gold Dealer';
+        certifications.push('Gold Dealer');
+      } else if (cardText.includes('Silver Dealer')) {
+        tier = 'Silver Dealer';
+        certifications.push('Silver Dealer');
+      } else if (cardText.includes('Bronze Dealer')) {
+        tier = 'Bronze Dealer';
+        certifications.push('Bronze Dealer');
+      }
+
+      if (cardText.includes('Titan Certified')) {
+        certifications.push('Titan Certified');
+        if (tier === 'Certified Installer') {
+          tier = 'Titan Certified';
+        }
+      }
+
+      if (certifications.length === 0) {
+        certifications.push('Certified Installer');
+      }
+
+      const phoneLink = card.querySelector('a[href^="tel:"]');
+      const phone = phoneLink ? phoneLink.textContent.trim() : '';
+
+      const websiteLinks = Array.from(card.querySelectorAll('a[href^="http"]'));
+      let website = '';
+      let domain = '';
+
+      for (const link of websiteLinks) {
+        if (link.textContent.trim().toLowerCase() === 'website') {
+          website = link.href;
+          break;
+        }
+      }
+
+      if (website) {
+        try {
+          const url = new URL(website);
+          domain = url.hostname.replace('www.', '');
+        } catch (e) {
+          console.log(`[Kohler] Card ${index + 1}: Invalid website URL`);
+        }
+      }
+
+      let street = '';
+      let city = '';
+      let state = '';
+      let zip = '';
+      let address_full = '';
+
+      for (const p of paragraphs) {
+        const text = p.textContent.trim();
+        if (text.match(/\\d+\\s+[^,]+,\\s*[^,]+,\\s*[A-Z]{2}\\s+\\d{5}/)) {
+          address_full = text;
+          const addressMatch = text.match(/^(.+),\\s*([^,]+),\\s*([A-Z]{2})\\s+(\\d{5})/);
+          if (addressMatch) {
+            street = addressMatch[1].trim();
+            city = addressMatch[2].trim();
+            state = addressMatch[3].trim();
+            zip = addressMatch[4].trim();
+          }
+          break;
+        }
+      }
+
+      let services = '';
+      for (const p of paragraphs) {
+        const text = p.textContent.trim();
+        if (text.includes('Sales') || text.includes('Installation') || text.includes('Service')) {
+          services = text;
+          break;
+        }
+      }
+
+      return {
+        name: name,
+        phone: phone,
+        website: website,
+        domain: domain,
+        street: street,
+        city: city,
+        state: state,
+        zip: zip,
+        address_full: address_full,
+        rating: 0,
+        review_count: 0,
+        tier: tier,
+        certifications: certifications,
+        distance: distance,
+        distance_miles: distance_miles,
+        services: services,
+        oem_source: 'Kohler'
+      };
+    } catch (e) {
+      console.error(`[Kohler] Error extracting dealer card ${index + 1}:`, e);
+      return null;
+    }
   });
 
-  return dealers.filter(d => d && d.name && d.phone);
+  const validDealers = dealers.filter(d => d && d.name && d.phone);
+  console.log(`[Kohler] Successfully extracted ${validDealers.length} valid dealers`);
+  return validDealers;
 }
 """
 

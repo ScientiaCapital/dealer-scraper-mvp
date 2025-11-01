@@ -7,7 +7,7 @@ Supports scraping installer/dealer networks across multiple OEM brands:
 - Enphase (microinverters + batteries) - PRODUCTION READY ✅
 - Briggs & Stratton (generators + battery storage) - PRODUCTION READY
 - Cummins (generators) - PRODUCTION READY ✅
-- Kohler (generators) - NEEDS DOM INSPECTION
+- Kohler (generators) - PRODUCTION READY ✅
 - Fronius (string inverters + hybrid systems) - PRODUCTION READY
 - Sol-Ark (hybrid inverters + battery storage) - PRODUCTION READY
 - SimpliPhi (LFP batteries + energy storage) - PRODUCTION READY
