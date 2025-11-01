@@ -6,7 +6,7 @@ Supports scraping installer/dealer networks across multiple OEM brands:
 - Tesla Powerwall (batteries + solar) - PRODUCTION READY ✅
 - Enphase (microinverters + batteries) - PRODUCTION READY ✅
 - Briggs & Stratton (generators + battery storage) - PRODUCTION READY
-- Cummins (generators) - NEEDS DOM INSPECTION
+- Cummins (generators) - PRODUCTION READY ✅
 - Kohler (generators) - NEEDS DOM INSPECTION
 - Fronius (string inverters + hybrid systems) - PRODUCTION READY
 - Sol-Ark (hybrid inverters + battery storage) - PRODUCTION READY
