@@ -12,6 +12,8 @@ NOTE: Currently 17 OEMs are production-ready. Missing:
 
 import sys
 import os
+import json
+import csv
 from datetime import datetime
 from pathlib import Path
 from fuzzywuzzy import fuzz
@@ -220,3 +222,133 @@ def deduplicate_dealers(dealers: List[Dict], oem_name: str) -> Tuple[List[Dict],
     print(f"  ✓ Deduplication complete: {initial_count} → {len(dealers_final)} (dedup rate: {total_dedup_rate:.1f}%)")
 
     return dealers_final, stats
+
+
+def generate_output_files(
+    raw_dealers: List[Dict],
+    deduped_dealers: List[Dict],
+    dedup_stats: Dict,
+    oem_name: str,
+    output_dir: Path
+) -> Dict[str, Path]:
+    """
+    Generate all output files for an OEM scraping run.
+
+    Generates 4 files:
+    1. {oem}_raw_{date}.json - All dealers with duplicates
+    2. {oem}_deduped_{date}.csv - Unique dealers after deduplication
+    3. {oem}_execution_{date}.log - Execution log
+    4. {oem}_dedup_report_{date}.txt - Deduplication report with fuzzy matches
+
+    Args:
+        raw_dealers: List of all dealers before deduplication
+        deduped_dealers: List of unique dealers after deduplication
+        dedup_stats: Statistics from deduplication pipeline
+        oem_name: Name of OEM (e.g., "Carrier")
+        output_dir: Output directory path
+
+    Returns:
+        Dict mapping file type to Path (e.g., {"raw_json": Path(...), "csv": Path(...)})
+    """
+    print(f"  → Generating output files...")
+
+    # Ensure output directory exists
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Normalize OEM name for filenames
+    oem_safe_name = oem_name.lower().replace(" ", "_").replace("&", "and")
+
+    generated_files = {}
+
+    # 1. Raw JSON (all dealers with duplicates)
+    raw_json_path = output_dir / f"{oem_safe_name}_raw_{TODAY}.json"
+    with open(raw_json_path, 'w') as f:
+        json.dump(raw_dealers, f, indent=2)
+    generated_files['raw_json'] = raw_json_path
+    print(f"     - {raw_json_path.name} ({len(raw_dealers)} dealers)")
+
+    # 2. Deduplicated CSV
+    csv_path = output_dir / f"{oem_safe_name}_deduped_{TODAY}.csv"
+    if deduped_dealers:
+        # Get all unique keys across all dealers
+        fieldnames = set()
+        for dealer in deduped_dealers:
+            fieldnames.update(dealer.keys())
+        fieldnames = sorted(fieldnames)
+
+        with open(csv_path, 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(deduped_dealers)
+    else:
+        # Create empty CSV with header
+        with open(csv_path, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['name', 'phone', 'domain', 'address', 'city', 'state', 'zip'])
+
+    generated_files['csv'] = csv_path
+    print(f"     - {csv_path.name} ({len(deduped_dealers)} unique)")
+
+    # 3. Execution log
+    log_path = output_dir / f"{oem_safe_name}_execution_{TODAY}.log"
+    with open(log_path, 'w') as f:
+        f.write(f"OEM: {oem_name}\n")
+        f.write(f"Execution Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        f.write(f"Target ZIPs: 264\n")
+        f.write(f"\n{'='*60}\n")
+        f.write(f"SCRAPING RESULTS\n")
+        f.write(f"{'='*60}\n")
+        f.write(f"Raw dealers scraped: {len(raw_dealers)}\n")
+        f.write(f"Unique dealers (after dedup): {len(deduped_dealers)}\n")
+        f.write(f"Deduplication rate: {dedup_stats.get('initial', 0) - dedup_stats.get('final', 0)}/{dedup_stats.get('initial', 0)} ")
+        dedup_pct = ((dedup_stats.get('initial', 0) - dedup_stats.get('final', 0)) / dedup_stats.get('initial', 1) * 100) if dedup_stats.get('initial', 0) > 0 else 0.0
+        f.write(f"({dedup_pct:.1f}%)\n")
+
+    generated_files['log'] = log_path
+    print(f"     - {log_path.name}")
+
+    # 4. Deduplication report
+    report_path = output_dir / f"{oem_safe_name}_dedup_report_{TODAY}.txt"
+    with open(report_path, 'w') as f:
+        f.write(f"{'='*80}\n")
+        f.write(f"DEDUPLICATION REPORT: {oem_name}\n")
+        f.write(f"{'='*80}\n\n")
+
+        f.write(f"Initial dealers: {dedup_stats.get('initial', 0)}\n")
+        f.write(f"Final unique dealers: {dedup_stats.get('final', 0)}\n")
+        f.write(f"Total removed: {dedup_stats.get('initial', 0) - dedup_stats.get('final', 0)}\n\n")
+
+        f.write(f"{'='*80}\n")
+        f.write(f"DEDUPLICATION BREAKDOWN\n")
+        f.write(f"{'='*80}\n\n")
+
+        phone_pct = (dedup_stats.get('phone_dupes', 0) / dedup_stats.get('initial', 1) * 100) if dedup_stats.get('initial', 0) > 0 else 0.0
+        f.write(f"Phase 1 - Phone Deduplication:\n")
+        f.write(f"  Duplicates removed: {dedup_stats.get('phone_dupes', 0)} ({phone_pct:.1f}%)\n\n")
+
+        domain_pct = (dedup_stats.get('domain_dupes', 0) / dedup_stats.get('initial', 1) * 100) if dedup_stats.get('initial', 0) > 0 else 0.0
+        f.write(f"Phase 2 - Domain Deduplication:\n")
+        f.write(f"  Duplicates removed: {dedup_stats.get('domain_dupes', 0)} ({domain_pct:.1f}%)\n\n")
+
+        fuzzy_pct = (dedup_stats.get('fuzzy_dupes', 0) / dedup_stats.get('initial', 1) * 100) if dedup_stats.get('initial', 0) > 0 else 0.0
+        f.write(f"Phase 3 - Fuzzy Name Matching (≥85% similarity):\n")
+        f.write(f"  Duplicates removed: {dedup_stats.get('fuzzy_dupes', 0)} ({fuzzy_pct:.1f}%)\n\n")
+
+        # Fuzzy match details
+        if dedup_stats.get('fuzzy_matches'):
+            f.write(f"{'='*80}\n")
+            f.write(f"FUZZY MATCHES DETECTED ({len(dedup_stats['fuzzy_matches'])} pairs)\n")
+            f.write(f"{'='*80}\n\n")
+
+            for i, match in enumerate(dedup_stats['fuzzy_matches'], 1):
+                f.write(f"{i}. \"{match['name1']}\" ↔ \"{match['name2']}\" ")
+                f.write(f"({match['similarity']}%, {match['state']})\n")
+        else:
+            f.write(f"No fuzzy name matches detected.\n")
+
+    generated_files['report'] = report_path
+    print(f"     - {report_path.name}")
+
+    print(f"  ✓ All output files generated")
+
+    return generated_files
