@@ -13,6 +13,10 @@ from typing import Dict, List, Optional, Set
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 import re
+import json
+import logging
+from datetime import datetime
+from pathlib import Path
 
 
 class ScraperMode(Enum):
@@ -397,16 +401,24 @@ class BaseDealerScraper(ABC):
         else:
             raise ValueError(f"Unknown scraper mode: {self.mode}")
     
-    def scrape_multiple(self, zip_codes: List[str], verbose: bool = True) -> List[StandardizedDealer]:
+    def scrape_multiple(
+        self,
+        zip_codes: List[str],
+        verbose: bool = True,
+        checkpoint_interval: int = 25,
+        checkpoint_dir: Optional[str] = None
+    ) -> List[StandardizedDealer]:
         """
-        Scrape multiple ZIP codes and return all dealers.
-        
+        Scrape dealers from multiple ZIP codes with automatic checkpoint saving.
+
         Args:
             zip_codes: List of ZIP codes to scrape
             verbose: Print progress messages
-        
+            checkpoint_interval: Save checkpoint every N ZIP codes (default: 25)
+            checkpoint_dir: Override default checkpoint directory
+
         Returns:
-            Combined list of all dealers from all ZIPs
+            List of all dealers collected
         """
         all_dealers = []
         
