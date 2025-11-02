@@ -521,10 +521,25 @@ def main():
             print(f"\n  → Scraping {len(ALL_ZIP_CODES)} ZIP codes...")
             print(f"     (Checkpoint saves every {CHECKPOINT_INTERVAL} ZIPs)")
 
-            raw_dealers = []
-            # TODO: Implement actual scraping with checkpoint system
-            # For now, this is a placeholder that will be implemented in Task 8 integration test
-            print(f"  ⚠️  Scraping not yet integrated (placeholder for Task 8)")
+            try:
+                raw_dealers = scraper.scrape_multiple(
+                    zip_codes=ALL_ZIP_CODES,
+                    verbose=True,
+                    checkpoint_interval=CHECKPOINT_INTERVAL
+                )
+                print(f"  ✓ Scraping complete: {len(raw_dealers)} dealers collected")
+            except Exception as e:
+                print(f"\n  ❌ ERROR during scraping:")
+                print(f"     {str(e)}")
+                import traceback
+                traceback.print_exc()
+
+                choice = input("\n  Options: (s)kip this OEM / (q)uit script: ").strip().lower()
+                if choice == 's':
+                    stats_summary['failed'].append({'oem': oem_name, 'error': f"Scraping error: {str(e)}"})
+                    continue
+                else:
+                    break
 
             # Step 5: Deduplicate dealers
             print(f"\n  → Deduplicating dealers...")
