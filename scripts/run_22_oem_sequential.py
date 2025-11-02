@@ -14,6 +14,9 @@ import sys
 import os
 from datetime import datetime
 from pathlib import Path
+from fuzzywuzzy import fuzz
+import pandas as pd
+from typing import List, Dict, Tuple
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -109,3 +112,102 @@ def prompt_user_confirmation(oem_name: str, oem_index: int, total_oems: int) -> 
             return 'skip'
         else:
             print("Invalid input. Enter y/n/skip:")
+
+
+def deduplicate_dealers(dealers: List[Dict], oem_name: str) -> Tuple[List[Dict], Dict]:
+    """
+    Deduplicate dealers using multi-signal matching (phone → domain → fuzzy name).
+
+    Args:
+        dealers: List of dealer dictionaries
+        oem_name: Name of OEM for logging
+
+    Returns:
+        (deduplicated_dealers, stats_dict)
+    """
+    print(f"  → Running deduplication pipeline...")
+
+    initial_count = len(dealers)
+    stats = {
+        'initial': initial_count,
+        'phone_dupes': 0,
+        'domain_dupes': 0,
+        'fuzzy_dupes': 0,
+        'fuzzy_matches': []
+    }
+
+    # Phase 1: Phone normalization deduplication
+    phone_map = {}
+    dealers_after_phone = []
+
+    for dealer in dealers:
+        phone = dealer.get('phone', '')
+        # Normalize: strip to 10 digits
+        normalized_phone = ''.join(filter(str.isdigit, phone))[-10:] if phone else ''
+
+        if normalized_phone and normalized_phone in phone_map:
+            stats['phone_dupes'] += 1
+        else:
+            if normalized_phone:
+                phone_map[normalized_phone] = dealer
+            dealers_after_phone.append(dealer)
+
+    print(f"     - Phone dedup: {initial_count} → {len(dealers_after_phone)} (-{stats['phone_dupes']}, {stats['phone_dupes']/initial_count*100:.1f}%)")
+
+    # Phase 2: Domain deduplication
+    domain_map = {}
+    dealers_after_domain = []
+
+    for dealer in dealers_after_phone:
+        domain = dealer.get('domain', '')
+        # Extract root domain
+        root_domain = domain.replace('www.', '').lower() if domain else ''
+
+        if root_domain and root_domain in domain_map:
+            stats['domain_dupes'] += 1
+        else:
+            if root_domain:
+                domain_map[root_domain] = dealer
+            dealers_after_domain.append(dealer)
+
+    print(f"     - Domain dedup: {len(dealers_after_phone)} → {len(dealers_after_domain)} (-{stats['domain_dupes']}, {stats['domain_dupes']/len(dealers_after_phone)*100:.1f}%)")
+
+    # Phase 3: Fuzzy name matching (85% threshold, same state)
+    dealers_final = []
+    name_state_map = {}
+
+    for dealer in dealers_after_domain:
+        name = dealer.get('name', '').strip().lower()
+        state = dealer.get('state', '').strip().upper()
+
+        if not name:
+            dealers_final.append(dealer)
+            continue
+
+        # Check for fuzzy matches in same state
+        found_match = False
+        for existing_name, existing_dealer in name_state_map.items():
+            if existing_dealer.get('state', '').strip().upper() == state:
+                similarity = fuzz.ratio(name, existing_name)
+                if similarity >= 85:
+                    stats['fuzzy_dupes'] += 1
+                    stats['fuzzy_matches'].append({
+                        'name1': existing_dealer.get('name'),
+                        'name2': dealer.get('name'),
+                        'similarity': similarity,
+                        'state': state
+                    })
+                    found_match = True
+                    break
+
+        if not found_match:
+            name_state_map[name] = dealer
+            dealers_final.append(dealer)
+
+    print(f"     - Fuzzy name dedup: {len(dealers_after_domain)} → {len(dealers_final)} (-{stats['fuzzy_dupes']}, {stats['fuzzy_dupes']/len(dealers_after_domain)*100:.1f}%)")
+
+    stats['final'] = len(dealers_final)
+    total_dedup_rate = (initial_count - len(dealers_final)) / initial_count * 100
+    print(f"  ✓ Deduplication complete: {initial_count} → {len(dealers_final)} (dedup rate: {total_dedup_rate:.1f}%)")
+
+    return dealers_final, stats
