@@ -77,3 +77,35 @@ def delete_checkpoints(oem_name: str) -> None:
             print(f"  ✓ Checkpoints deleted")
     else:
         print(f"  → No existing checkpoints")
+
+
+def prompt_user_confirmation(oem_name: str, oem_index: int, total_oems: int) -> str:
+    """
+    Prompt user for confirmation before running OEM scraper.
+
+    Args:
+        oem_name: Name of OEM (e.g., "Carrier")
+        oem_index: Index in priority list (0-based)
+        total_oems: Total number of OEMs
+
+    Returns:
+        'y' = proceed, 'n' = exit script, 'skip' = skip this OEM
+    """
+    print(f"\n{'='*80}")
+    print(f"OEM {oem_index + 1}/{total_oems}: {oem_name}")
+    print(f"{'='*80}")
+    print(f"Target: 264 ZIP codes (all 50 states)")
+    print(f"Output: output/oem_data/{oem_name.lower().replace(' ', '_').replace('&', 'and')}/")
+    print()
+
+    while True:
+        response = input(f"Ready to run {oem_name} scraper? (y/n/skip): ").strip().lower()
+
+        if response in ['y', 'yes']:
+            return 'y'
+        elif response in ['n', 'no']:
+            return 'n'
+        elif response in ['skip', 's']:
+            return 'skip'
+        else:
+            print("Invalid input. Enter y/n/skip:")
