@@ -17,7 +17,6 @@ import csv
 from datetime import datetime
 from pathlib import Path
 from fuzzywuzzy import fuzz
-import pandas as pd
 from typing import List, Dict, Tuple
 
 # Add project root to path
@@ -301,7 +300,7 @@ def generate_output_files(
         f.write(f"Raw dealers scraped: {len(raw_dealers)}\n")
         f.write(f"Unique dealers (after dedup): {len(deduped_dealers)}\n")
         f.write(f"Deduplication rate: {dedup_stats.get('initial', 0) - dedup_stats.get('final', 0)}/{dedup_stats.get('initial', 0)} ")
-        dedup_pct = ((dedup_stats.get('initial', 0) - dedup_stats.get('final', 0)) / dedup_stats.get('initial', 1) * 100) if dedup_stats.get('initial', 0) > 0 else 0.0
+        dedup_pct = ((dedup_stats.get('initial', 0) - dedup_stats.get('final', 0)) / dedup_stats.get('initial', 0) * 100) if dedup_stats.get('initial', 0) > 0 else 0.0
         f.write(f"({dedup_pct:.1f}%)\n")
 
     generated_files['log'] = log_path
