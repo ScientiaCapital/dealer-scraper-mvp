@@ -421,18 +421,68 @@ class BaseDealerScraper(ABC):
             List of all dealers collected
         """
         all_dealers = []
-        
+        failed_zips = []
+
+        # Setup checkpoint directory
+        if checkpoint_dir is None:
+            oem_name_lower = self.OEM_NAME.lower().replace(" ", "_")
+            checkpoint_dir = f"output/oem_data/{oem_name_lower}"
+
+        Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
+
+        # Setup logging
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_file = f"{checkpoint_dir}/{oem_name_lower}_run_{timestamp}.log"
+
+        logging.basicConfig(
+            level=logging.INFO,
+            format='[%(asctime)s] %(message)s',
+            handlers=[
+                logging.FileHandler(log_file),
+                logging.StreamHandler()
+            ]
+        )
+
+        logging.info(f"Starting {self.OEM_NAME} scraper with {len(zip_codes)} ZIP codes")
+
+        # Main scraping loop
         for i, zip_code in enumerate(zip_codes, 1):
             if verbose:
                 print(f"\n[{i}/{len(zip_codes)}] Scraping {self.OEM_NAME} dealers for ZIP {zip_code}...")
-            
-            dealers = self.scrape_zip_code(zip_code)
-            all_dealers.extend(dealers)
-            
-            if verbose:
-                print(f"  ✓ Found {len(dealers)} dealers")
-        
+
+            logging.info(f"[{i}/{len(zip_codes)}] ZIP {zip_code}: Starting")
+
+            try:
+                dealers = self.scrape_zip_code(zip_code)
+                all_dealers.extend(dealers)
+
+                logging.info(f"[{i}/{len(zip_codes)}] ZIP {zip_code}: Found {len(dealers)} dealers")
+
+                if verbose:
+                    print(f"  ✓ Found {len(dealers)} dealers")
+
+            except Exception as e:
+                logging.error(f"[{i}/{len(zip_codes)}] ZIP {zip_code}: ERROR - {str(e)}")
+                failed_zips.append(zip_code)
+
+                if verbose:
+                    print(f"  ✗ Error: {str(e)}")
+
+            # Save checkpoint every N zips or at end
+            if (i % checkpoint_interval == 0) or (i == len(zip_codes)):
+                self._save_checkpoint(
+                    checkpoint_dir=checkpoint_dir,
+                    checkpoint_number=i,
+                    all_dealers=all_dealers,
+                    completed_zips=i,
+                    total_zips=len(zip_codes),
+                    failed_zips=failed_zips,
+                    verbose=verbose
+                )
+
         self.dealers = all_dealers
+        logging.info(f"Completed: {len(all_dealers)} dealers total, {len(failed_zips)} failed ZIPs")
+
         return all_dealers
     
     def deduplicate(self, key: str = "phone") -> None:
