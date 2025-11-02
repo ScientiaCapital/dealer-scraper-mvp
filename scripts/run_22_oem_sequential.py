@@ -23,6 +23,10 @@ from typing import List, Dict, Tuple
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+# Import scraper factory
+from scrapers.scraper_factory import ScraperFactory
+from scrapers.base_scraper import ScraperMode
+
 # OEM Priority Order (HVAC → Generators → Solar → Battery)
 # Updated to reflect 18 production-ready OEMs (22 planned, 4 not yet implemented)
 OEM_PRIORITY_ORDER = [
@@ -447,3 +451,158 @@ def display_validation_metrics(dealers: List[Dict], oem_name: str, total_target_
     print(f"\n  {'=' * 76}\n")
 
     return metrics
+
+
+def main():
+    """
+    Main execution loop: Run all OEMs sequentially with user confirmation.
+    """
+    print(f"\n{'='*80}")
+    print(f"22-OEM SEQUENTIAL EXECUTION SYSTEM")
+    print(f"{'='*80}\n")
+    print(f"Total OEMs: {len(OEM_PRIORITY_ORDER)}")
+    print(f"Target ZIPs: 264 (all 50 states)")
+    print(f"Mode: PLAYWRIGHT (local browser automation)")
+    print(f"Checkpoint interval: Every {CHECKPOINT_INTERVAL} ZIPs")
+    print(f"\n{'='*80}\n")
+
+    # Load ALL_ZIP_CODES from config
+    try:
+        # Try to import from config module
+        from config import ALL_ZIP_CODES
+        print(f"✅ Loaded {len(ALL_ZIP_CODES)} ZIP codes from config.py\n")
+    except ImportError:
+        print(f"❌ ERROR: Could not import ALL_ZIP_CODES from config.py")
+        print(f"   Make sure config.py exists in project root with ALL_ZIP_CODES defined")
+        sys.exit(1)
+
+    # Statistics tracking
+    stats_summary = {
+        'completed': [],
+        'skipped': [],
+        'failed': [],
+        'start_time': datetime.now()
+    }
+
+    # Sequential OEM execution loop
+    for oem_index, oem_name in enumerate(OEM_PRIORITY_ORDER):
+        try:
+            # Step 1: Delete old checkpoints
+            delete_checkpoints(oem_name)
+
+            # Step 2: Prompt user for confirmation
+            response = prompt_user_confirmation(oem_name, oem_index, len(OEM_PRIORITY_ORDER))
+
+            if response == 'n':
+                print(f"\n⏹️  Stopped at user request\n")
+                break
+            elif response == 'skip':
+                print(f"\n⏭️  Skipped {oem_name}\n")
+                stats_summary['skipped'].append(oem_name)
+                continue
+
+            # Step 3: Create scraper instance
+            print(f"\n  → Creating {oem_name} scraper...")
+            try:
+                scraper = ScraperFactory.create(oem_name, mode=ScraperMode.PLAYWRIGHT)
+                print(f"  ✓ Scraper created")
+            except Exception as e:
+                print(f"\n  ❌ ERROR: Could not create scraper for {oem_name}")
+                print(f"     {str(e)}")
+
+                choice = input("\n  Options: (s)kip this OEM / (q)uit script: ").strip().lower()
+                if choice == 's':
+                    stats_summary['failed'].append({'oem': oem_name, 'error': str(e)})
+                    continue
+                else:
+                    break
+
+            # Step 4: Scrape all ZIPs with checkpoints
+            print(f"\n  → Scraping {len(ALL_ZIP_CODES)} ZIP codes...")
+            print(f"     (Checkpoint saves every {CHECKPOINT_INTERVAL} ZIPs)")
+
+            raw_dealers = []
+            # TODO: Implement actual scraping with checkpoint system
+            # For now, this is a placeholder that will be implemented in Task 8 integration test
+            print(f"  ⚠️  Scraping not yet integrated (placeholder for Task 8)")
+
+            # Step 5: Deduplicate dealers
+            print(f"\n  → Deduplicating dealers...")
+            deduped_dealers, dedup_stats = deduplicate_dealers(raw_dealers, oem_name)
+
+            # Step 6: Generate output files
+            oem_dir = PROJECT_ROOT / "output" / "oem_data" / oem_name.lower().replace(" ", "_").replace("&", "and")
+            output_files = generate_output_files(
+                raw_dealers=raw_dealers,
+                deduped_dealers=deduped_dealers,
+                dedup_stats=dedup_stats,
+                oem_name=oem_name,
+                output_dir=oem_dir
+            )
+
+            # Step 7: Display validation metrics
+            validation_metrics = display_validation_metrics(deduped_dealers, oem_name, total_target_zips=len(ALL_ZIP_CODES))
+
+            # Mark as completed
+            stats_summary['completed'].append({
+                'oem': oem_name,
+                'raw_count': len(raw_dealers),
+                'unique_count': len(deduped_dealers),
+                'dedup_rate': dedup_stats.get('initial', 0) - dedup_stats.get('final', 0),
+                'files': output_files
+            })
+
+            print(f"  ✅ {oem_name} complete!\n")
+
+        except KeyboardInterrupt:
+            print(f"\n\n⚠️  Interrupted by user (Ctrl+C)")
+            print(f"   Progress saved in checkpoints")
+            break
+
+        except Exception as e:
+            print(f"\n  ❌ UNEXPECTED ERROR in {oem_name}:")
+            print(f"     {str(e)}")
+            import traceback
+            traceback.print_exc()
+
+            choice = input("\n  Options: (s)kip this OEM / (q)uit script: ").strip().lower()
+            if choice == 's':
+                stats_summary['failed'].append({'oem': oem_name, 'error': str(e)})
+                continue
+            else:
+                break
+
+    # Final summary
+    stats_summary['end_time'] = datetime.now()
+    duration = stats_summary['end_time'] - stats_summary['start_time']
+
+    print(f"\n{'='*80}")
+    print(f"ALL OEM SCRAPING COMPLETE")
+    print(f"{'='*80}\n")
+    print(f"Duration: {duration}")
+    print(f"OEMs completed: {len(stats_summary['completed'])}/{len(OEM_PRIORITY_ORDER)}")
+    print(f"OEMs skipped: {len(stats_summary['skipped'])}")
+    print(f"OEMs failed: {len(stats_summary['failed'])}")
+
+    if stats_summary['completed']:
+        total_raw = sum(oem['raw_count'] for oem in stats_summary['completed'])
+        total_unique = sum(oem['unique_count'] for oem in stats_summary['completed'])
+        total_dedup_rate = ((total_raw - total_unique) / total_raw * 100) if total_raw > 0 else 0.0
+
+        print(f"\nTotal raw records: {total_raw}")
+        print(f"Total unique contractors: {total_unique}")
+        print(f"Overall dedup rate: {total_dedup_rate:.1f}%")
+
+    if stats_summary['skipped']:
+        print(f"\nSkipped OEMs: {', '.join(stats_summary['skipped'])}")
+
+    if stats_summary['failed']:
+        print(f"\nFailed OEMs:")
+        for failure in stats_summary['failed']:
+            print(f"  - {failure['oem']}: {failure['error']}")
+
+    print(f"\n{'='*80}\n")
+
+
+if __name__ == "__main__":
+    main()
