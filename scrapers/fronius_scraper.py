@@ -76,210 +76,109 @@ class FroniusScraper(BaseDealerScraper):
         """
         JavaScript extraction script for Fronius installer data.
 
-        Fronius uses a PartnerSearch component with map and list views.
-        This script extracts from the list view results.
+        VALIDATED: Tested on https://www.fronius.com/en-us/usa/solar-energy/home-owners/contact/find-installers
+        ZIP 94102 (San Francisco) - List view with installer buttons
+
+        Data Pattern:
+        Button text has NO SPACES between components:
+        "Fronius Solutions PartnerROAM Solar, Inc.20.93 mi40 La Barthe Lane, San ..."
         """
 
-        extraction_script = """
+        return """
         () => {
+            console.log('[Fronius] Starting extraction from list view...');
             const dealers = [];
 
-            // Fronius uses a PartnerSearch component - try multiple selectors
-            const partnerElements = document.querySelectorAll(
-                '.partner-item, .partner-card, .installer-item, [data-partner], .search-result-item'
-            );
+            // Find all buttons containing "Fronius Solutions Partner"
+            const allButtons = Array.from(document.querySelectorAll('button'));
+            const installerButtons = allButtons.filter(btn => {
+                const text = btn.textContent || '';
+                // Must have company name (letters) followed by distance (numbers + mi/km)
+                return text.includes('Fronius Solutions Partner') && 
+                       /\\d+\\.\\d+\\s*(mi|km)/.test(text);
+            });
 
-            console.log(`Found ${partnerElements.length} potential partner elements`);
+            console.log(`[Fronius] Found ${installerButtons.length} installer buttons`);
 
-            partnerElements.forEach(element => {
+            installerButtons.forEach(button => {
                 try {
-                    // Extract partner name
-                    const nameElement = element.querySelector(
-                        '.partner-name, .installer-name, .company-name, h3, h4, strong, .title'
-                    );
-                    const name = nameElement?.textContent?.trim() || '';
+                    const buttonText = button.textContent.trim();
 
+                    // Split by "Fronius Solutions Partner" or "Fronius Solutions Partner Plus"
+                    let afterTier = '';
+                    if (buttonText.includes('Fronius Solutions Partner Plus')) {
+                        afterTier = buttonText.split('Fronius Solutions Partner Plus')[1];
+                    } else {
+                        afterTier = buttonText.split('Fronius Solutions Partner')[1];
+                    }
+
+                    if (!afterTier) return;
+
+                    // Extract distance pattern (e.g., "20.93 mi" or "20.93mi")
+                    const distanceMatch = afterTier.match(/([\\d.]+)\\s*(mi|km)/);
+                    if (!distanceMatch) return;
+
+                    const distance = `${distanceMatch[1]} ${distanceMatch[2]}`;
+                    let distance_miles = parseFloat(distanceMatch[1]);
+                    if (distanceMatch[2] === 'km') {
+                        distance_miles = distance_miles * 0.621371;
+                    }
+
+                    // Find where the distance starts in the text
+                    const distanceIndex = afterTier.indexOf(distanceMatch[0]);
+
+                    // Company name is everything before the distance (no space separator!)
+                    const name = afterTier.substring(0, distanceIndex).trim();
                     if (!name || name.length < 2) return;
 
-                    // Extract phone number
-                    const phoneElement = element.querySelector(
-                        'a[href^="tel:"], .phone, .telephone, .contact-phone, [class*="phone"]'
-                    );
-                    let phone = '';
-                    if (phoneElement) {
-                        phone = phoneElement.textContent?.trim() || phoneElement.href?.replace('tel:', '') || '';
-                        phone = phone.replace(/[^\\d]/g, ''); // Normalize to digits only
-                    }
+                    // Address is everything after the distance
+                    const afterDistance = afterTier.substring(distanceIndex + distanceMatch[0].length).trim();
+                    const address_full = afterDistance.replace(/\\.\\.\\.$/,  '').trim();
 
-                    // Extract website/email
-                    const websiteElement = element.querySelector(
-                        'a[href^="http"]:not([href*="fronius"]), .website, .url, [class*="website"]'
-                    );
-                    const website = websiteElement?.href || '';
-
-                    // Extract email (Fronius sometimes shows email instead of website)
-                    const emailElement = element.querySelector('a[href^="mailto:"], .email');
-                    const email = emailElement?.href?.replace('mailto:', '') || '';
-
-                    // Extract address (Fronius shows full address in one element)
-                    const addressElement = element.querySelector(
-                        '.address, .location, .partner-address, [class*="address"]'
-                    );
-                    const address_full = addressElement?.textContent?.trim() || '';
-
-                    // Parse address components
+                    // Try to parse address components
                     let street = '', city = '', state = '', zip = '';
-                    if (address_full) {
-                        // Format: "123 Main St, City, ST 12345" or variations
-                        const parts = address_full.split(',').map(p => p.trim());
-
-                        if (parts.length >= 2) {
-                            street = parts[0];
-
-                            // Last part usually has state + ZIP
-                            const lastPart = parts[parts.length - 1];
-                            const stateZipMatch = lastPart.match(/([A-Z]{2})\\s+(\\d{5})/);
-
-                            if (stateZipMatch) {
-                                state = stateZipMatch[1];
-                                zip = stateZipMatch[2];
-
-                                // City is second-to-last part
-                                if (parts.length >= 3) {
-                                    city = parts[parts.length - 2];
-                                }
-                            } else {
-                                // Try alternate format: "City ST 12345"
-                                const altMatch = lastPart.match(/(.+?)\\s+([A-Z]{2})\\s+(\\d{5})/);
-                                if (altMatch) {
-                                    city = altMatch[1];
-                                    state = altMatch[2];
-                                    zip = altMatch[3];
-                                }
-                            }
-                        }
+                    const addressParts = address_full.split(',').map(p => p.trim());
+                    if (addressParts.length >= 1) {
+                        street = addressParts[0];
+                    }
+                    if (addressParts.length >= 2) {
+                        city = addressParts[1].replace(/\\.\\.\\.$/,  '').trim();
                     }
 
-                    // Extract partner tier/status
-                    let tier = 'Fronius Solutions Partner';
-                    const tierElement = element.querySelector(
-                        '.partner-status, .tier, .badge, .certification-level, [class*="status"]'
-                    );
-                    if (tierElement) {
-                        const tierText = tierElement.textContent?.trim() || '';
-                        if (tierText.toLowerCase().includes('plus') || tierText.toLowerCase().includes('premium')) {
-                            tier = 'Fronius Solutions Partner Plus';
-                        }
-                    }
+                    // Determine tier
+                    const tier = buttonText.includes('Plus') ? 'Fronius Solutions Partner Plus' : 'Fronius Solutions Partner';
 
-                    // Extract certifications and capabilities
-                    const certifications = ['Fronius Certified'];
-                    const capabilities = [];
-
-                    // Default capabilities for all Fronius installers
-                    capabilities.push('Solar');
-                    capabilities.push('String Inverters');
-
-                    // Check for specific certifications/badges
-                    const badges = element.querySelectorAll(
-                        '.badge, .certification, .capability, .tag, [class*="cert"]'
-                    );
-
-                    badges.forEach(badge => {
-                        const text = badge.textContent?.trim().toLowerCase() || '';
-
-                        if (text.includes('battery') || text.includes('storage') || text.includes('gen24')) {
-                            capabilities.push('Battery Storage');
-                            certifications.push('Battery Storage Certified');
-                        }
-                        if (text.includes('commercial')) {
-                            capabilities.push('Commercial');
-                            certifications.push('Commercial Certified');
-                        }
-                        if (text.includes('hybrid')) {
-                            capabilities.push('Hybrid Systems');
-                            certifications.push('Hybrid Inverter Certified');
-                        }
-                        if (text.includes('service') || text.includes('maintenance') || text.includes('o&m')) {
-                            capabilities.push('O&M Services');
-                            certifications.push('Service Provider');
-                        }
-                    });
-
-                    // Extract distance if shown
-                    const distanceElement = element.querySelector(
-                        '.distance, [class*="distance"], [data-distance]'
-                    );
-                    let distance = '';
-                    let distance_miles = 0;
-                    if (distanceElement) {
-                        distance = distanceElement.textContent?.trim() || '';
-                        const distMatch = distance.match(/([\\d.]+)\\s*(mi|km)/);
-                        if (distMatch) {
-                            distance_miles = parseFloat(distMatch[1]);
-                            if (distMatch[2] === 'km') {
-                                distance_miles = distance_miles * 0.621371; // Convert km to miles
-                            }
-                        }
-                    }
-
-                    // Check for commercial indicators
-                    const has_commercial = capabilities.includes('Commercial') ||
-                                          name.toLowerCase().includes('commercial') ||
-                                          name.toLowerCase().includes('solar systems') ||
-                                          name.toLowerCase().includes('energy solutions');
-
-                    // Check for O&M services
-                    const has_ops_maintenance = capabilities.includes('O&M Services') ||
-                                               name.toLowerCase().includes('service') ||
-                                               name.toLowerCase().includes('maintenance');
-
-                    const dealer = {
+                    dealers.push({
                         name: name,
-                        phone: phone,
-                        email: email,
-                        website: website,
+                        phone: '',  // Not available in list view
+                        email: '',
+                        website: '',
                         street: street,
                         city: city,
                         state: state,
                         zip: zip,
                         address_full: address_full,
-                        certifications: certifications,
-                        capabilities: capabilities,
-                        rating: 0,              // Fronius doesn't show ratings on locator
+                        certifications: ['Fronius Certified'],
+                        capabilities: ['Solar', 'String Inverters'],
+                        rating: 0,
                         review_count: 0,
                         tier: tier,
                         distance: distance,
                         distance_miles: distance_miles,
-                        has_commercial: has_commercial,
-                        has_ops_maintenance: has_ops_maintenance,
-                        is_resimercial: capabilities.includes('Commercial') // Commercial-capable likely does both
-                    };
-
-                    // Prioritize by tier and capabilities
-                    if (tier.includes('Plus') && has_commercial) {
-                        dealers.unshift(dealer); // Highest priority
-                    } else if (has_commercial || tier.includes('Plus')) {
-                        dealers.push(dealer);     // Medium priority
-                    } else {
-                        dealers.push(dealer);     // Standard priority
-                    }
+                        has_commercial: name.toLowerCase().includes('commercial'),
+                        has_ops_maintenance: name.toLowerCase().includes('service') || name.toLowerCase().includes('maintenance'),
+                        is_resimercial: false
+                    });
 
                 } catch (error) {
-                    console.error('Error parsing Fronius partner:', error);
+                    console.error('[Fronius] Error parsing installer:', error);
                 }
             });
 
-            console.log(`Extracted ${dealers.length} Fronius installers`);
-            console.log(`Partner Plus: ${dealers.filter(d => d.tier.includes('Plus')).length}`);
-            console.log(`Commercial: ${dealers.filter(d => d.has_commercial).length}`);
-            console.log(`Battery Storage: ${dealers.filter(d => d.capabilities.includes('Battery Storage')).length}`);
-
+            console.log(`[Fronius] Extracted ${dealers.length} installers`);
             return dealers;
         }
         """
-
-        return extraction_script
 
     def detect_capabilities(self, raw_dealer_data: Dict) -> DealerCapabilities:
         """
@@ -392,48 +291,129 @@ class FroniusScraper(BaseDealerScraper):
 
     def _scrape_with_playwright(self, zip_code: str) -> List[StandardizedDealer]:
         """
-        PLAYWRIGHT mode: Print manual MCP Playwright instructions.
+        PLAYWRIGHT mode: Automated browser workflow for Fronius installer search.
+        
+        Fronius uses address/city input (not strict ZIP code field).
         """
-        print(f"\n{'='*60}")
-        print(f"Fronius Installer Network Scraper - PLAYWRIGHT Mode")
-        print(f"ZIP Code: {zip_code}")
-        print(f"{'='*60}\n")
+        from playwright.sync_api import sync_playwright
+        import time
 
-        print("⚠️  MANUAL WORKFLOW - Execute these MCP Playwright tools in order:\n")
+        dealers = []
 
-        print("1. Navigate to Fronius installer locator:")
-        print(f'   mcp__playwright__browser_navigate({{"url": "{self.DEALER_LOCATOR_URL}"}})\n')
+        with sync_playwright() as p:
+            try:
+                # Launch browser
+                browser = p.chromium.launch(headless=True)
+                context = browser.new_context(
+                    viewport={'width': 1920, 'height': 1080},
+                    user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+                )
+                page = context.new_page()
 
-        print("2. Take snapshot to get current element refs:")
-        print('   mcp__playwright__browser_snapshot({})\n')
+                # Navigate to dealer locator
+                print(f"  → Navigating to Fronius installer locator...")
+                page.goto(self.DEALER_LOCATOR_URL, timeout=60000, wait_until='domcontentloaded')
+                time.sleep(3)
 
-        print("3. Handle cookie consent (if present):")
-        print('   mcp__playwright__browser_click({"element": "Accept", "ref": "[from snapshot]"})\n')
+                # Handle cookie consent dialog if it appears
+                print(f"  → Checking for cookie consent dialog...")
+                try:
+                    cookie_selectors = [
+                        'button:has-text("Accept All")',
+                        'button:has-text("Accept")',
+                        'button:has-text("OK")',
+                        '#onetrust-accept-btn-handler',
+                        '.onetrust-close-btn-handler',
+                        'button[class*="cookie"]',
+                    ]
 
-        print("4. Enter ZIP code or address:")
-        print(f'   mcp__playwright__browser_type({{')
-        print(f'       "element": "Search input",')
-        print(f'       "ref": "[from snapshot]",')
-        print(f'       "text": "{zip_code}",')
-        print(f'       "submit": False')
-        print(f'   }})\n')
+                    for selector in cookie_selectors:
+                        try:
+                            cookie_btn = page.locator(selector)
+                            if cookie_btn.count() > 0 and cookie_btn.first.is_visible():
+                                print(f"     Found cookie dialog, dismissing...")
+                                cookie_btn.first.click(timeout=2000)
+                                time.sleep(2)
+                                break
+                        except Exception:
+                            continue
+                except Exception:
+                    pass  # No cookie dialog found, continue
 
-        print("5. Click search button:")
-        print('   mcp__playwright__browser_click({"element": "Search", "ref": "[from snapshot]"})\n')
+                # Fill search input (Fronius uses address/city input)
+                print(f"  → Filling search input: {zip_code}")
+                search_input_selectors = [
+                    'input[placeholder*="address" i]',
+                    'input[placeholder*="city" i]',
+                    'input[placeholder*="zip" i]',
+                    'input[type="text"]',
+                    'input[name*="search" i]',
+                ]
 
-        print("6. Wait for results to load:")
-        print('   mcp__playwright__browser_wait_for({"time": 3})\n')
+                search_filled = False
+                for selector in search_input_selectors:
+                    try:
+                        search_input = page.locator(selector)
+                        if search_input.count() > 0 and search_input.first.is_visible():
+                            search_input.first.fill(zip_code)
+                            time.sleep(1)
+                            search_filled = True
+                            break
+                    except Exception:
+                        continue
 
-        print("7. Extract installer data:")
-        extraction_script = self.get_extraction_script()
-        print(f'   mcp__playwright__browser_evaluate({{"function": """{extraction_script}"""}})\n')
+                if not search_filled:
+                    raise Exception("Could not find search input")
 
-        print("8. Process results with:")
-        print(f'   fronius_scraper.parse_results(results_json, "{zip_code}")\n')
+                # Click search button
+                print(f"  → Clicking search button...")
+                button_selectors = [
+                    'button[type="submit"]',
+                    'button:has-text("Search")',
+                    'button:has-text("Find")',
+                    'button.search-button',
+                    'input[type="submit"]',
+                ]
 
-        print(f"{'='*60}\n")
+                button_clicked = False
+                for selector in button_selectors:
+                    try:
+                        btn = page.locator(selector)
+                        if btn.count() > 0 and btn.first.is_visible():
+                            btn.first.click(timeout=5000)
+                            button_clicked = True
+                            break
+                    except Exception:
+                        continue
 
-        return []
+                if not button_clicked:
+                    raise Exception("Could not find/click search button")
+
+                # Wait for AJAX results
+                print(f"  → Waiting for results...")
+                time.sleep(5)
+
+                # Extract dealers using JavaScript
+                print(f"  → Extracting installer data...")
+                extraction_script = self.get_extraction_script()
+                results_json = page.evaluate(extraction_script)
+
+                # Parse results
+                if results_json and len(results_json) > 0:
+                    print(f"  ✅ Extracted {len(results_json)} installers from Fronius")
+                    dealers = self.parse_results(results_json, zip_code)
+                else:
+                    print(f"  ⚠️  No installers found for ZIP {zip_code}")
+
+                # Close browser
+                browser.close()
+
+            except Exception as e:
+                print(f"  ❌ Error during Fronius Playwright scraping: {str(e)}")
+                import traceback
+                traceback.print_exc()
+
+        return dealers
 
     def _scrape_with_runpod(self, zip_code: str) -> List[StandardizedDealer]:
         """
