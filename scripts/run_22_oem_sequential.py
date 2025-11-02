@@ -145,14 +145,18 @@ def deduplicate_dealers(dealers: List[Dict], oem_name: str) -> Tuple[List[Dict],
         # Normalize: strip to 10 digits
         normalized_phone = ''.join(filter(str.isdigit, phone))[-10:] if phone else ''
 
+        # If phone exists and is a duplicate, skip this dealer
         if normalized_phone and normalized_phone in phone_map:
             stats['phone_dupes'] += 1
-        else:
-            if normalized_phone:
-                phone_map[normalized_phone] = dealer
-            dealers_after_phone.append(dealer)
+            continue  # Skip duplicate dealer
 
-    print(f"     - Phone dedup: {initial_count} → {len(dealers_after_phone)} (-{stats['phone_dupes']}, {stats['phone_dupes']/initial_count*100:.1f}%)")
+        # Otherwise, keep this dealer
+        if normalized_phone:
+            phone_map[normalized_phone] = dealer
+        dealers_after_phone.append(dealer)
+
+    phone_dedup_pct = (stats['phone_dupes']/initial_count*100) if initial_count > 0 else 0.0
+    print(f"     - Phone dedup: {initial_count} → {len(dealers_after_phone)} (-{stats['phone_dupes']}, {phone_dedup_pct:.1f}%)")
 
     # Phase 2: Domain deduplication
     domain_map = {}
@@ -163,14 +167,18 @@ def deduplicate_dealers(dealers: List[Dict], oem_name: str) -> Tuple[List[Dict],
         # Extract root domain
         root_domain = domain.replace('www.', '').lower() if domain else ''
 
+        # If domain exists and is a duplicate, skip this dealer
         if root_domain and root_domain in domain_map:
             stats['domain_dupes'] += 1
-        else:
-            if root_domain:
-                domain_map[root_domain] = dealer
-            dealers_after_domain.append(dealer)
+            continue  # Skip duplicate dealer
 
-    print(f"     - Domain dedup: {len(dealers_after_phone)} → {len(dealers_after_domain)} (-{stats['domain_dupes']}, {stats['domain_dupes']/len(dealers_after_phone)*100:.1f}%)")
+        # Otherwise, keep this dealer
+        if root_domain:
+            domain_map[root_domain] = dealer
+        dealers_after_domain.append(dealer)
+
+    domain_dedup_pct = (stats['domain_dupes']/len(dealers_after_phone)*100) if len(dealers_after_phone) > 0 else 0.0
+    print(f"     - Domain dedup: {len(dealers_after_phone)} → {len(dealers_after_domain)} (-{stats['domain_dupes']}, {domain_dedup_pct:.1f}%)")
 
     # Phase 3: Fuzzy name matching (85% threshold, same state)
     dealers_final = []
@@ -204,10 +212,11 @@ def deduplicate_dealers(dealers: List[Dict], oem_name: str) -> Tuple[List[Dict],
             name_state_map[name] = dealer
             dealers_final.append(dealer)
 
-    print(f"     - Fuzzy name dedup: {len(dealers_after_domain)} → {len(dealers_final)} (-{stats['fuzzy_dupes']}, {stats['fuzzy_dupes']/len(dealers_after_domain)*100:.1f}%)")
+    fuzzy_dedup_pct = (stats['fuzzy_dupes']/len(dealers_after_domain)*100) if len(dealers_after_domain) > 0 else 0.0
+    print(f"     - Fuzzy name dedup: {len(dealers_after_domain)} → {len(dealers_final)} (-{stats['fuzzy_dupes']}, {fuzzy_dedup_pct:.1f}%)")
 
     stats['final'] = len(dealers_final)
-    total_dedup_rate = (initial_count - len(dealers_final)) / initial_count * 100
+    total_dedup_rate = ((initial_count - len(dealers_final)) / initial_count * 100) if initial_count > 0 else 0.0
     print(f"  ✓ Deduplication complete: {initial_count} → {len(dealers_final)} (dedup rate: {total_dedup_rate:.1f}%)")
 
     return dealers_final, stats
