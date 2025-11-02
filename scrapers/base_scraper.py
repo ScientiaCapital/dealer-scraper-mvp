@@ -568,31 +568,40 @@ class BaseDealerScraper(ABC):
             "dealers": [dealer.to_dict() for dealer in unique_dealers]
         }
 
-        with open(json_file, 'w') as f:
-            json.dump(checkpoint_data, f, indent=2)
+        try:
+            # Save JSON checkpoint file
+            with open(json_file, 'w') as f:
+                json.dump(checkpoint_data, f, indent=2)
 
-        # Save checkpoint log file
-        log_file = f"{checkpoint_base}.log"
-        with open(log_file, 'w') as f:
-            f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Starting {self.OEM_NAME} scraper with {total_zips} ZIP codes\n")
-            f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] CHECKPOINT: Saved {checkpoint_number} zips, {len(all_dealers)} dealers total\n")
-            f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Checkpoint saved to: {oem_name_lower}_checkpoint_{checkpoint_number:04d}.json\n")
-            f.write(f"\n")
-            f.write(f"Progress: {completed_zips}/{total_zips} ZIPs ({100*completed_zips/total_zips:.1f}%)\n")
-            f.write(f"Total dealers: {len(all_dealers)}\n")
-            f.write(f"After dedup: {len(unique_dealers)}\n")
-            f.write(f"Failed ZIPs: {len(failed_zips)}\n")
-            if failed_zips:
-                f.write(f"Failed ZIP codes: {', '.join(failed_zips)}\n")
+            # Save checkpoint log file
+            log_file = f"{checkpoint_base}.log"
+            with open(log_file, 'w') as f:
+                f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Starting {self.OEM_NAME} scraper with {total_zips} ZIP codes\n")
+                f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] CHECKPOINT: Saved {checkpoint_number} zips, {len(all_dealers)} dealers total\n")
+                f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Checkpoint saved to: {oem_name_lower}_checkpoint_{checkpoint_number:04d}.json\n")
+                f.write(f"\n")
+                f.write(f"Progress: {completed_zips}/{total_zips} ZIPs ({100*completed_zips/total_zips:.1f}%)\n")
+                f.write(f"Total dealers: {len(all_dealers)}\n")
+                f.write(f"After dedup: {len(unique_dealers)}\n")
+                f.write(f"Failed ZIPs: {len(failed_zips)}\n")
+                if failed_zips:
+                    f.write(f"Failed ZIP codes: {', '.join(failed_zips)}\n")
 
-        # Log checkpoint confirmation
-        logging.info(f"CHECKPOINT: Saved {checkpoint_number} zips, {len(all_dealers)} dealers total")
-        logging.info(f"Checkpoint saved to: {json_file}")
+            # Log checkpoint confirmation
+            logging.info(f"CHECKPOINT: Saved {checkpoint_number} zips, {len(all_dealers)} dealers total")
+            logging.info(f"Checkpoint saved to: {json_file}")
 
-        # Print if verbose
-        if verbose:
-            print(f"\n  Checkpoint saved: {checkpoint_number} zips, {len(all_dealers)} dealers ({len(unique_dealers)} after dedup)")
-            print(f"     Saved to: {json_file}")
+            # Print if verbose
+            if verbose:
+                print(f"\n  Checkpoint saved: {checkpoint_number} zips, {len(all_dealers)} dealers ({len(unique_dealers)} after dedup)")
+                print(f"     Saved to: {json_file}")
+
+        except (IOError, OSError) as e:
+            # Log error but don't crash - allow scraping to continue
+            logging.error(f"CHECKPOINT FAILED: Unable to save checkpoint {checkpoint_number}: {str(e)}")
+            if verbose:
+                print(f"\n  Warning: Checkpoint save failed: {str(e)}")
+            # Continue scraping - don't crash
 
     def deduplicate(self, key: str = "phone") -> None:
         """
