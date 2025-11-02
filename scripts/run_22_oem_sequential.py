@@ -55,3 +55,25 @@ OEM_PRIORITY_ORDER = [
 # Configuration
 CHECKPOINT_INTERVAL = 25
 TODAY = datetime.now().strftime("%Y%m%d")
+
+
+def delete_checkpoints(oem_name: str) -> None:
+    """
+    Delete all checkpoint files for an OEM (fresh start policy).
+
+    Args:
+        oem_name: Name of OEM (e.g., "Carrier", "Briggs & Stratton")
+    """
+    # Normalize OEM name: lowercase, replace spaces with _, replace & with "and"
+    oem_dir_name = oem_name.lower().replace(" ", "_").replace("&", "and")
+    checkpoint_dir = PROJECT_ROOT / "output" / "oem_data" / oem_dir_name / "checkpoints"
+
+    if checkpoint_dir.exists():
+        checkpoint_files = list(checkpoint_dir.glob("checkpoint_*.json"))
+        if checkpoint_files:
+            print(f"  → Deleting {len(checkpoint_files)} old checkpoints...")
+            for checkpoint_file in checkpoint_files:
+                checkpoint_file.unlink()
+            print(f"  ✓ Checkpoints deleted")
+    else:
+        print(f"  → No existing checkpoints")
