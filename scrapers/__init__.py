@@ -32,6 +32,7 @@ from scrapers import solark_scraper
 from scrapers import simpliphi_scraper
 from scrapers import mitsubishi_scraper
 from scrapers import sma_scraper
+from scrapers import solaredge_scraper
 from scrapers import lennox_scraper
 from scrapers import carrier_scraper
 from scrapers import rheem_scraper

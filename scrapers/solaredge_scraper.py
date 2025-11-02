@@ -342,48 +342,194 @@ class SolarEdgeScraper(BaseDealerScraper):
 
     def _scrape_with_playwright(self, zip_code: str) -> List[StandardizedDealer]:
         """
-        PLAYWRIGHT mode: Print manual MCP Playwright instructions.
+        PLAYWRIGHT mode: Automated scraping using Playwright Python library.
+
+        SolarEdge has complex requirements:
+        1. Google Maps autocomplete (must select from dropdown to get lat/long)
+        2. AJAX-based dealer loading
+        3. Click each installer card to reveal phone/website
+        4. Extract from detail panel, then return to list
         """
-        print(f"\n{'='*60}")
-        print(f"SolarEdge Installer Network Scraper - PLAYWRIGHT Mode")
-        print(f"ZIP Code: {zip_code}")
-        print(f"{'='*60}\n")
+        from playwright.sync_api import sync_playwright
+        import time
 
-        print("⚠️  MANUAL WORKFLOW - Execute these MCP Playwright tools in order:\n")
+        dealers = []
 
-        print("1. Navigate to SolarEdge installer locator:")
-        print(f'   mcp__playwright__browser_navigate({{"url": "{self.DEALER_LOCATOR_URL}"}})\n')
+        with sync_playwright() as p:
+            try:
+                # Launch browser
+                print(f"  → Launching browser for ZIP {zip_code}...")
+                browser = p.chromium.launch(headless=True)
+                context = browser.new_context(
+                    viewport={'width': 1920, 'height': 1080},
+                    user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+                )
+                page = context.new_page()
 
-        print("2. Take snapshot to get current element refs:")
-        print('   mcp__playwright__browser_snapshot({})\n')
+                # Navigate to dealer locator
+                print(f"  → Navigating to SolarEdge locator...")
+                page.goto(self.DEALER_LOCATOR_URL, timeout=60000, wait_until='domcontentloaded')
+                time.sleep(3)
 
-        print("3. Handle cookie consent (if present):")
-        print('   mcp__playwright__browser_click({"element": "Accept", "ref": "[from snapshot]"})\n')
+                # Handle cookie consent if present
+                print(f"  → Checking for cookie dialog...")
+                try:
+                    cookie_selectors = [
+                        'button:has-text("Accept")',
+                        'button:has-text("Accept All")',
+                        '#onetrust-accept-btn-handler',
+                    ]
+                    for selector in cookie_selectors:
+                        try:
+                            if page.locator(selector).count() > 0:
+                                page.locator(selector).first.click(timeout=2000)
+                                time.sleep(1)
+                                break
+                        except:
+                            continue
+                except:
+                    pass
 
-        print("4. Enter ZIP code:")
-        print(f'   mcp__playwright__browser_type({{')
-        print(f'       "element": "ZIP code input",')
-        print(f'       "ref": "[from snapshot]",')
-        print(f'       "text": "{zip_code}",')
-        print(f'       "submit": False')
-        print(f'   }})\n')
+                # Find and fill search input with city, state format (triggers autocomplete)
+                print(f"  → Entering search location...")
+                search_input = page.locator('input[name="zip_or_address"]')
+                search_input.fill(f"ZIP {zip_code}, USA")
+                time.sleep(2)
 
-        print("5. Click search button:")
-        print('   mcp__playwright__browser_click({"element": "Search", "ref": "[from snapshot]"})\n')
+                # Wait for autocomplete dropdown and select first option
+                print(f"  → Selecting from autocomplete...")
+                try:
+                    page.keyboard.press("ArrowDown")
+                    time.sleep(1)
+                    page.keyboard.press("Enter")
+                    time.sleep(2)
+                except:
+                    # Fallback: manually set coordinates via JavaScript
+                    print(f"     Autocomplete failed, setting coordinates manually...")
+                    page.evaluate(f"""
+                        () => {{
+                            const latInput = document.querySelector('input[name="latitude"]');
+                            const lonInput = document.querySelector('input[name="longitude"]');
+                            if (latInput && lonInput) {{
+                                latInput.value = '37.7749';
+                                lonInput.value = '-122.4194';
+                            }}
+                        }}
+                    """)
 
-        print("6. Wait for results:")
-        print('   mcp__playwright__browser_wait_for({"time": 3})\n')
+                # Click search button
+                print(f"  → Submitting search...")
+                submit_button = page.locator('input[name="op"][type="submit"]')
+                submit_button.click()
+                time.sleep(5)  # Wait for AJAX to load installers
 
-        print("7. Extract installer data:")
-        extraction_script = self.get_extraction_script()
-        print(f'   mcp__playwright__browser_evaluate({{"function": """{extraction_script}"""}})\n')
+                # Check if results loaded
+                print(f"  → Checking for results...")
+                results_text = page.locator('h4:has-text("results")').count()
+                if results_text == 0:
+                    print(f"     No results found for ZIP {zip_code}")
+                    browser.close()
+                    return []
 
-        print("8. Process results with:")
-        print(f'   solaredge_scraper.parse_results(results_json, "{zip_code}")\n')
+                # Extract installer cards from list view
+                print(f"  → Extracting installer list...")
+                installer_cards = page.locator('[class*="installer"]').all()
 
-        print(f"{'='*60}\n")
+                if len(installer_cards) == 0:
+                    print(f"     No installer cards found")
+                    browser.close()
+                    return []
 
-        return []
+                print(f"  → Found {len(installer_cards)} installers, extracting details...")
+
+                # For each installer, click to reveal details
+                for i in range(min(len(installer_cards), 10)):  # Limit to 10 for performance
+                    try:
+                        print(f"     Processing installer {i+1}/{min(len(installer_cards), 10)}...")
+
+                        # Re-locate cards (DOM refreshes after each click/back)
+                        cards = page.locator('[class*="installer"]').all()
+                        if i >= len(cards):
+                            break
+
+                        card = cards[i]
+                        card.click()
+                        time.sleep(2)
+
+                        # Extract data from detail panel
+                        dealer_data = page.evaluate("""
+                            () => {
+                                // Find name
+                                const nameEl = document.querySelector('h3, h2, [class*="name"]');
+                                const name = nameEl ? nameEl.textContent.trim() : '';
+
+                                // Find phone from tel: link
+                                const phoneLink = document.querySelector('a[href^="tel:"]');
+                                const phone = phoneLink ? phoneLink.textContent.trim() : '';
+
+                                // Find website
+                                const websiteLink = Array.from(document.querySelectorAll('a[href^="http"]'))
+                                    .find(link => !link.href.includes('google') &&
+                                                  !link.href.includes('facebook') &&
+                                                  !link.href.includes('marketing.solaredge'));
+                                const website = websiteLink ? websiteLink.href : '';
+
+                                // Find address
+                                const addressEl = document.querySelector('[class*="address"]');
+                                const address_full = addressEl ? addressEl.textContent.trim() : '';
+
+                                // Find services
+                                const servicesList = document.querySelectorAll('li');
+                                const services = Array.from(servicesList)
+                                    .map(li => li.textContent.trim())
+                                    .filter(s => s.includes('Solar') || s.includes('Storage') || s.includes('Maintenance'));
+
+                                return {
+                                    name: name,
+                                    phone: phone,
+                                    website: website,
+                                    address_full: address_full,
+                                    services: services
+                                };
+                            }
+                        """)
+
+                        if dealer_data and dealer_data.get('name'):
+                            dealers.append(dealer_data)
+
+                        # Click back to list
+                        back_button = page.locator('text=Back to Installers List')
+                        if back_button.count() > 0:
+                            back_button.click()
+                            time.sleep(1)
+                        else:
+                            # Fallback: use browser back
+                            page.go_back()
+                            time.sleep(2)
+
+                    except Exception as e:
+                        print(f"       Error extracting installer {i+1}: {e}")
+                        continue
+
+                browser.close()
+
+                print(f"  → Successfully extracted {len(dealers)} installers")
+
+                # Parse into StandardizedDealer objects
+                standardized_dealers = []
+                for raw_dealer in dealers:
+                    dealer = self.parse_dealer_data(raw_dealer, zip_code)
+                    standardized_dealers.append(dealer)
+
+                return standardized_dealers
+
+            except Exception as e:
+                print(f"  ✗ Error scraping with Playwright: {e}")
+                import traceback
+                traceback.print_exc()
+                if 'browser' in locals():
+                    browser.close()
+                return []
 
     def _scrape_with_runpod(self, zip_code: str) -> List[StandardizedDealer]:
         """
