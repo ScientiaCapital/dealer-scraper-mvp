@@ -242,6 +242,19 @@ class YorkScraper(BaseDealerScraper):
                 page.goto(self.get_base_url(), timeout=60000)
                 time.sleep(3)
 
+                # Handle TrustE cookie consent dialog (blocks iframe interactions)
+                print(f"  → Checking for cookie consent dialog...")
+                try:
+                    # TrustE overlay appears on main page (not in iframe)
+                    cookie_button = page.locator('a.call:has-text("Close")').first
+                    if cookie_button.is_visible(timeout=2000):
+                        print(f"     Found TrustE cookie dialog, dismissing...")
+                        cookie_button.click()
+                        time.sleep(1)
+                except Exception:
+                    # No cookie dialog found or already dismissed
+                    pass
+
                 # CRITICAL: Switch to iframe context
                 print(f"  → Switching to iframe context...")
                 iframe_selector = 'iframe[name="locator_iframe16959"]'
@@ -252,6 +265,28 @@ class YorkScraper(BaseDealerScraper):
                     print(f"  ❌ Could not find iframe: {e}")
                     browser.close()
                     return []
+
+                # Handle TrustE cookie overlay inside iframe (blocks interactions)
+                print(f"  → Checking for TrustE overlay in iframe...")
+                try:
+                    # The TrustE overlay div blocks interactions
+                    page.evaluate('''() => {
+                        const overlay = document.querySelector('.truste_overlay');
+                        if (overlay) {
+                            overlay.remove();
+                            console.log('[York] Removed TrustE overlay');
+                        }
+                        // Also remove the cookie banner itself
+                        const banner = document.querySelector('#teconsent');
+                        if (banner) {
+                            banner.remove();
+                            console.log('[York] Removed TrustE banner');
+                        }
+                    }''')
+                    time.sleep(0.5)
+                except Exception:
+                    # No overlay found
+                    pass
 
                 # CRITICAL: Select "United States" from country dropdown
                 print(f"  → Selecting United States from country dropdown...")

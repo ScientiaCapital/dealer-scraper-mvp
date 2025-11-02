@@ -38,6 +38,10 @@ from scrapers import carrier_scraper
 from scrapers import rheem_scraper
 from scrapers import trane_scraper
 from scrapers import york_scraper
+from scrapers import schneider_scraper
+from scrapers import honeywell_scraper
+from scrapers import sensi_scraper
+from scrapers import johnson_controls_scraper
 
 __all__ = [
     "BaseDealerScraper",
