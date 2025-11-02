@@ -352,3 +352,99 @@ def generate_output_files(
     print(f"  ✓ All output files generated")
 
     return generated_files
+
+
+def display_validation_metrics(dealers: List[Dict], oem_name: str, total_target_zips: int = 264) -> Dict:
+    """
+    Display validation metrics for scraped dealers.
+
+    Metrics displayed:
+    1. ZIP coverage: % of target ZIPs that returned results
+    2. Data completeness: % of dealers with phone, address, name
+    3. Geographic distribution: Dealers per state (top 10)
+
+    Args:
+        dealers: List of dealer dictionaries
+        oem_name: Name of OEM for logging
+        total_target_zips: Total number of target ZIPs (default: 264)
+
+    Returns:
+        Dict with validation metrics
+    """
+    print(f"  → Running validation metrics...")
+
+    metrics = {
+        'total_dealers': len(dealers),
+        'data_completeness': {},
+        'geographic_distribution': {},
+        'zip_coverage': {}
+    }
+
+    if not dealers:
+        print(f"     ⚠️  No dealers to validate")
+        return metrics
+
+    # Data Completeness: Check critical fields
+    fields_to_check = ['name', 'phone', 'address', 'city', 'state', 'zip']
+    for field in fields_to_check:
+        non_empty_count = sum(1 for d in dealers if d.get(field, '').strip())
+        completeness_pct = (non_empty_count / len(dealers) * 100) if dealers else 0.0
+        metrics['data_completeness'][field] = {
+            'count': non_empty_count,
+            'percentage': completeness_pct
+        }
+
+    # Geographic Distribution: Count dealers per state
+    state_counts = {}
+    for dealer in dealers:
+        state = dealer.get('state', '').strip().upper()
+        if state:
+            state_counts[state] = state_counts.get(state, 0) + 1
+
+    metrics['geographic_distribution'] = state_counts
+
+    # ZIP Coverage: Count unique ZIPs that returned results
+    unique_zips = set()
+    for dealer in dealers:
+        scraped_from_zip = dealer.get('scraped_from_zip', '').strip()
+        if scraped_from_zip:
+            unique_zips.add(scraped_from_zip)
+
+    zips_with_results = len(unique_zips)
+    zip_coverage_pct = (zips_with_results / total_target_zips * 100) if total_target_zips > 0 else 0.0
+
+    metrics['zip_coverage'] = {
+        'zips_with_results': zips_with_results,
+        'total_target_zips': total_target_zips,
+        'coverage_percentage': zip_coverage_pct
+    }
+
+    # Display metrics
+    print(f"\n  {'=' * 76}")
+    print(f"  VALIDATION METRICS: {oem_name}")
+    print(f"  {'=' * 76}\n")
+
+    # ZIP Coverage
+    coverage_status = "✅" if zip_coverage_pct >= 95.0 else "⚠️"
+    print(f"  {coverage_status} ZIP Coverage: {zips_with_results}/{total_target_zips} ({zip_coverage_pct:.1f}%)")
+    if zip_coverage_pct < 95.0:
+        print(f"     Warning: Coverage below 95% target")
+
+    # Data Completeness
+    print(f"\n  📊 Data Completeness:")
+    for field in ['name', 'phone', 'address']:
+        pct = metrics['data_completeness'][field]['percentage']
+        count = metrics['data_completeness'][field]['count']
+        status = "✅" if pct >= 95.0 else "⚠️"
+        print(f"     {status} {field.capitalize()}: {count}/{len(dealers)} ({pct:.1f}%)")
+
+    # Geographic Distribution (top 10 states)
+    print(f"\n  🌎 Geographic Distribution (Top 10):")
+    sorted_states = sorted(state_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+    for state, count in sorted_states:
+        pct = (count / len(dealers) * 100) if dealers else 0.0
+        print(f"     {state}: {count} dealers ({pct:.1f}%)")
+
+    print(f"\n  {'=' * 76}\n")
+
+    return metrics
