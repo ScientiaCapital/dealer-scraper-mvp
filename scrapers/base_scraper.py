@@ -13,6 +13,10 @@ from typing import Dict, List, Optional, Set
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 import re
+import json
+import logging
+from datetime import datetime
+from pathlib import Path
 
 
 class ScraperMode(Enum):
@@ -397,32 +401,208 @@ class BaseDealerScraper(ABC):
         else:
             raise ValueError(f"Unknown scraper mode: {self.mode}")
     
-    def scrape_multiple(self, zip_codes: List[str], verbose: bool = True) -> List[StandardizedDealer]:
+    def scrape_multiple(
+        self,
+        zip_codes: List[str],
+        verbose: bool = True,
+        checkpoint_interval: int = 25,
+        checkpoint_dir: Optional[str] = None
+    ) -> List[StandardizedDealer]:
         """
-        Scrape multiple ZIP codes and return all dealers.
-        
+        Scrape dealers from multiple ZIP codes with automatic checkpoint saving.
+
         Args:
             zip_codes: List of ZIP codes to scrape
             verbose: Print progress messages
-        
+            checkpoint_interval: Save checkpoint every N ZIP codes (default: 25)
+            checkpoint_dir: Override default checkpoint directory
+
         Returns:
-            Combined list of all dealers from all ZIPs
+            List of all dealers collected
         """
         all_dealers = []
-        
+        failed_zips = []
+
+        # Setup checkpoint directory
+        if checkpoint_dir is None:
+            oem_name_lower = self.OEM_NAME.lower().replace(" ", "_")
+            checkpoint_dir = f"output/oem_data/{oem_name_lower}"
+
+        Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
+
+        # Setup logging
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_file = f"{checkpoint_dir}/{oem_name_lower}_run_{timestamp}.log"
+
+        logging.basicConfig(
+            level=logging.INFO,
+            format='[%(asctime)s] %(message)s',
+            handlers=[
+                logging.FileHandler(log_file),
+                logging.StreamHandler()
+            ]
+        )
+
+        logging.info(f"Starting {self.OEM_NAME} scraper with {len(zip_codes)} ZIP codes")
+
+        # Main scraping loop
         for i, zip_code in enumerate(zip_codes, 1):
             if verbose:
                 print(f"\n[{i}/{len(zip_codes)}] Scraping {self.OEM_NAME} dealers for ZIP {zip_code}...")
-            
-            dealers = self.scrape_zip_code(zip_code)
-            all_dealers.extend(dealers)
-            
-            if verbose:
-                print(f"  ✓ Found {len(dealers)} dealers")
-        
+
+            logging.info(f"[{i}/{len(zip_codes)}] ZIP {zip_code}: Starting")
+
+            try:
+                dealers = self.scrape_zip_code(zip_code)
+                all_dealers.extend(dealers)
+
+                logging.info(f"[{i}/{len(zip_codes)}] ZIP {zip_code}: Found {len(dealers)} dealers")
+
+                if verbose:
+                    print(f"  ✓ Found {len(dealers)} dealers")
+
+            except Exception as e:
+                logging.error(f"[{i}/{len(zip_codes)}] ZIP {zip_code}: ERROR - {str(e)}")
+                failed_zips.append(zip_code)
+
+                if verbose:
+                    print(f"  ✗ Error: {str(e)}")
+
+            # Save checkpoint every N zips or at end
+            if (i % checkpoint_interval == 0) or (i == len(zip_codes)):
+                self._save_checkpoint(
+                    checkpoint_dir=checkpoint_dir,
+                    checkpoint_number=i,
+                    all_dealers=all_dealers,
+                    completed_zips=i,
+                    total_zips=len(zip_codes),
+                    failed_zips=failed_zips,
+                    verbose=verbose
+                )
+
         self.dealers = all_dealers
+        logging.info(f"Completed: {len(all_dealers)} dealers total, {len(failed_zips)} failed ZIPs")
+
         return all_dealers
-    
+
+    def _save_checkpoint(
+        self,
+        checkpoint_dir: str,
+        checkpoint_number: int,
+        all_dealers: List[StandardizedDealer],
+        completed_zips: int,
+        total_zips: int,
+        failed_zips: List[str],
+        verbose: bool = True
+    ) -> None:
+        """
+        Save checkpoint files (.json and .log) with dealer data and metadata.
+
+        Args:
+            checkpoint_dir: Directory to save checkpoint files
+            checkpoint_number: Current ZIP index (for filename)
+            all_dealers: List of StandardizedDealer objects collected so far
+            completed_zips: Number of ZIPs processed
+            total_zips: Total ZIPs to process
+            failed_zips: List of ZIP codes that errored
+            verbose: Whether to print status messages
+        """
+        # Track started_at timestamp (store as instance variable on first call)
+        if not hasattr(self, '_scrape_started_at'):
+            self._scrape_started_at = datetime.now().isoformat()
+
+        # Deduplicate dealers before saving
+        seen_phones = set()
+        seen_domains = set()
+        seen_names_by_state = {}
+        unique_dealers = []
+
+        for dealer in all_dealers:
+            is_duplicate = False
+
+            # Phone match
+            if dealer.phone and dealer.phone in seen_phones:
+                is_duplicate = True
+            # Domain match
+            elif dealer.domain and dealer.domain in seen_domains:
+                is_duplicate = True
+            # Fuzzy name + same state
+            elif dealer.name and dealer.state:
+                normalized_name = self._normalize_company_name(dealer.name)
+                if dealer.state in seen_names_by_state:
+                    for existing_norm_name, _ in seen_names_by_state[dealer.state]:
+                        similarity = SequenceMatcher(None, normalized_name, existing_norm_name).ratio()
+                        if similarity >= 0.85:
+                            is_duplicate = True
+                            break
+
+            if not is_duplicate:
+                unique_dealers.append(dealer)
+                if dealer.phone:
+                    seen_phones.add(dealer.phone)
+                if dealer.domain:
+                    seen_domains.add(dealer.domain)
+                if dealer.name and dealer.state:
+                    normalized_name = self._normalize_company_name(dealer.name)
+                    if dealer.state not in seen_names_by_state:
+                        seen_names_by_state[dealer.state] = []
+                    seen_names_by_state[dealer.state].append((normalized_name, dealer))
+
+        # Prepare checkpoint filename base
+        oem_name_lower = self.OEM_NAME.lower().replace(" ", "_")
+        checkpoint_base = f"{checkpoint_dir}/{oem_name_lower}_checkpoint_{checkpoint_number:04d}"
+
+        # Save JSON checkpoint file
+        json_file = f"{checkpoint_base}.json"
+        checkpoint_data = {
+            "oem_name": self.OEM_NAME,
+            "started_at": self._scrape_started_at,
+            "last_updated": datetime.now().isoformat(),
+            "total_zips": total_zips,
+            "completed_zips": completed_zips,
+            "failed_zips": failed_zips,
+            "total_dealers": len(all_dealers),
+            "dealers_after_dedup": len(unique_dealers),
+            "checkpoint_number": checkpoint_number,
+            "status": "in_progress" if completed_zips < total_zips else "completed",
+            "dealers": [dealer.to_dict() for dealer in unique_dealers]
+        }
+
+        try:
+            # Save JSON checkpoint file
+            with open(json_file, 'w') as f:
+                json.dump(checkpoint_data, f, indent=2)
+
+            # Save checkpoint log file
+            log_file = f"{checkpoint_base}.log"
+            with open(log_file, 'w') as f:
+                f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Starting {self.OEM_NAME} scraper with {total_zips} ZIP codes\n")
+                f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] CHECKPOINT: Saved {checkpoint_number} zips, {len(all_dealers)} dealers total\n")
+                f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Checkpoint saved to: {oem_name_lower}_checkpoint_{checkpoint_number:04d}.json\n")
+                f.write(f"\n")
+                f.write(f"Progress: {completed_zips}/{total_zips} ZIPs ({100*completed_zips/total_zips:.1f}%)\n")
+                f.write(f"Total dealers: {len(all_dealers)}\n")
+                f.write(f"After dedup: {len(unique_dealers)}\n")
+                f.write(f"Failed ZIPs: {len(failed_zips)}\n")
+                if failed_zips:
+                    f.write(f"Failed ZIP codes: {', '.join(failed_zips)}\n")
+
+            # Log checkpoint confirmation
+            logging.info(f"CHECKPOINT: Saved {checkpoint_number} zips, {len(all_dealers)} dealers total")
+            logging.info(f"Checkpoint saved to: {json_file}")
+
+            # Print if verbose
+            if verbose:
+                print(f"\n  Checkpoint saved: {checkpoint_number} zips, {len(all_dealers)} dealers ({len(unique_dealers)} after dedup)")
+                print(f"     Saved to: {json_file}")
+
+        except (IOError, OSError) as e:
+            # Log error but don't crash - allow scraping to continue
+            logging.error(f"CHECKPOINT FAILED: Unable to save checkpoint {checkpoint_number}: {str(e)}")
+            if verbose:
+                print(f"\n  Warning: Checkpoint save failed: {str(e)}")
+            # Continue scraping - don't crash
+
     def deduplicate(self, key: str = "phone") -> None:
         """
         Remove duplicate dealers based on key field (usually phone number).
