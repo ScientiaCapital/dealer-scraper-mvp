@@ -3,7 +3,7 @@
 22-OEM Sequential Execution System
 Scrapes all 22 OEM networks with checkpoints and full validation.
 
-NOTE: Currently 18 OEMs are production-ready. Missing:
+NOTE: Currently 17 OEMs are production-ready. Missing:
 - Generac (needs conversion to unified framework)
 - Tesla (needs conversion to unified framework)
 - Enphase (needs conversion to unified framework)
