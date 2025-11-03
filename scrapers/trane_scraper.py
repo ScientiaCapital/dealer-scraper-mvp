@@ -40,7 +40,7 @@ class TraneScraper(BaseDealerScraper):
     """Scraper for Trane HVAC dealer network."""
 
     OEM_NAME = "Trane"
-    DEALER_LOCATOR_URL = "https://www.trane.com/residential/en/dealers/"
+    DEALER_LOCATOR_URL = "https://www.trane.com/residential/en/dealer-locator/"
     PRODUCT_LINES = [
         "HVAC Systems",
         "Air Conditioners",
@@ -53,7 +53,7 @@ class TraneScraper(BaseDealerScraper):
 
     def get_base_url(self) -> str:
         """Return the base URL for Trane dealer locator."""
-        return "https://www.trane.com/residential/en/dealers/"
+        return "https://www.trane.com/residential/en/dealer-locator/"
 
     def get_brand_name(self) -> str:
         """Return the brand name."""
@@ -65,91 +65,155 @@ class TraneScraper(BaseDealerScraper):
 
     def get_extraction_script(self) -> str:
         """
-        JavaScript extraction for Trane dealers from TABLE format.
-        
-        Trane lists ALL dealers (~1,138) in a sortable table on page load.
-        No ZIP search needed - extracts complete national dealer list.
-        
-        Table columns: Dealer Name | State | City | Zip/Postal Code | Country
-        Phone numbers NOT included in table (enrichment needed).
+        JavaScript extraction for Trane dealers from INTERACTIVE DEALER LOCATOR.
+
+        FIXED VERSION - Uses interactive dealer locator (like Carrier).
+        Extracts dealer cards with phone numbers, ratings, and contact info.
         """
         return r"""
 () => {
   const dealers = [];
-  
-  // Trane uses a TABLE with columns: Dealer Name | State | City | Zip/Postal Code | Country
-  // No ZIP search needed - all dealers loaded on page
-  const rows = Array.from(document.querySelectorAll('tr'));
-  
-  rows.forEach((row) => {
-    const cells = Array.from(row.querySelectorAll('td, th'));
-    
-    // Need at least 4 cells: name, state, city, zip
-    if (cells.length >= 4) {
-      // First cell should have a dealer name link
-      const nameLink = cells[0]?.querySelector('a');
-      
-      if (nameLink) {
-        const name = nameLink.textContent.trim();
-        
-        // Skip header row
-        if (name === 'Dealer Name' || name.length < 3) return;
-        
-        const state = cells[1]?.textContent.trim() || '';
-        const city = cells[2]?.textContent.trim() || '';
-        const zip = cells[3]?.textContent.trim() || '';
-        const country = cells[4]?.textContent.trim() || 'US';
-        
-        dealers.push({
-          name: name,
-          phone: '',  // Not available in table view
-          domain: '',
-          website: '',
-          street: '',
-          city: city,
-          state: state,
-          zip: zip,
-          address_full: city && state ? `${city}, ${state} ${zip}` : '',
-          rating: 0.0,
-          review_count: 0,
-          tier: 'Standard',
-          certifications: [],
-          distance: '',
-          distance_miles: 0,
-          oem_source: 'Trane',
-          country: country
-        });
+  const seen = new Set();
+
+  // Find all dealer cards - Trane uses similar structure to Carrier/Lennox
+  // Look for phone links first to identify dealer cards
+  const phoneLinks = Array.from(document.querySelectorAll('a[href^="tel:"]'));
+
+  phoneLinks.forEach(phoneLink => {
+    // Extract and normalize phone
+    let phone = phoneLink.href.replace('tel:', '').replace(/[^0-9]/g, '');
+    if (phone.length === 11 && phone.startsWith('1')) {
+      phone = phone.substring(1);
+    }
+    if (!phone || phone.length !== 10) return;
+
+    // Skip duplicates
+    if (seen.has(phone)) return;
+    seen.add(phone);
+
+    // Find dealer card container by traversing up from phone link
+    let container = phoneLink.parentElement;
+    let depth = 0;
+    while (container && depth < 15) {
+      const hasName = container.querySelector('h2, h3, h4, h5, a') || container.textContent.length > 50;
+      if (hasName && container.textContent.includes(phone) &&
+          (container.querySelector('[class*="dealer"]') || container.querySelector('[class*="location"]') ||
+           container.querySelector('[class*="card"]'))) {
+        break;
+      }
+      container = container.parentElement;
+      depth++;
+    }
+
+    if (!container) return;
+
+    // Extract dealer name - try different heading levels
+    const nameEl = container.querySelector('h2, h3, h4, h5, a[class*="name"], a[class*="dealer"], strong');
+    let name = '';
+    if (nameEl) {
+      name = nameEl.textContent.trim();
+      // Clean up name (remove extra whitespace, line breaks)
+      name = name.replace(/\s+/g, ' ').trim();
+    }
+
+    // Fallback: find longest text node if no name found
+    if (!name || name.length < 3) {
+      const textNodes = Array.from(container.querySelectorAll('*')).filter(el =>
+        el.children.length === 0 && el.textContent.trim().length > 3 &&
+        !el.textContent.includes(phone) && !el.textContent.match(/^\d/)
+      );
+      if (textNodes.length > 0) {
+        name = textNodes[0].textContent.trim();
       }
     }
+
+    if (!name || name.length < 3) return;
+
+    // Extract location - look for city/state patterns
+    const locationText = container.textContent;
+    let city = '', state = '';
+
+    // Try to find "City, ST" pattern
+    const cityStateMatch = locationText.match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*([A-Z]{2})/);
+    if (cityStateMatch) {
+      city = cityStateMatch[1];
+      state = cityStateMatch[2];
+    } else {
+      // Try to find state abbreviation
+      const stateMatch = locationText.match(/\b([A-Z]{2})\b/);
+      if (stateMatch) {
+        state = stateMatch[1];
+      }
+    }
+
+    // Extract rating and reviews
+    let rating = 0.0;
+    let review_count = 0;
+    const ratingMatch = locationText.match(/(\d+\.?\d*)\s*\((\d+)\)/);
+    if (ratingMatch) {
+      rating = parseFloat(ratingMatch[1]);
+      review_count = parseInt(ratingMatch[2]);
+    }
+
+    // Extract distance
+    let distance = '';
+    let distance_miles = 0;
+    const distanceMatch = locationText.match(/(\d+\.?\d*)\s*(mi|miles)/i);
+    if (distanceMatch) {
+      distance_miles = parseFloat(distanceMatch[1]);
+      distance = `${distance_miles} mi`;
+    }
+
+    // Extract website (if available)
+    const websiteLink = container.querySelector('a[href^="http"]:not([href*="tel:"]):not([href*="trane.com"]):not([href*="google.com/maps"])');
+    let website = '';
+    let domain = '';
+    if (websiteLink) {
+      website = websiteLink.href;
+      try {
+        const url = new URL(website);
+        domain = url.hostname.replace(/^www\./, '');
+      } catch (e) {}
+    }
+
+    dealers.push({
+      name: name,
+      phone: phone,
+      domain: domain,
+      website: website,
+      street: '',
+      city: city || '',
+      state: state || '',
+      zip: '',
+      address_full: city && state ? `${city}, ${state}` : city || state || '',
+      rating: rating,
+      review_count: review_count,
+      tier: 'Standard Dealer',
+      certifications: ['Trane Dealer'],
+      distance: distance,
+      distance_miles: distance_miles
+    });
   });
-  
+
   return dealers;
 }
 """
 
-    def _scrape_with_playwright(
-        self, zip_code: str
-    ) -> List[StandardizedDealer]:
+    def _scrape_with_playwright(self, zip_code: str) -> List[StandardizedDealer]:
         """
-        Scrape Trane dealers using Playwright (local automation).
-        
-        NOTE: Trane lists ALL dealers in one table (no ZIP search).
-        This method ignores zip_code and returns the full dealer list.
-        
-        Args:
-            zip_code: Ignored (kept for interface compatibility)
-        
-        Returns:
-            List of ALL Trane dealers (~1,138 dealers)
+        PLAYWRIGHT mode with button clicking.
+
+        TRANE-SPECIFIC: Phone numbers are hidden behind "Call Now" buttons.
+        Must click each button to reveal phones - can't use JavaScript extraction.
         """
         from playwright.sync_api import sync_playwright
+        import time
+        import re
 
         dealers = []
 
         with sync_playwright() as p:
             try:
-                print(f"\n🔧 TRANE: Loading full dealer directory (ZIP search not used)")
-
                 # Launch browser
                 browser = p.chromium.launch(headless=True)
                 context = browser.new_context(
@@ -158,44 +222,140 @@ class TraneScraper(BaseDealerScraper):
                 )
                 page = context.new_page()
 
-                # Navigate to dealer directory
-                print(f"  → Navigating to {self.get_base_url()}")
-                page.goto(self.get_base_url(), timeout=60000, wait_until="domcontentloaded")
-                time.sleep(5)  # Wait for table to fully render
+                # Navigate and handle cookies
+                print(f"  → Navigating to Trane dealer locator...")
+                page.goto(self.DEALER_LOCATOR_URL, timeout=60000, wait_until='domcontentloaded')
+                time.sleep(2)
 
-                # Execute extraction script (no search needed)
-                print(f"  → Extracting all dealers from table...")
-                raw_results = page.evaluate(self.get_extraction_script())
+                # Dismiss cookie banner
+                try:
+                    cookie_btn = page.locator('button:has-text("continue")').first
+                    if cookie_btn.count() > 0:
+                        cookie_btn.click(timeout=2000)
+                        time.sleep(1)
+                except Exception:
+                    pass
 
-                if not raw_results:
-                    print(f"  ❌ No dealers found in table")
-                    browser.close()
-                    return []
+                # Fill ZIP and search
+                print(f"  → Searching ZIP: {zip_code}")
+                zip_input = page.locator('input[type="text"]').first
+                zip_input.fill(zip_code)
+                time.sleep(0.5)
 
-                # Parse results
-                dealers = self.parse_results(raw_results, zip_code)
-                print(f"  ✅ Extracted {len(dealers)} Trane dealers")
+                search_btn = page.locator('button:has-text("Search")').first
+                search_btn.click()
+                time.sleep(4)  # Wait for dealer cards to load
+
+                # Get all dealer cards by heading (h2 elements contain names)
+                dealer_headings = page.locator('h2').all()
+
+                print(f"  → Found {len(dealer_headings)} potential dealers")
+
+                for heading in dealer_headings:
+                    try:
+                        name = heading.inner_text().strip()
+                        if not name or len(name) < 3:
+                            continue
+
+                        # Find the dealer card container (climb up DOM)
+                        try:
+                            container = heading.locator('xpath=..').locator('xpath=..').first
+                        except:
+                            container = heading.locator('xpath=..').first
+
+                        # Click "Call Now" to reveal phone
+                        phone = ''
+                        try:
+                            call_btns = container.locator('button').all()
+                            for btn in call_btns:
+                                btn_text = btn.inner_text().lower()
+                                if 'call' in btn_text:
+                                    btn.click(timeout=2000)
+                                    time.sleep(0.3)
+
+                                    # Extract revealed phone link
+                                    phone_link = container.locator('a[href^="tel:"]').first
+                                    if phone_link.count() > 0:
+                                        href = phone_link.get_attribute('href')
+                                        phone = re.sub(r'[^0-9]', '', href)
+                                        if len(phone) == 11 and phone.startswith('1'):
+                                            phone = phone[1:]
+                                    break
+                        except Exception:
+                            pass
+
+                        # Skip if no phone (required field)
+                        if not phone or len(phone) != 10:
+                            continue
+
+                        # Extract location from paragraphs
+                        city, state = '', ''
+                        try:
+                            paras = container.locator('p').all()
+                            for p in paras:
+                                text = p.inner_text().strip()
+                                if ',' in text and len(text) < 100:
+                                    parts = [x.strip() for x in text.split(',')]
+                                    if len(parts) >= 2:
+                                        city = parts[-2] if len(parts) > 2 else parts[0]
+                                        state_text = parts[-1].split()[0] if parts[-1] else ''
+                                        if len(state_text) == 2 and state_text.isupper():
+                                            state = state_text
+                                        break
+                        except Exception:
+                            pass
+
+                        # Extract rating/reviews
+                        rating, review_count = 0.0, 0
+                        try:
+                            review_btns = container.locator('button').all()
+                            for btn in review_btns:
+                                text = btn.inner_text()
+                                if 'Google Reviews' in text:
+                                    match = re.search(r'(\d+)\s+Google', text)
+                                    if match:
+                                        review_count = int(match.group(1))
+                                    break
+
+                            # Rating is in a generic element with just the number
+                            all_text = container.inner_text()
+                            rating_match = re.search(r'\b([4-5]\.\d)\b', all_text)
+                            if rating_match:
+                                rating = float(rating_match.group(1))
+                        except Exception:
+                            pass
+
+                        dealers.append({
+                            'name': name,
+                            'phone': phone,
+                            'domain': '',
+                            'website': '',
+                            'street': '',
+                            'city': city,
+                            'state': state,
+                            'zip': '',
+                            'address_full': f"{city}, {state}" if city and state else city or state or '',
+                            'rating': rating,
+                            'review_count': review_count,
+                            'tier': 'Standard Dealer',
+                            'certifications': ['Trane Dealer'],
+                            'distance': '',
+                            'distance_miles': 0
+                        })
+
+                    except Exception as e:
+                        continue
+
+                print(f"  → Extracted {len(dealers)} dealers with phones")
+
+                # Parse into StandardizedDealer objects
+                parsed_dealers = self.parse_results(dealers, zip_code)
 
                 browser.close()
-                return dealers
+                return parsed_dealers
 
             except Exception as e:
-                print(f"  ❌ Error loading Trane dealer directory: {e}")
-                import traceback
-                traceback.print_exc()
-                if 'browser' in locals():
-                    browser.close()
-                return []
-
-                # Parse results
-                dealers = self.parse_results(raw_results, zip_code)
-                print(f"  ✅ Found {len(dealers)} Trane dealers")
-
-                browser.close()
-                return dealers
-
-            except Exception as e:
-                print(f"  ❌ Error scraping ZIP {zip_code}: {e}")
+                print(f"  ✗ Error scraping: {e}")
                 import traceback
                 traceback.print_exc()
                 if 'browser' in locals():

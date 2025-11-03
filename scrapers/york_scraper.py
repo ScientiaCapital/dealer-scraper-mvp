@@ -242,6 +242,23 @@ class YorkScraper(BaseDealerScraper):
                 page.goto(self.get_base_url(), timeout=60000)
                 time.sleep(3)
 
+                # CRITICAL: Accept cookie consent (TrustArc overlay blocks all clicks)
+                print(f"  → Checking for cookie consent popup...")
+                try:
+                    # Find cookie consent iframe (separate from dealer locator iframe)
+                    cookie_iframe_selector = 'iframe[title="Cookie Consent Notice"]'
+                    cookie_iframe_element = page.wait_for_selector(cookie_iframe_selector, timeout=5000)
+                    cookie_iframe = cookie_iframe_element.content_frame()
+
+                    # Click "Accept All" button inside cookie iframe
+                    accept_button = cookie_iframe.locator('button:has-text("Accept All")').first
+                    accept_button.click()
+                    time.sleep(2)
+                    print(f"  ✅ Cookies accepted")
+                except Exception:
+                    # Cookie popup might not appear or already accepted
+                    print(f"  → No cookie popup (already accepted)")
+
                 # CRITICAL: Switch to iframe context
                 print(f"  → Switching to iframe context...")
                 iframe_selector = 'iframe[name="locator_iframe16959"]'
