@@ -14,10 +14,27 @@ import sys
 import os
 import json
 import csv
+import argparse
+from dataclasses import asdict, is_dataclass
 from datetime import datetime
 from pathlib import Path
 from fuzzywuzzy import fuzz
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
+
+
+class DataclassJSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles dataclasses with to_dict() method support."""
+    def default(self, obj):
+        # Check for custom to_dict() method first (handles nested objects like DealerCapabilities)
+        if hasattr(obj, 'to_dict'):
+            return obj.to_dict()
+        # Fallback to asdict for simple dataclasses
+        if is_dataclass(obj):
+            return asdict(obj)
+        # Handle sets (convert to list for JSON serialization)
+        if isinstance(obj, set):
+            return list(obj)
+        return super().default(obj)
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -43,21 +60,24 @@ OEM_PRIORITY_ORDER = [
     "Cummins",
     "Briggs & Stratton",
 
-    # Tier 3: Solar Inverters (8 OEMs - Enphase/Tigo not ready, ABB/Delta commented out)
+    # Tier 3: Solar Inverters (5 OEMs - Sol-Ark/SolarEdge removed, ABB/Delta/Tigo commented out)
     "Fronius",
     "SMA",
-    "Sol-Ark",
     "GoodWe",
     "Growatt",
     "Sungrow",
-    "SolarEdge",
+    # "Sol-Ark",  # Removed - not working
+    # "SolarEdge",  # Removed - not working
     # "ABB",      # Commented out in scraper (FIMER acquisition)
     # "Delta",    # Commented out in scraper (no public locator)
     # "Tigo",     # Commented out in scraper (needs implementation)
 
-    # Tier 4: Battery Storage (1 OEM - Tesla needs conversion)
-    "SimpliPhi"
-    # "Tesla",    # Needs conversion to unified framework
+    # Tier 4: Battery Storage (2 OEMs)
+    "SimpliPhi",
+    "Tesla",
+
+    # Tier 5: Microinverters (1 OEM)
+    "Enphase"
 ]
 
 # Configuration
@@ -266,7 +286,7 @@ def generate_output_files(
     # 1. Raw JSON (all dealers with duplicates)
     raw_json_path = output_dir / f"{oem_safe_name}_raw_{TODAY}.json"
     with open(raw_json_path, 'w') as f:
-        json.dump(raw_dealers, f, indent=2)
+        json.dump(raw_dealers, f, indent=2, cls=DataclassJSONEncoder)
     generated_files['raw_json'] = raw_json_path
     print(f"     - {raw_json_path.name} ({len(raw_dealers)} dealers)")
 
@@ -453,27 +473,90 @@ def display_validation_metrics(dealers: List[Dict], oem_name: str, total_target_
     return metrics
 
 
-def main():
+def parse_args():
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description="22-OEM Sequential Execution System - Run OEM scrapers one at a time"
+    )
+    parser.add_argument(
+        '--oem',
+        type=str,
+        default=None,
+        help=f'Run a specific OEM non-interactively. Available: {", ".join(OEM_PRIORITY_ORDER)}'
+    )
+    parser.add_argument(
+        '--list-oems',
+        action='store_true',
+        help='List all available OEMs and exit'
+    )
+    return parser.parse_args()
+
+
+def main(target_oem: Optional[str] = None):
     """
     Main execution loop: Run all OEMs sequentially with user confirmation.
+
+    Args:
+        target_oem: If specified, run only this OEM non-interactively
     """
+    # Filter to target OEM if specified
+    oems_to_run = [target_oem] if target_oem else OEM_PRIORITY_ORDER
+
+    # Validate target OEM
+    if target_oem and target_oem not in OEM_PRIORITY_ORDER:
+        print(f"\n❌ ERROR: Unknown OEM '{target_oem}'")
+        print(f"\nAvailable OEMs:")
+        for i, oem in enumerate(OEM_PRIORITY_ORDER, 1):
+            print(f"  {i}. {oem}")
+        sys.exit(1)
+
     print(f"\n{'='*80}")
     print(f"22-OEM SEQUENTIAL EXECUTION SYSTEM")
     print(f"{'='*80}\n")
-    print(f"Total OEMs: {len(OEM_PRIORITY_ORDER)}")
+    print(f"Total OEMs: {len(oems_to_run)}")
     print(f"Target ZIPs: 264 (all 50 states)")
-    print(f"Mode: PLAYWRIGHT (local browser automation)")
+    print(f"Mode: {'NON-INTERACTIVE' if target_oem else 'INTERACTIVE'} (PLAYWRIGHT automation)")
     print(f"Checkpoint interval: Every {CHECKPOINT_INTERVAL} ZIPs")
     print(f"\n{'='*80}\n")
 
-    # Load ALL_ZIP_CODES from config
-    try:
-        # Try to import from config module
-        from config import ALL_ZIP_CODES
-        print(f"✅ Loaded {len(ALL_ZIP_CODES)} ZIP codes from config.py\n")
-    except ImportError:
-        print(f"❌ ERROR: Could not import ALL_ZIP_CODES from config.py")
-        print(f"   Make sure config.py exists in project root with ALL_ZIP_CODES defined")
+    # Load ALL_ZIP_CODES from config - FIXED VERSION
+    # Try multiple locations (worktree support)
+    config_paths = [
+        PROJECT_ROOT / "config.py",                    # Worktree root
+        PROJECT_ROOT.parent / "config.py",             # Parent of worktree
+        PROJECT_ROOT.parent.parent / "config.py",      # Main project root
+    ]
+
+    ALL_ZIP_CODES = None
+    last_error = None
+    for config_path in config_paths:
+        if config_path.exists():
+            try:
+                # Execute config file directly to avoid import caching issues
+                config_globals = {}
+                with open(config_path, 'r') as f:
+                    code = compile(f.read(), str(config_path), 'exec')
+                    eval(code, config_globals)
+
+                ALL_ZIP_CODES = config_globals.get('ALL_ZIP_CODES')
+                if ALL_ZIP_CODES:
+                    print(f"✅ Loaded {len(ALL_ZIP_CODES)} ZIP codes from {config_path}\n")
+                    break
+                else:
+                    last_error = "ALL_ZIP_CODES not found in config file"
+            except Exception as e:
+                import traceback
+                last_error = f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
+                continue
+
+    if ALL_ZIP_CODES is None:
+        print(f"❌ ERROR: Could not load ALL_ZIP_CODES from config.py")
+        print(f"   Searched in:")
+        for path in config_paths:
+            print(f"     - {path} {'(exists)' if path.exists() else '(not found)'}")
+        if last_error:
+            print(f"\n   Last error: {last_error}")
+        print(f"\n   Make sure config.py exists with ALL_ZIP_CODES defined")
         sys.exit(1)
 
     # Statistics tracking
@@ -485,21 +568,30 @@ def main():
     }
 
     # Sequential OEM execution loop
-    for oem_index, oem_name in enumerate(OEM_PRIORITY_ORDER):
+    for oem_index, oem_name in enumerate(oems_to_run):
         try:
             # Step 1: Delete old checkpoints
             delete_checkpoints(oem_name)
 
-            # Step 2: Prompt user for confirmation
-            response = prompt_user_confirmation(oem_name, oem_index, len(OEM_PRIORITY_ORDER))
+            # Step 2: Prompt user for confirmation (only in interactive mode)
+            if not target_oem:
+                response = prompt_user_confirmation(oem_name, oem_index, len(oems_to_run))
 
-            if response == 'n':
-                print(f"\n⏹️  Stopped at user request\n")
-                break
-            elif response == 'skip':
-                print(f"\n⏭️  Skipped {oem_name}\n")
-                stats_summary['skipped'].append(oem_name)
-                continue
+                if response == 'n':
+                    print(f"\n⏹️  Stopped at user request\n")
+                    break
+                elif response == 'skip':
+                    print(f"\n⏭️  Skipped {oem_name}\n")
+                    stats_summary['skipped'].append(oem_name)
+                    continue
+            else:
+                # Non-interactive mode: show banner and proceed
+                print(f"{'='*80}")
+                print(f"OEM 1/1: {oem_name}")
+                print(f"{'='*80}")
+                print(f"Target: {len(ALL_ZIP_CODES)} ZIP codes (all 50 states)")
+                print(f"Output: output/oem_data/{oem_name.lower().replace(' ', '_').replace('&', 'and')}/")
+                print()
 
             # Step 3: Create scraper instance
             print(f"\n  → Creating {oem_name} scraper...")
@@ -510,12 +602,18 @@ def main():
                 print(f"\n  ❌ ERROR: Could not create scraper for {oem_name}")
                 print(f"     {str(e)}")
 
-                choice = input("\n  Options: (s)kip this OEM / (q)uit script: ").strip().lower()
-                if choice == 's':
+                if target_oem:
+                    # Non-interactive: fail immediately
                     stats_summary['failed'].append({'oem': oem_name, 'error': str(e)})
-                    continue
-                else:
                     break
+                else:
+                    # Interactive: ask user
+                    choice = input("\n  Options: (s)kip this OEM / (q)uit script: ").strip().lower()
+                    if choice == 's':
+                        stats_summary['failed'].append({'oem': oem_name, 'error': str(e)})
+                        continue
+                    else:
+                        break
 
             # Step 4: Scrape all ZIPs with checkpoints
             print(f"\n  → Scraping {len(ALL_ZIP_CODES)} ZIP codes...")
@@ -534,34 +632,63 @@ def main():
                 import traceback
                 traceback.print_exc()
 
-                choice = input("\n  Options: (s)kip this OEM / (q)uit script: ").strip().lower()
-                if choice == 's':
+                if target_oem:
+                    # Non-interactive: fail immediately
                     stats_summary['failed'].append({'oem': oem_name, 'error': f"Scraping error: {str(e)}"})
-                    continue
-                else:
                     break
+                else:
+                    # Interactive: ask user
+                    choice = input("\n  Options: (s)kip this OEM / (q)uit script: ").strip().lower()
+                    if choice == 's':
+                        stats_summary['failed'].append({'oem': oem_name, 'error': f"Scraping error: {str(e)}"})
+                        continue
+                    else:
+                        break
 
-            # Step 5: Deduplicate dealers
-            print(f"\n  → Deduplicating dealers...")
-            deduped_dealers, dedup_stats = deduplicate_dealers(raw_dealers, oem_name)
+            # Step 5: Convert StandardizedDealer objects to dictionaries
+            print(f"\n  → Converting dealers to dict format...")
+            raw_dealers_dict = []
+            for dealer in raw_dealers:
+                if hasattr(dealer, '__dataclass_fields__'):
+                    # It's a dataclass, convert to dict recursively
+                    dealer_dict = asdict(dealer)
+                    # Ensure all nested dataclasses are also converted
+                    # (asdict should handle this, but being explicit)
+                    raw_dealers_dict.append(dealer_dict)
+                elif isinstance(dealer, dict):
+                    # Already a dict, but check for nested dataclasses
+                    clean_dict = {}
+                    for key, value in dealer.items():
+                        if hasattr(value, '__dataclass_fields__'):
+                            clean_dict[key] = asdict(value)
+                        else:
+                            clean_dict[key] = value
+                    raw_dealers_dict.append(clean_dict)
+                else:
+                    # Unknown type, try to convert
+                    raw_dealers_dict.append(dict(dealer))
 
-            # Step 6: Generate output files
+            # Step 6: Deduplicate dealers
+            print(f"  → Deduplicating dealers...")
+            deduped_dealers, dedup_stats = deduplicate_dealers(raw_dealers_dict, oem_name)
+
+            # Step 7: Generate output files
             oem_dir = PROJECT_ROOT / "output" / "oem_data" / oem_name.lower().replace(" ", "_").replace("&", "and")
             output_files = generate_output_files(
-                raw_dealers=raw_dealers,
+                raw_dealers=raw_dealers_dict,
                 deduped_dealers=deduped_dealers,
                 dedup_stats=dedup_stats,
                 oem_name=oem_name,
                 output_dir=oem_dir
             )
 
-            # Step 7: Display validation metrics
+            # Step 8: Display validation metrics
             validation_metrics = display_validation_metrics(deduped_dealers, oem_name, total_target_zips=len(ALL_ZIP_CODES))
 
             # Mark as completed
             stats_summary['completed'].append({
                 'oem': oem_name,
-                'raw_count': len(raw_dealers),
+                'raw_count': len(raw_dealers_dict),
                 'unique_count': len(deduped_dealers),
                 'dedup_rate': dedup_stats.get('initial', 0) - dedup_stats.get('final', 0),
                 'files': output_files
@@ -580,22 +707,28 @@ def main():
             import traceback
             traceback.print_exc()
 
-            choice = input("\n  Options: (s)kip this OEM / (q)uit script: ").strip().lower()
-            if choice == 's':
+            if target_oem:
+                # Non-interactive: fail immediately
                 stats_summary['failed'].append({'oem': oem_name, 'error': str(e)})
-                continue
-            else:
                 break
+            else:
+                # Interactive: ask user
+                choice = input("\n  Options: (s)kip this OEM / (q)uit script: ").strip().lower()
+                if choice == 's':
+                    stats_summary['failed'].append({'oem': oem_name, 'error': str(e)})
+                    continue
+                else:
+                    break
 
     # Final summary
     stats_summary['end_time'] = datetime.now()
     duration = stats_summary['end_time'] - stats_summary['start_time']
 
     print(f"\n{'='*80}")
-    print(f"ALL OEM SCRAPING COMPLETE")
+    print(f"{'SINGLE OEM' if target_oem else 'ALL OEM'} SCRAPING COMPLETE")
     print(f"{'='*80}\n")
     print(f"Duration: {duration}")
-    print(f"OEMs completed: {len(stats_summary['completed'])}/{len(OEM_PRIORITY_ORDER)}")
+    print(f"OEMs completed: {len(stats_summary['completed'])}/{len(oems_to_run)}")
     print(f"OEMs skipped: {len(stats_summary['skipped'])}")
     print(f"OEMs failed: {len(stats_summary['failed'])}")
 
@@ -620,4 +753,15 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    args = parse_args()
+
+    # Handle --list-oems flag
+    if args.list_oems:
+        print(f"\nAvailable OEMs ({len(OEM_PRIORITY_ORDER)} total):\n")
+        for i, oem in enumerate(OEM_PRIORITY_ORDER, 1):
+            print(f"  {i:2d}. {oem}")
+        print(f"\nUsage: python3 scripts/run_22_oem_sequential.py --oem \"OEM Name\"\n")
+        sys.exit(0)
+
+    # Run main with optional target OEM
+    main(target_oem=args.oem)
