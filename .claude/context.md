@@ -1,58 +1,113 @@
-# Project: Dealer Scraper MVP - State License Acquisition
-Last Updated: 2025-11-19
+# Project: Dealer Scraper MVP - State License Expansion
+Last Updated: 2025-11-19 (Evening Session)
 
-## Current Sprint/Focus - New Jersey State License Scraper
-- [x] Research NJ MyLicense portal structure (ASP.NET WebForms)
-- [x] Build production scraper with proper pagination support
-- [x] Add all 4 MEP+Energy professions
-- [x] Run full production scrape
-- [x] Verify data quality (821 active Electrical Contractors extracted!)
-- [ ] Re-run Home Improvement with full pagination
-- [ ] Investigate Master Plumbers and HVACR (0 results issue)
-- [ ] Implement multi-license detection (self-performing contractors)
-- [ ] Replicate pattern to Maryland
+## Current Sprint/Focus: STRATEGIC PIVOT - County-Level AHJ Licensing
 
-## Architecture Overview
+### CRITICAL FINDING - Nov 19, 2025
 
-### NJ Scraper Breakthrough
-- **Framework**: Python + Playwright (local automation)
-- **Portal**: https://newjersey.mylicense.com/verification/Search.aspx?facility=Y
-- **Key Challenge**: ASP.NET WebForms pagination with __doPostBack
-- **Solution**: Direct JavaScript execution + raw HTML regex parsing
+**STATE-LEVEL LICENSING IS INCOMPLETE FOR MEP CONTRACTORS!**
 
-### Technical Pattern (Reusable for Other States)
-1. **HTML Extraction**: Use `page.content()` to get raw HTML (JavaScript DOM queries fail on NJ's non-standard tables)
-2. **Regex Parsing**: Python regex on raw HTML finds contractor records
-3. **ASP.NET Pagination**: Execute `__doPostBack('datagrid_results$_ctl44$_ctl{N}','')` where N = page_num - 2
-4. **Fresh Sessions**: New browser per profession to avoid rate limiting
-5. **Error Handling**: Continue on timing errors (page.content() during navigation)
+Both NJ and NY license MEP contractors (HVAC, Plumbing, Electrical) at the **COUNTY/MUNICIPAL level**, not state level. This fundamentally changes our approach.
 
-## Recent Changes (2025-11-19)
+## What Was Completed Today
 
-### Major Breakthrough: NJ Pagination Working! 🎉
-- **Results**:
-  - ✅ **821 active Electrical Contractors** across 42 pages (COMPLETE)
-  - ✅ **14 Home Improvement Contractors** (partial - page 1 only, needs re-run)
-  - ❌ **0 Master Plumbers** (needs investigation)
-  - ❌ **0 HVACR** (needs investigation)
+### New Jersey Research
+- ✅ Scraped NJ MyLicense portal (newjersey.mylicense.com)
+- ✅ Found 25 Electrical Contractors (BUSINESS portal)
+- ✅ Discovered PERSON vs BUSINESS portal distinction
+- ❌ **HVACR returns ONLY CE Sponsors** (Continuing Education providers), NOT actual contractors
+- ❌ **Master Plumbers database is EMPTY** (42 pages, all empty)
+- ✅ Dumped all 53 profession options (both portals identical)
+- ✅ Explored RGB portal (rgbportal.dca.njoag.gov) - wrong data (business registrations, not contractor licenses)
 
-### Key Insights Gained
-1. **Self-Performing Contractors = Highest Value**: Contractors with multiple trade licenses (appearing in 2+ profession lists) are the most valuable targets
-2. **Quality Over Speed**: "there is 'Gold in them Hills of NJ' claude" - get it right
-3. **Project Focus**: This project handles data acquisition ONLY - enrichment happens in separate `sales-agent` project
+### New York Research
+- ✅ Confirmed NY has NO unified statewide contractor licensing
+- ✅ **NYC DOB portal is JACKPOT!** (a810-bisweb.nyc.gov)
+- ✅ Found comprehensive license types:
+  - A) ELECTRICAL CONTRACTOR
+  - P) MASTER PLUMBER
+  - O) OIL BURNER INSTALLER (HVAC heating)
+  - F) FIRE SUPPRESSION CONTRACTOR
+  - G) GENERAL CONTRACTOR
+  - K) ENERGY AUDITOR / RETRO-COMMISSION AGENT
 
-## Next Steps
+### Scripts Created
+- `scripts/scrape_new_jersey.py` - NJ BUSINESS portal scraper with pagination
+- `scripts/scrape_nj_persons.py` - NJ PERSON portal scraper
+- `scripts/dump_all_nj_professions.py` - Dumps all profession options
+- `scripts/explore_rgb_portal.py` - RGB portal explorer
+- `scripts/explore_nyc_dob.py` - NYC DOB portal explorer
+- `scripts/explore_county_ahjs.py` - County-level AHJ research script (READY TO RUN)
+- `scripts/convert_portal_excel.py` - Excel to CSV converter
 
-### Immediate
-1. Re-run Home Improvement Contractors with full pagination
-2. Investigate Master Plumbers and HVACR (0 results issue)
-3. Implement multi-license detection script
+### Output Files Created
+- `output/state_licenses/new_jersey/professions_person.json`
+- `output/state_licenses/new_jersey/professions_business.json`
+- `output/state_licenses/new_york/nyc_dob/page_content.html`
+- `output/state_licenses/new_jersey/nj_electrical_contractors_20251119.csv` (25 contractors)
 
-### Short-Term
-4. Document NJ scraper pattern in reusable template
-5. Replicate pattern to Maryland
+## Key Insights
 
-## File Locations
-- Production: `scripts/scrape_new_jersey.py`
-- Output: `output/state_licenses/new_jersey/nj_electrical_contractors_20251119.csv` (821 contractors)
-- Logs: `output/nj_proper_pagination_test.log`
+### State Licensing Structure (CRITICAL!)
+1. **MEP contractors are licensed at COUNTY/MUNICIPAL level in NJ and NY**
+2. State portals only have:
+   - Continuing Education sponsors
+   - Business registrations
+   - Some specific professions (nursing, pharmacy, etc.)
+3. **Strategy must pivot to AHJ (Authority Having Jurisdiction) portals**
+
+### Wealthy County Targets Identified (Top 10)
+**New York:**
+- Nassau County ($130K median income)
+- Westchester County ($110K) - has known trade license search
+- Putnam County ($100K)
+- Suffolk County ($95K)
+
+**New Jersey:**
+- Hunterdon County ($126K)
+- Somerset County ($123K)
+- Morris County ($120K)
+- Bergen County ($110K)
+- Monmouth County ($106K)
+
+## Next Steps for Tomorrow
+
+### IMMEDIATE PRIORITY (Do First!)
+1. **Run `scripts/explore_county_ahjs.py`** - Systematically research all 10 wealthy county portals
+2. **Identify which AHJs have online searchable contractor databases**
+3. **Focus on Westchester County first** (known trade license search at consumer.westchestergov.com)
+
+### NYC DOB Scraper (High Value)
+1. Build scraper for NYC DOB portal (a810-bisweb.nyc.gov)
+2. Target license types: ELECTRICAL CONTRACTOR, MASTER PLUMBER, OIL BURNER INSTALLER, FIRE SUPPRESSION, GENERAL CONTRACTOR, ENERGY AUDITOR
+3. Search by business name (iterate through alphabet)
+
+### County-Level Strategy
+1. For each wealthy county with searchable database:
+   - Explore portal structure
+   - Identify license types available
+   - Build scraper
+2. Combine county data into unified dataset
+3. Deduplicate across counties (contractors may be licensed in multiple)
+
+## Architecture Notes
+
+### ASP.NET Pagination Pattern (NJ)
+```python
+postback_target = f"datagrid_results$_ctl44$_ctl{page_num - 2}"
+await page.evaluate(f"__doPostBack('{postback_target}', '')")
+```
+
+### License Number Patterns
+- NJ Electrical: `34XX########`
+- NJ Home Improvement: `13VH########`
+- NYC varies by license type
+
+### Portal Types
+- **PERSON portal**: Individual licenses (Master Plumber, HVACR person)
+- **BUSINESS portal**: Business/firm licenses (Electrical Contractor firm)
+
+## Files to Review Tomorrow
+- `output/state_licenses/new_york/nyc_dob/page_content.html` - NYC DOB structure
+- `output/state_licenses/new_jersey/professions_*.json` - Available professions
+- `scripts/explore_county_ahjs.py` - Ready to run for county research
