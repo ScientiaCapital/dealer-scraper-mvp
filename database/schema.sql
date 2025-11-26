@@ -21,7 +21,12 @@ CREATE TABLE IF NOT EXISTS contractors (
     primary_email TEXT,    -- Lowercase
     primary_domain TEXT,   -- Extracted from email, excludes webmail
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- Soft delete support (for audit trail)
+    is_deleted INTEGER DEFAULT 0,
+    deleted_at TIMESTAMP,
+    deleted_by TEXT,
+    deletion_reason TEXT
 );
 
 -- Contact information (multiple per contractor)
@@ -110,6 +115,56 @@ CREATE TABLE IF NOT EXISTS spw_rankings (
 );
 
 -- ============================================
+-- AUDIT TRAIL TABLES (for import tracking and change history)
+-- ============================================
+
+-- File imports tracking (which files were imported, when, and outcome)
+-- Prevents duplicate imports and enables rollback by file
+CREATE TABLE IF NOT EXISTS file_imports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_path TEXT NOT NULL,
+    file_name TEXT NOT NULL,
+    file_hash TEXT NOT NULL,          -- SHA256 of file content
+    file_size_bytes INTEGER,
+    row_count INTEGER,
+    source_type TEXT,                 -- 'fl_license', 'ca_license', 'tx_license', 'oem_generac', etc.
+    import_started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    import_completed_at TIMESTAMP,
+    import_status TEXT DEFAULT 'in_progress',  -- 'completed', 'failed', 'rolled_back'
+    records_created INTEGER DEFAULT 0,
+    records_updated INTEGER DEFAULT 0,
+    records_merged INTEGER DEFAULT 0,
+    records_skipped INTEGER DEFAULT 0,
+    error_message TEXT,
+    UNIQUE(file_hash)
+);
+
+-- Contractor change history (before/after snapshots for all changes)
+-- Enables point-in-time recovery and debugging of data quality issues
+CREATE TABLE IF NOT EXISTS contractor_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    contractor_id INTEGER NOT NULL,
+    change_type TEXT NOT NULL,        -- 'INSERT', 'UPDATE', 'DELETE', 'MERGE', 'RESTORE'
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    source TEXT,                      -- 'fl_license_import', 'oem_import', 'manual', 'api'
+    file_import_id INTEGER,
+    old_values TEXT,                  -- JSON of fields before change
+    new_values TEXT,                  -- JSON of fields after change
+    FOREIGN KEY (contractor_id) REFERENCES contractors(id) ON DELETE SET NULL,
+    FOREIGN KEY (file_import_id) REFERENCES file_imports(id)
+);
+
+-- Import locks (prevent concurrent imports from corrupting data)
+-- Singleton table with max 1 row - acts as distributed lock
+CREATE TABLE IF NOT EXISTS import_locks (
+    id INTEGER PRIMARY KEY CHECK (id = 1),  -- Singleton row
+    lock_holder TEXT NOT NULL,              -- 'hostname:pid'
+    created_at TIMESTAMP NOT NULL,
+    expires_at TIMESTAMP NOT NULL,          -- Auto-expire after 30 min
+    reason TEXT
+);
+
+-- ============================================
 -- INDEXES for fast lookups
 -- ============================================
 
@@ -119,6 +174,7 @@ CREATE INDEX IF NOT EXISTS idx_contractors_email ON contractors(primary_email);
 CREATE INDEX IF NOT EXISTS idx_contractors_domain ON contractors(primary_domain);
 CREATE INDEX IF NOT EXISTS idx_contractors_normalized ON contractors(normalized_name);
 CREATE INDEX IF NOT EXISTS idx_contractors_state ON contractors(state);
+CREATE INDEX IF NOT EXISTS idx_contractors_deleted ON contractors(is_deleted);
 
 -- Contact indexes
 CREATE INDEX IF NOT EXISTS idx_contacts_email ON contacts(email);
@@ -138,6 +194,14 @@ CREATE INDEX IF NOT EXISTS idx_oem_name ON oem_certifications(oem_name);
 -- Pipeline run indexes
 CREATE INDEX IF NOT EXISTS idx_runs_state ON pipeline_runs(state);
 CREATE INDEX IF NOT EXISTS idx_runs_timestamp ON pipeline_runs(run_timestamp);
+
+-- Audit trail indexes
+CREATE INDEX IF NOT EXISTS idx_file_imports_hash ON file_imports(file_hash);
+CREATE INDEX IF NOT EXISTS idx_file_imports_status ON file_imports(import_status);
+CREATE INDEX IF NOT EXISTS idx_contractor_history_cid ON contractor_history(contractor_id);
+CREATE INDEX IF NOT EXISTS idx_contractor_history_ts ON contractor_history(created_at);
+CREATE INDEX IF NOT EXISTS idx_contractor_history_type ON contractor_history(change_type);
+CREATE INDEX IF NOT EXISTS idx_contractor_history_import ON contractor_history(file_import_id);
 
 -- ============================================
 -- VIEWS for common queries
