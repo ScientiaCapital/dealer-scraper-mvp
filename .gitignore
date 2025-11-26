@@ -107,7 +107,15 @@ scripts/generate_leads.py
 enrichment/
 crm/
 data/
-# CLAUDE.md - now tracked for project context
+
+# Claude Code project context - PRIVATE (contains strategy, business context)
+CLAUDE.md
+CLAUDE_INIT.md
+.claude/
+.claude/context.md
+
+# Documentation with sensitive info
 QUICKSTART.md
 FINDINGS.md
 API_KEYS_GUIDE.md
+docs/SALES_AGENT_SYNC.md
