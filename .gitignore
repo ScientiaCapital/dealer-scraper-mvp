@@ -20,13 +20,19 @@ dist/
 *_key.*
 *_secret.*
 
-# Output files
+# Output files - SENSITIVE DATA (contractor PII)
 output/
 *.json
 *.csv
 !example_output.json
 !test_input.json
 !**/examples/*.json
+
+# Databases - NEVER commit (contains PII)
+*.db
+*.sqlite
+*.sqlite3
+pipeline.db
 
 # Docker and RunPod
 .docker/
@@ -101,7 +107,7 @@ scripts/generate_leads.py
 enrichment/
 crm/
 data/
-CLAUDE.md
+# CLAUDE.md - now tracked for project context
 QUICKSTART.md
 FINDINGS.md
 API_KEYS_GUIDE.md
