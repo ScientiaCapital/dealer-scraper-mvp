@@ -2,7 +2,7 @@ from typing import Dict, Type, List
 from .base_license_scraper import BaseLicenseScraper
 from .bulk_download_scraper import BulkDownloadScraper
 from .models import ScraperMode, StandardizedLicensee
-from config.state_license_configs import STATE_CONFIGS
+from state_configs.state_license_configs import STATE_CONFIGS
 
 # ==================== Concrete State Scrapers ====================
 
