@@ -47,6 +47,11 @@ from database.models import (
     TX_LICENSE_CATEGORIES,
     WEBMAIL_DOMAINS
 )
+from database.audit import (
+    FileFingerprint,
+    ImportLock,
+    AuditTrail
+)
 
 __all__ = [
     # Main database class
@@ -61,6 +66,11 @@ __all__ = [
     'PipelineRun',
     'DedupMatch',
     'SPWRanking',
+
+    # Audit classes
+    'FileFingerprint',
+    'ImportLock',
+    'AuditTrail',
 
     # Utility functions
     'normalize_phone',
