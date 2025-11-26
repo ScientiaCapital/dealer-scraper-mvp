@@ -30,6 +30,7 @@ import os
 import socket
 from datetime import datetime, timedelta
 from pathlib import Path
+from sqlite3 import Connection
 from typing import Any, Dict, List, Optional
 import csv
 
@@ -135,7 +136,7 @@ class ImportLock:
 
     LOCK_TIMEOUT_MINUTES = 30
 
-    def __init__(self, conn):
+    def __init__(self, conn: Connection) -> None:
         """
         Initialize lock manager.
 
@@ -255,7 +256,7 @@ class AuditTrail:
     with full before/after snapshots. Uses batching for performance.
     """
 
-    def __init__(self, conn, source: str = "unknown", file_import_id: Optional[int] = None):
+    def __init__(self, conn: Connection, source: str = "unknown", file_import_id: Optional[int] = None) -> None:
         """
         Initialize audit trail logger.
 
