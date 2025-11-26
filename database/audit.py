@@ -406,9 +406,13 @@ class AuditTrail:
             new_values=merge_info
         )
 
-    def flush(self) -> int:
+    def flush(self, commit: bool = True) -> int:
         """
         Write batch to database.
+
+        Args:
+            commit: Whether to commit transaction (default True).
+                    Set to False when caller manages transaction.
 
         Returns:
             Number of audit records written
@@ -448,7 +452,8 @@ class AuditTrail:
             ) VALUES (?, ?, ?, ?, ?, ?, ?)
         """, rows)
 
-        self.conn.commit()
+        if commit:
+            self.conn.commit()
 
         count = len(self._batch)
         self._batch.clear()

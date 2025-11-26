@@ -44,9 +44,9 @@ def test_db():
     conn = sqlite3.connect(':memory:')
     cursor = conn.cursor()
 
-    # Create audit_trail table
+    # Create contractor_history table (matches schema.sql)
     cursor.execute("""
-        CREATE TABLE audit_trail (
+        CREATE TABLE contractor_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             contractor_id INTEGER NOT NULL,
             change_type TEXT NOT NULL,
@@ -58,13 +58,14 @@ def test_db():
         )
     """)
 
-    # Create import_locks table
+    # Create import_locks table (matches schema.sql)
     cursor.execute("""
         CREATE TABLE import_locks (
-            id INTEGER PRIMARY KEY,
+            id INTEGER PRIMARY KEY CHECK (id = 1),
             lock_holder TEXT NOT NULL,
-            reason TEXT,
-            created_at TIMESTAMP NOT NULL
+            created_at TIMESTAMP NOT NULL,
+            expires_at TIMESTAMP NOT NULL,
+            reason TEXT
         )
     """)
 
@@ -153,7 +154,7 @@ def test_acquire_lock_success(test_db):
     row = cursor.fetchone()
 
     assert row is not None
-    assert 'Test import' in row[2]  # reason column
+    assert 'Test import' in row[4]  # reason column (index: id=0, lock_holder=1, created_at=2, expires_at=3, reason=4)
 
 
 def test_acquire_lock_failure_already_held(test_db):
@@ -222,10 +223,11 @@ def test_lock_auto_expiry(test_db):
 
     # Manually insert an expired lock (31 minutes old)
     expired_time = datetime.now() - timedelta(minutes=31)
+    expired_expires = expired_time + timedelta(minutes=30)  # Would have expired 1 min ago
     cursor.execute("""
-        INSERT INTO import_locks (id, lock_holder, reason, created_at)
-        VALUES (1, 'expired_process', 'Old import', ?)
-    """, (expired_time.isoformat(),))
+        INSERT INTO import_locks (id, lock_holder, reason, created_at, expires_at)
+        VALUES (1, 'expired_process', 'Old import', ?, ?)
+    """, (expired_time.isoformat(), expired_expires.isoformat()))
     test_db.commit()
 
     # Trying to acquire should clean up expired lock and succeed
@@ -251,7 +253,7 @@ def test_log_insert(test_db):
 
     # Verify audit record
     cursor = test_db.cursor()
-    cursor.execute("SELECT * FROM audit_trail WHERE contractor_id = 1")
+    cursor.execute("SELECT * FROM contractor_history WHERE contractor_id = 1")
     row = cursor.fetchone()
 
     assert row is not None
@@ -278,7 +280,7 @@ def test_log_update_only_changed_fields(test_db):
 
     # Verify only 'city' was logged (the changed field)
     cursor = test_db.cursor()
-    cursor.execute("SELECT * FROM audit_trail WHERE contractor_id = 1")
+    cursor.execute("SELECT * FROM contractor_history WHERE contractor_id = 1")
     row = cursor.fetchone()
 
     assert row is not None
@@ -313,7 +315,7 @@ def test_log_update_no_changes(test_db):
 
     # Should log nothing (no changes)
     cursor = test_db.cursor()
-    cursor.execute("SELECT COUNT(*) FROM audit_trail WHERE contractor_id = 1")
+    cursor.execute("SELECT COUNT(*) FROM contractor_history WHERE contractor_id = 1")
     count = cursor.fetchone()[0]
 
     assert count == 0
@@ -332,7 +334,7 @@ def test_log_delete(test_db):
 
     # Verify audit record
     cursor = test_db.cursor()
-    cursor.execute("SELECT * FROM audit_trail WHERE contractor_id = 1")
+    cursor.execute("SELECT * FROM contractor_history WHERE contractor_id = 1")
     row = cursor.fetchone()
 
     assert row is not None
@@ -357,7 +359,7 @@ def test_log_merge(test_db):
 
     # Verify audit record
     cursor = test_db.cursor()
-    cursor.execute("SELECT * FROM audit_trail WHERE contractor_id = 1")
+    cursor.execute("SELECT * FROM contractor_history WHERE contractor_id = 1")
     row = cursor.fetchone()
 
     assert row is not None
@@ -384,13 +386,13 @@ def test_batch_auto_flush(test_db):
 
     # Should have auto-flushed 5 records
     cursor = test_db.cursor()
-    cursor.execute("SELECT COUNT(*) FROM audit_trail")
+    cursor.execute("SELECT COUNT(*) FROM contractor_history")
     count = cursor.fetchone()[0]
     assert count == 5
 
     # Manual flush should write remaining 2
     audit.flush()
-    cursor.execute("SELECT COUNT(*) FROM audit_trail")
+    cursor.execute("SELECT COUNT(*) FROM contractor_history")
     count = cursor.fetchone()[0]
     assert count == 7
 
@@ -427,7 +429,7 @@ def test_audit_with_file_import_id(test_db):
 
     # Verify file_import_id was stored
     cursor = test_db.cursor()
-    cursor.execute("SELECT file_import_id FROM audit_trail WHERE contractor_id = 1")
+    cursor.execute("SELECT file_import_id FROM contractor_history WHERE contractor_id = 1")
     file_import_id = cursor.fetchone()[0]
 
     assert file_import_id == 999
@@ -477,7 +479,7 @@ def test_import_workflow_with_lock_and_audit(test_db, temp_csv):
         assert released is True
 
     # Verify audit records were created with correct file_import_id
-    cursor.execute("SELECT COUNT(*) FROM audit_trail WHERE file_import_id = ?", (file_import_id,))
+    cursor.execute("SELECT COUNT(*) FROM contractor_history WHERE file_import_id = ?", (file_import_id,))
     count = cursor.fetchone()[0]
     assert count == 3
 
