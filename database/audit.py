@@ -176,10 +176,12 @@ class ImportLock:
 
         # Try to acquire lock (singleton id=1)
         try:
+            now = datetime.now()
+            expires = now + timedelta(minutes=self.LOCK_TIMEOUT_MINUTES)
             cursor.execute("""
-                INSERT INTO import_locks (id, lock_holder, reason, created_at)
-                VALUES (1, ?, ?, ?)
-            """, (self.lock_holder, reason, datetime.now().isoformat()))
+                INSERT INTO import_locks (id, lock_holder, reason, created_at, expires_at)
+                VALUES (1, ?, ?, ?, ?)
+            """, (self.lock_holder, reason, now.isoformat(), expires.isoformat()))
             self.conn.commit()
             return True
         except Exception:
@@ -435,7 +437,7 @@ class AuditTrail:
         ]
 
         cursor.executemany("""
-            INSERT INTO audit_trail (
+            INSERT INTO contractor_history (
                 contractor_id,
                 change_type,
                 old_values,

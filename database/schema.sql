@@ -145,8 +145,8 @@ CREATE TABLE IF NOT EXISTS contractor_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     contractor_id INTEGER NOT NULL,
     change_type TEXT NOT NULL,        -- 'INSERT', 'UPDATE', 'DELETE', 'MERGE', 'RESTORE'
-    change_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    change_source TEXT,               -- 'fl_license_import', 'oem_import', 'manual', 'api'
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    source TEXT,                      -- 'fl_license_import', 'oem_import', 'manual', 'api'
     file_import_id INTEGER,
     old_values TEXT,                  -- JSON of fields before change
     new_values TEXT,                  -- JSON of fields after change
@@ -159,9 +159,9 @@ CREATE TABLE IF NOT EXISTS contractor_history (
 CREATE TABLE IF NOT EXISTS import_locks (
     id INTEGER PRIMARY KEY CHECK (id = 1),  -- Singleton row
     lock_holder TEXT NOT NULL,              -- 'hostname:pid'
-    lock_acquired_at TIMESTAMP NOT NULL,
-    lock_expires_at TIMESTAMP NOT NULL,     -- Auto-expire after 30 min
-    lock_reason TEXT
+    created_at TIMESTAMP NOT NULL,
+    expires_at TIMESTAMP NOT NULL,          -- Auto-expire after 30 min
+    reason TEXT
 );
 
 -- ============================================
@@ -199,7 +199,7 @@ CREATE INDEX IF NOT EXISTS idx_runs_timestamp ON pipeline_runs(run_timestamp);
 CREATE INDEX IF NOT EXISTS idx_file_imports_hash ON file_imports(file_hash);
 CREATE INDEX IF NOT EXISTS idx_file_imports_status ON file_imports(import_status);
 CREATE INDEX IF NOT EXISTS idx_contractor_history_cid ON contractor_history(contractor_id);
-CREATE INDEX IF NOT EXISTS idx_contractor_history_ts ON contractor_history(change_timestamp);
+CREATE INDEX IF NOT EXISTS idx_contractor_history_ts ON contractor_history(created_at);
 CREATE INDEX IF NOT EXISTS idx_contractor_history_type ON contractor_history(change_type);
 CREATE INDEX IF NOT EXISTS idx_contractor_history_import ON contractor_history(file_import_id);
 
