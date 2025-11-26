@@ -27,6 +27,8 @@ import hashlib
 import csv
 import json
 import logging
+import socket
+import os
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Tuple, List, Dict, Any
@@ -45,6 +47,7 @@ from database.models import (
     normalize_phone, normalize_email, extract_domain,
     normalize_company_name, fuzzy_match_ratio
 )
+from database.audit import FileFingerprint, ImportLock, AuditTrail
 
 
 # Default database location
@@ -809,6 +812,532 @@ class PipelineDB:
             """, params + (limit,))
 
             return [dict(row) for row in cursor.fetchall()]
+
+    # ========== AUDIT TRAIL METHODS ==========
+
+    def check_file_imported(self, file_path: Path) -> Optional[Dict]:
+        """
+        Check if a file has already been imported.
+
+        Calculates file hash and checks file_imports table for matching record.
+        Prevents accidental duplicate imports of the same source file.
+
+        Args:
+            file_path: Path to file to check
+
+        Returns:
+            Dictionary with import record if file already imported, None if new file:
+                - id: file_import_id
+                - file_name: Original filename
+                - file_hash: SHA256 hash
+                - file_size: Size in bytes
+                - row_count: Number of rows
+                - status: 'completed', 'failed', or 'in_progress'
+                - import_started_at: Timestamp
+                - import_completed_at: Timestamp (if completed)
+
+        Example:
+            >>> existing = db.check_file_imported(Path("fl_licenses.csv"))
+            >>> if existing:
+            >>>     print(f"File already imported on {existing['import_started_at']}")
+            >>> else:
+            >>>     print("New file - safe to import")
+        """
+        file_info = FileFingerprint.get_file_info(file_path)
+        file_hash = file_info['file_hash']
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id, file_name, file_hash, file_size, row_count,
+                       status, import_started_at, import_completed_at
+                FROM file_imports
+                WHERE file_hash = ?
+            """, (file_hash,))
+
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+            return None
+
+    def start_file_import(self, file_path: Path, source_type: str) -> Tuple[int, AuditTrail]:
+        """
+        Start a new file import with audit tracking.
+
+        Checks for duplicate file, acquires import lock, and creates
+        file_imports record with 'in_progress' status.
+
+        Args:
+            file_path: Path to file being imported
+            source_type: Source identifier (e.g., 'FL_DBPR', 'CA_CSLB', 'TX_TDLR')
+
+        Returns:
+            Tuple of (file_import_id, AuditTrail instance)
+
+        Raises:
+            ValueError: If file already imported or import lock is held
+
+        Example:
+            >>> file_import_id, audit = db.start_file_import(
+            >>>     Path("fl_licenses.csv"),
+            >>>     source_type="FL_DBPR"
+            >>> )
+            >>> try:
+            >>>     # Import records with audit trail
+            >>>     for record in records:
+            >>>         contractor_id, is_new = db.add_contractor_with_audit(record, audit)
+            >>>     audit.flush()
+            >>>     db.complete_file_import(file_import_id, stats)
+            >>> except Exception as e:
+            >>>     db.fail_file_import(file_import_id, str(e))
+        """
+        file_path = Path(file_path)
+
+        # Check if already imported
+        existing = self.check_file_imported(file_path)
+        if existing:
+            raise ValueError(
+                f"File already imported: {existing['file_name']} "
+                f"on {existing['import_started_at']} (status: {existing['status']})"
+            )
+
+        # Calculate file fingerprint
+        file_info = FileFingerprint.get_file_info(file_path)
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Acquire import lock
+            lock = ImportLock(conn)
+            lock_acquired = lock.acquire(reason=f"{source_type}: {file_info['file_name']}")
+            if not lock_acquired:
+                lock_info = lock.check_lock()
+                raise ValueError(
+                    f"Import locked by {lock_info['lock_holder']} "
+                    f"({lock_info['reason']}) for {lock_info['age_minutes']:.1f} minutes"
+                )
+
+            # Insert file_imports record
+            hostname = socket.gethostname()
+            username = os.getenv('USER', 'unknown')
+
+            cursor.execute("""
+                INSERT INTO file_imports (
+                    file_name, file_path, file_hash, file_size, row_count,
+                    source_type, status, import_started_at, imported_by
+                )
+                VALUES (?, ?, ?, ?, ?, ?, 'in_progress', ?, ?)
+            """, (
+                file_info['file_name'],
+                str(file_path.absolute()),
+                file_info['file_hash'],
+                file_info['file_size'],
+                file_info['row_count'],
+                source_type,
+                datetime.now().isoformat(),
+                f"{username}@{hostname}"
+            ))
+
+            file_import_id = cursor.lastrowid
+
+            # Create audit trail instance
+            audit = AuditTrail(conn, source=source_type, file_import_id=file_import_id)
+
+            logger.info(
+                f"Started import {file_import_id}: {file_info['file_name']} "
+                f"({file_info['row_count']} rows, {file_info['file_size']} bytes)"
+            )
+
+            return file_import_id, audit
+
+    def complete_file_import(self, file_import_id: int, stats: Dict) -> None:
+        """
+        Mark file import as completed with statistics.
+
+        Updates file_imports record with 'completed' status, completion timestamp,
+        and import statistics. Releases import lock.
+
+        Args:
+            file_import_id: ID from start_file_import()
+            stats: Dictionary with import statistics:
+                - records_input: Total records in file
+                - records_new: New contractors created
+                - records_merged: Duplicates merged
+                - multi_license_found: Multi-license contractors found
+                - unicorns_found: Unicorns (3+ licenses) found
+                - duration_seconds: Import duration
+
+        Example:
+            >>> stats = {
+            >>>     'records_input': 50000,
+            >>>     'records_new': 45000,
+            >>>     'records_merged': 5000,
+            >>>     'multi_license_found': 2500,
+            >>>     'unicorns_found': 300,
+            >>>     'duration_seconds': 120.5
+            >>> }
+            >>> db.complete_file_import(file_import_id, stats)
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                UPDATE file_imports SET
+                    status = 'completed',
+                    import_completed_at = ?,
+                    records_input = ?,
+                    records_new = ?,
+                    records_merged = ?,
+                    multi_license_found = ?,
+                    unicorns_found = ?,
+                    duration_seconds = ?
+                WHERE id = ?
+            """, (
+                datetime.now().isoformat(),
+                stats.get('records_input', 0),
+                stats.get('records_new', 0),
+                stats.get('records_merged', 0),
+                stats.get('multi_license_found', 0),
+                stats.get('unicorns_found', 0),
+                stats.get('duration_seconds', 0.0),
+                file_import_id
+            ))
+
+            # Release import lock
+            lock = ImportLock(conn)
+            if not lock.release():
+                logger.warning(
+                    f"Import lock was not held during completion of import {file_import_id}. "
+                    f"Lock may have expired or been manually released."
+                )
+
+            logger.info(
+                f"Completed import {file_import_id}: "
+                f"{stats.get('records_new', 0)} new, "
+                f"{stats.get('records_merged', 0)} merged, "
+                f"{stats.get('multi_license_found', 0)} multi-license"
+            )
+
+    def fail_file_import(self, file_import_id: int, error: str) -> None:
+        """
+        Mark file import as failed with error message.
+
+        Updates file_imports record with 'failed' status and error message.
+        Releases import lock.
+
+        Args:
+            file_import_id: ID from start_file_import()
+            error: Error message describing failure
+
+        Example:
+            >>> try:
+            >>>     file_import_id, audit = db.start_file_import(...)
+            >>>     # Import logic
+            >>> except Exception as e:
+            >>>     db.fail_file_import(file_import_id, str(e))
+            >>>     raise
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                UPDATE file_imports SET
+                    status = 'failed',
+                    error_message = ?
+                WHERE id = ?
+            """, (error, file_import_id))
+
+            # Release import lock
+            lock = ImportLock(conn)
+            if not lock.release():
+                logger.warning(
+                    f"Import lock was not held during failure of import {file_import_id}. "
+                    f"Lock may have expired or been manually released."
+                )
+
+            logger.error(f"Failed import {file_import_id}: {error}")
+
+    def add_contractor_with_audit(
+        self,
+        record: Dict[str, Any],
+        audit: AuditTrail,
+        source: str = "unknown"
+    ) -> Tuple[int, bool]:
+        """
+        Add contractor with audit trail logging.
+
+        Calls existing add_contractor() logic and logs INSERT or MERGE
+        to audit trail for full change tracking.
+
+        Args:
+            record: Contractor record dictionary (same as add_contractor)
+            audit: AuditTrail instance from start_file_import()
+            source: Source identifier (e.g., 'FL_DBPR')
+
+        Returns:
+            Tuple of (contractor_id, is_new):
+                - contractor_id: ID of contractor (new or existing)
+                - is_new: True if new contractor, False if merged into existing
+
+        Example:
+            >>> file_import_id, audit = db.start_file_import(path, "FL_DBPR")
+            >>> for record in csv_records:
+            >>>     contractor_id, is_new = db.add_contractor_with_audit(
+            >>>         record, audit, source="FL_DBPR"
+            >>>     )
+            >>>     if is_new:
+            >>>         print(f"Created contractor {contractor_id}")
+            >>> audit.flush()
+        """
+        # Call existing add_contractor logic
+        contractor_id, is_new = self.add_contractor(record, source=source)
+
+        # Log to audit trail
+        if is_new:
+            # New contractor - log INSERT
+            audit.log_insert(
+                contractor_id=contractor_id,
+                new_values={
+                    'company_name': record.get('company_name', ''),
+                    'city': record.get('city', ''),
+                    'state': record.get('state', ''),
+                    'phone': record.get('phone', ''),
+                    'email': record.get('email', ''),
+                    'license_type': record.get('license_type', ''),
+                    'license_number': record.get('license_number', '')
+                }
+            )
+        else:
+            # Merged into existing - log MERGE
+            audit.log_merge(
+                master_id=contractor_id,
+                merged_id=0,  # Don't have duplicate ID (not created)
+                merged_values={
+                    'company_name': record.get('company_name', ''),
+                    'phone': record.get('phone', ''),
+                    'email': record.get('email', '')
+                }
+            )
+
+        return contractor_id, is_new
+
+    def soft_delete_contractor(
+        self,
+        contractor_id: int,
+        reason: str,
+        conn: Optional[sqlite3.Connection] = None
+    ) -> bool:
+        """
+        Soft delete a contractor record.
+
+        Sets is_deleted=1 flag and logs deletion reason. Does not actually
+        remove record from database (preserves audit trail).
+
+        Args:
+            contractor_id: ID of contractor to delete
+            reason: Reason for deletion (e.g., 'Duplicate of ID 123', 'Invalid data')
+            conn: Optional connection to use (for transactional rollback scenarios)
+
+        Returns:
+            True if contractor deleted, False if not found
+
+        Example:
+            >>> deleted = db.soft_delete_contractor(
+            >>>     contractor_id=123,
+            >>>     reason="Duplicate of contractor_id=456"
+            >>> )
+            >>> if deleted:
+            >>>     print("Contractor soft deleted")
+        """
+        # Determine if we need to manage our own connection
+        manage_conn = conn is None
+
+        if manage_conn:
+            conn = sqlite3.connect(str(self.db_path), timeout=30.0)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA foreign_keys=ON")
+
+        try:
+            cursor = conn.cursor()
+
+            # Get current contractor values for audit log
+            cursor.execute("""
+                SELECT company_name, city, state, primary_phone, primary_email
+                FROM contractors
+                WHERE id = ? AND (is_deleted IS NULL OR is_deleted = 0)
+            """, (contractor_id,))
+
+            row = cursor.fetchone()
+            if not row:
+                return False
+
+            old_values = dict(row)
+
+            # Soft delete
+            hostname = socket.gethostname()
+            username = os.getenv('USER', 'unknown')
+            deleted_by = f"{username}@{hostname}"
+
+            cursor.execute("""
+                UPDATE contractors SET
+                    is_deleted = 1,
+                    deleted_at = ?,
+                    deleted_by = ?,
+                    deletion_reason = ?
+                WHERE id = ?
+            """, (
+                datetime.now().isoformat(),
+                deleted_by,
+                reason,
+                contractor_id
+            ))
+
+            # Log DELETE to audit trail
+            audit = AuditTrail(conn, source="manual_delete")
+            audit.log_delete(
+                contractor_id=contractor_id,
+                old_values=old_values,
+                reason=reason
+            )
+            audit.flush(commit=False)  # Don't commit yet - let caller handle transaction
+
+            if manage_conn:
+                conn.commit()
+
+            logger.info(f"Soft deleted contractor {contractor_id}: {reason}")
+
+            return True
+        except Exception:
+            if manage_conn:
+                conn.rollback()
+            raise
+        finally:
+            if manage_conn:
+                conn.close()
+
+    def get_contractor_history(self, contractor_id: int) -> List[Dict]:
+        """
+        Get full change history for a contractor.
+
+        Retrieves all audit trail records showing how contractor record
+        has evolved over time (inserts, updates, merges, deletes).
+
+        Args:
+            contractor_id: ID of contractor
+
+        Returns:
+            List of change records (newest first), each with:
+                - id: History record ID
+                - contractor_id: Contractor ID
+                - change_type: 'INSERT', 'UPDATE', 'DELETE', or 'MERGE'
+                - old_values: Dictionary of old values (parsed from JSON)
+                - new_values: Dictionary of new values (parsed from JSON)
+                - source: Source identifier
+                - file_import_id: Associated import ID
+                - created_at: Timestamp
+
+        Example:
+            >>> history = db.get_contractor_history(contractor_id=123)
+            >>> for change in history:
+            >>>     print(f"{change['created_at']}: {change['change_type']}")
+            >>>     if change['new_values']:
+            >>>         print(f"  New: {change['new_values']}")
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT
+                    id,
+                    contractor_id,
+                    change_type,
+                    old_values,
+                    new_values,
+                    source,
+                    file_import_id,
+                    created_at
+                FROM contractor_history
+                WHERE contractor_id = ?
+                ORDER BY created_at DESC
+            """, (contractor_id,))
+
+            results = []
+            for row in cursor.fetchall():
+                record = dict(row)
+
+                # Parse JSON values with error handling
+                try:
+                    if record['old_values']:
+                        record['old_values'] = json.loads(record['old_values'])
+                    if record['new_values']:
+                        record['new_values'] = json.loads(record['new_values'])
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Corrupted JSON in history record {record['id']}: {e}")
+                    # Keep as string if parsing fails (already in record from dict(row))
+
+                results.append(record)
+
+            return results
+
+    def rollback_import(self, file_import_id: int) -> int:
+        """
+        Rollback a file import by soft-deleting all created contractors.
+
+        Finds all contractors created in this import and soft-deletes them.
+        Updates file_imports status to 'rolled_back'.
+
+        Args:
+            file_import_id: ID of import to rollback
+
+        Returns:
+            Number of contractors rolled back (soft-deleted)
+
+        Example:
+            >>> # Oops, imported wrong file!
+            >>> rolled_back = db.rollback_import(file_import_id=123)
+            >>> print(f"Rolled back {rolled_back} contractors")
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Find all contractors created in this import
+            # (Look for INSERT records in contractor_history)
+            cursor.execute("""
+                SELECT DISTINCT contractor_id
+                FROM contractor_history
+                WHERE file_import_id = ? AND change_type = 'INSERT'
+            """, (file_import_id,))
+
+            contractor_ids = [row[0] for row in cursor.fetchall()]
+
+            if not contractor_ids:
+                logger.warning(f"No contractors found for import {file_import_id}")
+                return 0
+
+            # Soft delete each contractor atomically using the shared connection
+            rollback_count = 0
+            for contractor_id in contractor_ids:
+                deleted = self.soft_delete_contractor(
+                    contractor_id,
+                    reason=f"Rollback of import {file_import_id}",
+                    conn=conn  # Pass connection for atomicity
+                )
+                if deleted:
+                    rollback_count += 1
+
+            # Update file_imports status
+            cursor.execute("""
+                UPDATE file_imports SET
+                    status = 'rolled_back'
+                WHERE id = ?
+            """, (file_import_id,))
+
+            logger.info(
+                f"Rolled back import {file_import_id}: "
+                f"{rollback_count} contractors soft-deleted"
+            )
+
+            return rollback_count
 
     def reset_database(self, confirm: bool = False) -> None:
         """
