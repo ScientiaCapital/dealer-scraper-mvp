@@ -40,7 +40,10 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from playwright.sync_api import sync_playwright, Page
-from config import WEALTHY_ZIPS_NATIONWIDE
+
+# Import from config.py - use MASTER_ZIP_CODES (the ONE source of truth)
+import config
+MASTER_ZIP_CODES = config.MASTER_ZIP_CODES
 
 # Load environment variables
 from dotenv import load_dotenv
@@ -340,9 +343,9 @@ def scrape_tesla_production(test_mode=False, resume=False):
         test_mode: Only scrape 3 ZIPs for testing
         resume: Resume from previous progress
     """
-    # Get all wealthy ZIPs
+    # Get all ZIPs from master list
     all_zips = []
-    for state_zips in WEALTHY_ZIPS_NATIONWIDE.values():
+    for state_zips in MASTER_ZIP_CODES.values():
         all_zips.extend(state_zips)
 
     if test_mode:

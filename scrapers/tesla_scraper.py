@@ -5,7 +5,13 @@ Scrapes Tesla's Powerwall certified installer network for battery + solar instal
 Tesla Powerwall installers are strategic targets because they handle premium battery storage
 systems and often manage complex residential + commercial energy projects.
 
-Target URL: https://www.tesla.com/support/certified-installers-powerwall
+Target URL: https://www.tesla.com/support/certified-installers
+(Updated Nov 2025 - old URL /certified-installers-powerwall redirects to new URL)
+
+**BOT DETECTION**: Tesla uses Cloudflare/bot protection. Requires Playwright with:
+- Stealth user agent
+- JavaScript execution
+- Realistic browsing patterns
 
 Capabilities detected from Tesla certification:
 - Battery installation (Powerwall is their core product)
@@ -45,8 +51,10 @@ class TeslaScraper(BaseDealerScraper):
     """
 
     OEM_NAME = "Tesla"
-    DEALER_LOCATOR_URL = "https://www.tesla.com/support/certified-installers-powerwall"
+    DEALER_LOCATOR_URL = "https://www.tesla.com/support/certified-installers"
     PRODUCT_LINES = ["Powerwall", "Solar Roof", "Solar Panels", "Wall Connector", "Powershare"]
+
+    # NOTE: Tesla requires Playwright with stealth mode due to bot detection (403 without it)
 
     # CSS Selectors (validated via Playwright MCP)
     SELECTORS = {

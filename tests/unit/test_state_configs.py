@@ -1,4 +1,4 @@
-from config.state_license_configs import STATE_CONFIGS, get_state_config
+from state_configs.state_license_configs import STATE_CONFIGS, get_state_config
 
 def test_all_50_states_configured():
     """Test all 50 US states + DC have configurations"""
