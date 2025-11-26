@@ -36,6 +36,12 @@ from scrapers import growatt_scraper
 from scrapers import sungrow_scraper
 from scrapers import tigo_scraper
 from scrapers import solaredge_scraper
+from scrapers import generac_scraper
+from scrapers import enphase_scraper
+from scrapers import honeywell_scraper
+from scrapers import johnson_controls_scraper
+from scrapers import schneider_scraper
+from scrapers import sensi_scraper
 
 __all__ = [
     "BaseDealerScraper",
