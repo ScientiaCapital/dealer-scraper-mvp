@@ -6,6 +6,11 @@
 requests>=2.31.0
 python-dotenv>=1.0.0
 
+# Fuzzy string matching for deduplication
+# Required for multi-signal deduplication pipeline (Phase 3: name matching)
+fuzzywuzzy>=0.18.0
+python-Levenshtein>=0.21.0
+
 # Playwright for Browserbase cloud browser automation
 # Install with: pip install playwright && playwright install chromium
 # Required for BROWSERBASE mode

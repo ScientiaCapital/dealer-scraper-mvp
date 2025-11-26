@@ -98,104 +98,69 @@ class LennoxScraper(BaseDealerScraper):
   const dealers = [];
   const seen = new Set();
 
-  // Lennox dealer cards: Start from phone links (most reliable), find dealer container
-  const phoneLinks = Array.from(document.querySelectorAll('a[href^="tel:"]'));
+  // FIXED: Find all dealer cards by their wrapper class instead of traversing from phone
+  const dealerCards = Array.from(document.querySelectorAll('.lnx-dealer-card'));
 
-  phoneLinks.forEach(phoneLink => {
+  dealerCards.forEach(card => {
+    // Extract name using CSS class (CRITICAL FIX: name is in sibling, not phone container)
+    const nameElement = card.querySelector('a.dealer-name');
+    const name = nameElement ? nameElement.textContent.trim() : '';
+
+    if (!name || name.length < 3) return;
+
+    // Extract phone
+    const phoneLink = card.querySelector('a[href^="tel:"]');
+    if (!phoneLink) return;
+
     let phone = phoneLink.href.replace('tel:', '').replace(/[^0-9]/g, '');
     if (phone.length === 11 && phone.startsWith('1')) {
       phone = phone.substring(1);
     }
     if (!phone || phone.length !== 10) return;
-
-    // Skip duplicates
     if (seen.has(phone)) return;
     seen.add(phone);
 
-    // Traverse up to find dealer card container (has rating, distance, etc.)
-    let container = phoneLink.parentElement;
-    while (container && container !== document.body) {
-      const text = container.textContent || '';
-      // Dealer card should have distance AND either rating or miles
-      if (text.includes('miles') && (text.includes('(') || text.match(/\\d+\\.\\d+/))) {
-        break;
-      }
-      container = container.parentElement;
-    }
+    // Extract city and distance using CSS classes
+    const cityElement = card.querySelector('.dealer-city');
+    const city = cityElement ? cityElement.textContent.trim() : '';
 
-    if (!container || container === document.body) return;
+    const distanceElement = card.querySelector('.dealer-distance');
+    const distanceText = distanceElement ? distanceElement.textContent.trim() : '';
+    const distanceMatch = distanceText.match(/([\\d.]+)\\s*miles/i);
+    const distance_miles = distanceMatch ? parseFloat(distanceMatch[1]) : 0;
+    const distance = distance_miles ? `${distance_miles} mi` : '';
 
-    // Extract dealer name - look for prominent text element (not phone, not rating, not location)
-    let name = '';
-    const allDivs = container.querySelectorAll('div, span, p');
+    // Extract rating and review count
+    const ratingElement = card.querySelector('.dealer-rating');
+    const ratingText = ratingElement ? ratingElement.textContent.trim() : '';
+    const ratingMatch = ratingText.match(/([\\d.]+)\\s*\\((\\d+)\\)/);
+    const rating = ratingMatch ? parseFloat(ratingMatch[1]) : 0.0;
+    const review_count = ratingMatch ? parseInt(ratingMatch[2]) : 0;
 
-    for (const el of allDivs) {
-      const text = el.textContent.trim();
-      // Name criteria: substantial length, not phone, not generic text, not just numbers
-      if (text.length > 10 && text.length < 100 &&
-          !text.includes(phoneLink.textContent) &&
-          !text.includes('miles') &&
-          !text.includes('List') &&
-          !text.includes('Map') &&
-          !text.includes('Find') &&
-          !text.includes('Trained') &&
-          !text.includes('Filter') &&
-          !text.match(/^\\d/) &&  // Not starting with digit
-          !text.includes('${') &&  // Not template variable
-          text.split(' ').length <= 8) {  // Not too many words (paragraph)
-        // Check if this element's text is mostly unique to it (not inherited from children)
-        const childrenText = Array.from(el.children).map(c => c.textContent).join('');
-        if (text.length - childrenText.length > 5) {  // Has its own text content
-          name = text;
-          break;
-        }
-      }
-    }
-
-    if (!name || name.length < 3) return;
-
-    // Extract location and distance (format: "City | XX.X miles")
-    const locationText = container.textContent;
-    let city = '', state = '', zip = '';
-    let distance = '', distance_miles = 0;
-
-    // Extract distance
-    const distanceMatch = locationText.match(/([\\d.]+)\\s*miles/i);
-    if (distanceMatch) {
-      distance_miles = parseFloat(distanceMatch[1]);
-      distance = `${distance_miles} mi`;
-    }
-
-    // Extract city (usually before the | or miles)
-    const cityMatch = locationText.match(/([A-Z][a-z]+(?: [A-Z][a-z]+)*)\\s*[|\\d]/);
-    if (cityMatch) {
-      city = cityMatch[1].trim();
-    }
-
-    // Try to find state in text (2-letter uppercase)
-    const stateMatch = locationText.match(/\\b([A-Z]{2})\\b/);
-    if (stateMatch) {
-      state = stateMatch[1];
-    }
-
-    // Extract rating
-    let rating = 0.0;
-    let review_count = 0;
-    const ratingMatch = locationText.match(/([\\d.]+)\\s*\\((\\d+)\\)/);
-    if (ratingMatch) {
-      rating = parseFloat(ratingMatch[1]);
-      review_count = parseInt(ratingMatch[2]);
-    }
-
-    // Extract tier
+    // Extract tier from image alt text or wrapper class
     let tier = 'Standard Dealer';
-    const tierMatch = locationText.match(/lennox\\s+(premier|standard|elite)\\s+dealer/i);
-    if (tierMatch) {
-      tier = `Lennox ${tierMatch[1].charAt(0).toUpperCase() + tierMatch[1].slice(1)} Dealer`;
+    const tierImage = card.querySelector('img.mb-2, img.mb-lg-3');
+    if (tierImage && tierImage.alt) {
+      const altText = tierImage.alt.toLowerCase();
+      if (altText.includes('premier') || altText.includes('premium')) {
+        tier = 'Lennox Premier Dealer';
+      } else if (altText.includes('elite')) {
+        tier = 'Lennox Elite Dealer';
+      }
+    }
+
+    // Check wrapper class for tier info
+    const wrapper = card.closest('.lnx-dealer-card-wrapper');
+    if (wrapper) {
+      if (wrapper.classList.contains('premier-dealer') || wrapper.classList.contains('premium-dealer')) {
+        tier = 'Lennox Premier Dealer';
+      } else if (wrapper.classList.contains('elite-dealer')) {
+        tier = 'Lennox Elite Dealer';
+      }
     }
 
     // Extract website (if available)
-    const websiteLink = container.querySelector('a[href^="http"]:not([href*="tel:"]):not([href*="google.com/maps"]):not([href*="facebook.com"])');
+    const websiteLink = card.querySelector('a[href^="http"]:not([href*="tel:"]):not([href*="google.com/maps"]):not([href*="facebook.com"]):not([href*="lennox.com"])');
     let website = '';
     let domain = '';
     if (websiteLink) {
@@ -206,6 +171,11 @@ class LennoxScraper(BaseDealerScraper):
       } catch (e) {}
     }
 
+    // Try to extract state (2-letter uppercase)
+    const cardText = card.textContent;
+    const stateMatch = cardText.match(/\\b([A-Z]{2})\\b/);
+    const state = stateMatch ? stateMatch[1] : '';
+
     dealers.push({
       name: name,
       phone: phone,
@@ -214,7 +184,7 @@ class LennoxScraper(BaseDealerScraper):
       street: '',  // Not available in results
       city: city || '',
       state: state || '',
-      zip: zip || '',
+      zip: '',  // Not available in results
       address_full: city && state ? `${city}, ${state}` : city,
       rating: rating,
       review_count: review_count,
@@ -394,15 +364,40 @@ class LennoxScraper(BaseDealerScraper):
                 print(f"  → Waiting for results...")
                 time.sleep(5)
 
-                # Extract dealers using JavaScript
-                print(f"  → Extracting dealer data...")
+                # PAGINATION LOOP - Extract dealers from all pages
+                all_dealers_data = []
+                page_num = 1
                 extraction_script = self.get_extraction_script()
-                dealers_data = page.evaluate(extraction_script)
 
-                print(f"  → Found {len(dealers_data)} dealers")
+                while True:
+                    # Extract dealers from current page
+                    print(f"  → Extracting dealers from page {page_num}...")
+                    dealers_data = page.evaluate(extraction_script)
+                    print(f"     Found {len(dealers_data)} dealers on page {page_num}")
+
+                    all_dealers_data.extend(dealers_data)
+
+                    # Check if "Next" button exists and is clickable
+                    try:
+                        next_btn = page.locator('#next-group')
+                        if next_btn.count() > 0 and next_btn.is_visible():
+                            # Check if button is disabled (last page)
+                            is_disabled = next_btn.evaluate('el => el.classList.contains("disabled") || el.hasAttribute("disabled")')
+                            if not is_disabled:
+                                print(f"     Clicking Next to page {page_num + 1}...")
+                                next_btn.click(timeout=5000)
+                                time.sleep(3)  # Wait for new page to load
+                                page_num += 1
+                                continue
+                    except Exception:
+                        pass
+
+                    # No more pages - break loop
+                    print(f"  → Pagination complete: {page_num} pages, {len(all_dealers_data)} total dealers")
+                    break
 
                 # Parse into StandardizedDealer objects
-                dealers = self.parse_results(dealers_data, zip_code)
+                dealers = self.parse_results(all_dealers_data, zip_code)
 
                 browser.close()
 
