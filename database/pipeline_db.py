@@ -849,8 +849,8 @@ class PipelineDB:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT id, file_name, file_hash, file_size, row_count,
-                       status, import_started_at, import_completed_at
+                SELECT id, file_name, file_hash, file_size_bytes, row_count,
+                       import_status, import_started_at, import_completed_at
                 FROM file_imports
                 WHERE file_hash = ?
             """, (file_hash,))
@@ -860,7 +860,7 @@ class PipelineDB:
                 return dict(row)
             return None
 
-    def start_file_import(self, file_path: Path, source_type: str) -> Tuple[int, AuditTrail]:
+    def start_file_import(self, file_path: Path, source_type: str) -> int:
         """
         Start a new file import with audit tracking.
 
@@ -872,21 +872,22 @@ class PipelineDB:
             source_type: Source identifier (e.g., 'FL_DBPR', 'CA_CSLB', 'TX_TDLR')
 
         Returns:
-            Tuple of (file_import_id, AuditTrail instance)
+            file_import_id: ID for tracking this import
 
         Raises:
             ValueError: If file already imported or import lock is held
 
         Example:
-            >>> file_import_id, audit = db.start_file_import(
+            >>> file_import_id = db.start_file_import(
             >>>     Path("fl_licenses.csv"),
             >>>     source_type="FL_DBPR"
             >>> )
             >>> try:
             >>>     # Import records with audit trail
             >>>     for record in records:
-            >>>         contractor_id, is_new = db.add_contractor_with_audit(record, audit)
-            >>>     audit.flush()
+            >>>         contractor_id, is_new = db.add_contractor_with_audit(
+            >>>             record, file_import_id, source="FL_DBPR"
+            >>>         )
             >>>     db.complete_file_import(file_import_id, stats)
             >>> except Exception as e:
             >>>     db.fail_file_import(file_import_id, str(e))
@@ -923,32 +924,27 @@ class PipelineDB:
 
             cursor.execute("""
                 INSERT INTO file_imports (
-                    file_name, file_path, file_hash, file_size, row_count,
-                    source_type, status, import_started_at, imported_by
+                    file_name, file_path, file_hash, file_size_bytes, row_count,
+                    source_type, import_status
                 )
-                VALUES (?, ?, ?, ?, ?, ?, 'in_progress', ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, 'in_progress')
             """, (
                 file_info['file_name'],
                 str(file_path.absolute()),
                 file_info['file_hash'],
                 file_info['file_size'],
                 file_info['row_count'],
-                source_type,
-                datetime.now().isoformat(),
-                f"{username}@{hostname}"
+                source_type
             ))
 
             file_import_id = cursor.lastrowid
-
-            # Create audit trail instance
-            audit = AuditTrail(conn, source=source_type, file_import_id=file_import_id)
 
             logger.info(
                 f"Started import {file_import_id}: {file_info['file_name']} "
                 f"({file_info['row_count']} rows, {file_info['file_size']} bytes)"
             )
 
-            return file_import_id, audit
+            return file_import_id
 
     def complete_file_import(self, file_import_id: int, stats: Dict) -> None:
         """
@@ -983,23 +979,19 @@ class PipelineDB:
 
             cursor.execute("""
                 UPDATE file_imports SET
-                    status = 'completed',
+                    import_status = 'completed',
                     import_completed_at = ?,
-                    records_input = ?,
-                    records_new = ?,
+                    records_created = ?,
+                    records_updated = ?,
                     records_merged = ?,
-                    multi_license_found = ?,
-                    unicorns_found = ?,
-                    duration_seconds = ?
+                    records_skipped = ?
                 WHERE id = ?
             """, (
                 datetime.now().isoformat(),
-                stats.get('records_input', 0),
-                stats.get('records_new', 0),
-                stats.get('records_merged', 0),
-                stats.get('multi_license_found', 0),
-                stats.get('unicorns_found', 0),
-                stats.get('duration_seconds', 0.0),
+                stats.get('created', stats.get('records_created', 0)),
+                stats.get('updated', stats.get('records_updated', 0)),
+                stats.get('merged', stats.get('records_merged', 0)),
+                stats.get('skipped', stats.get('records_skipped', 0)),
                 file_import_id
             ))
 
@@ -1042,7 +1034,7 @@ class PipelineDB:
 
             cursor.execute("""
                 UPDATE file_imports SET
-                    status = 'failed',
+                    import_status = 'failed',
                     error_message = ?
                 WHERE id = ?
             """, (error, file_import_id))
@@ -1060,7 +1052,7 @@ class PipelineDB:
     def add_contractor_with_audit(
         self,
         record: Dict[str, Any],
-        audit: AuditTrail,
+        file_import_id: int,
         source: str = "unknown"
     ) -> Tuple[int, bool]:
         """
@@ -1071,7 +1063,7 @@ class PipelineDB:
 
         Args:
             record: Contractor record dictionary (same as add_contractor)
-            audit: AuditTrail instance from start_file_import()
+            file_import_id: ID from start_file_import() for linking audit trail
             source: Source identifier (e.g., 'FL_DBPR')
 
         Returns:
@@ -1080,44 +1072,50 @@ class PipelineDB:
                 - is_new: True if new contractor, False if merged into existing
 
         Example:
-            >>> file_import_id, audit = db.start_file_import(path, "FL_DBPR")
+            >>> file_import_id = db.start_file_import(path, "FL_DBPR")
             >>> for record in csv_records:
             >>>     contractor_id, is_new = db.add_contractor_with_audit(
-            >>>         record, audit, source="FL_DBPR"
+            >>>         record, file_import_id, source="FL_DBPR"
             >>>     )
             >>>     if is_new:
             >>>         print(f"Created contractor {contractor_id}")
-            >>> audit.flush()
+            >>> db.complete_file_import(file_import_id, stats)
         """
         # Call existing add_contractor logic
         contractor_id, is_new = self.add_contractor(record, source=source)
 
-        # Log to audit trail
-        if is_new:
-            # New contractor - log INSERT
-            audit.log_insert(
-                contractor_id=contractor_id,
-                new_values={
-                    'company_name': record.get('company_name', ''),
-                    'city': record.get('city', ''),
-                    'state': record.get('state', ''),
-                    'phone': record.get('phone', ''),
-                    'email': record.get('email', ''),
-                    'license_type': record.get('license_type', ''),
-                    'license_number': record.get('license_number', '')
-                }
-            )
-        else:
-            # Merged into existing - log MERGE
-            audit.log_merge(
-                master_id=contractor_id,
-                merged_id=0,  # Don't have duplicate ID (not created)
-                merged_values={
-                    'company_name': record.get('company_name', ''),
-                    'phone': record.get('phone', ''),
-                    'email': record.get('email', '')
-                }
-            )
+        # Log to audit trail (create fresh connection for each entry)
+        with self._get_connection() as conn:
+            audit = AuditTrail(conn, source=source, file_import_id=file_import_id)
+
+            if is_new:
+                # New contractor - log INSERT
+                audit.log_insert(
+                    contractor_id=contractor_id,
+                    new_values={
+                        'company_name': record.get('company_name', ''),
+                        'city': record.get('city', ''),
+                        'state': record.get('state', ''),
+                        'phone': record.get('phone', ''),
+                        'email': record.get('email', ''),
+                        'license_type': record.get('license_type', ''),
+                        'license_number': record.get('license_number', '')
+                    }
+                )
+            else:
+                # Merged into existing - log MERGE
+                audit.log_merge(
+                    master_id=contractor_id,
+                    merged_id=0,  # Don't have duplicate ID (not created)
+                    merged_values={
+                        'company_name': record.get('company_name', ''),
+                        'phone': record.get('phone', ''),
+                        'email': record.get('email', '')
+                    }
+                )
+
+            # Flush audit entry immediately
+            audit.flush(commit=False)  # Let context manager commit
 
         return contractor_id, is_new
 
@@ -1328,7 +1326,7 @@ class PipelineDB:
             # Update file_imports status
             cursor.execute("""
                 UPDATE file_imports SET
-                    status = 'rolled_back'
+                    import_status = 'rolled_back'
                 WHERE id = ?
             """, (file_import_id,))
 
