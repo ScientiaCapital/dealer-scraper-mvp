@@ -899,7 +899,7 @@ class PipelineDB:
         if existing:
             raise ValueError(
                 f"File already imported: {existing['file_name']} "
-                f"on {existing['import_started_at']} (status: {existing['status']})"
+                f"on {existing['import_started_at']} (status: {existing['import_status']})"
             )
 
         # Calculate file fingerprint
