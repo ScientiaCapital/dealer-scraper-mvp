@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS contractors (
     primary_phone TEXT,    -- Normalized 10-digit
     primary_email TEXT,    -- Lowercase
     primary_domain TEXT,   -- Extracted from email, excludes webmail
+    source_type TEXT DEFAULT 'state_license',  -- 'state_license', 'oem_dealer', 'both'
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     -- Soft delete support (for audit trail)
@@ -175,6 +176,7 @@ CREATE INDEX IF NOT EXISTS idx_contractors_domain ON contractors(primary_domain)
 CREATE INDEX IF NOT EXISTS idx_contractors_normalized ON contractors(normalized_name);
 CREATE INDEX IF NOT EXISTS idx_contractors_state ON contractors(state);
 CREATE INDEX IF NOT EXISTS idx_contractors_deleted ON contractors(is_deleted);
+CREATE INDEX IF NOT EXISTS idx_contractors_source_type ON contractors(source_type);
 
 -- Contact indexes
 CREATE INDEX IF NOT EXISTS idx_contacts_email ON contacts(email);

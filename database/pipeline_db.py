@@ -392,6 +392,151 @@ class PipelineDB:
                   normalize_phone(phone), title, source, confidence))
             return cursor.lastrowid or 0
 
+    def add_oem_certification(
+        self,
+        contractor_id: int,
+        oem_name: str,
+        certification_tier: str = "",
+        scraped_from_zip: str = "",
+        source_url: str = ""
+    ) -> int:
+        """
+        Add an OEM certification to an existing contractor.
+
+        Args:
+            contractor_id: ID of the contractor
+            oem_name: OEM name (e.g., 'Generac', 'Tesla', 'Carrier')
+            certification_tier: Tier level (e.g., 'Premier', 'Elite')
+            scraped_from_zip: ZIP code from which this was scraped
+            source_url: URL source of the data
+
+        Returns:
+            ID of the certification record, or 0 if already exists
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR IGNORE INTO oem_certifications
+                (contractor_id, oem_name, certification_tier, scraped_from_zip, source_url)
+                VALUES (?, ?, ?, ?, ?)
+            """, (contractor_id, oem_name, certification_tier, scraped_from_zip, source_url))
+            return cursor.lastrowid or 0
+
+    def update_source_type(
+        self,
+        contractor_id: int,
+        source_type: str
+    ) -> None:
+        """
+        Update the source_type of a contractor.
+
+        Use when an OEM dealer matches an existing state license contractor
+        to mark them as 'both'.
+
+        Args:
+            contractor_id: ID of the contractor
+            source_type: New source type ('state_license', 'oem_dealer', 'both')
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE contractors SET source_type = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (source_type, contractor_id))
+
+    def create_contractor_from_oem(
+        self,
+        oem_record: Dict[str, Any],
+        oem_name: str,
+        source_type: str = "oem_dealer"
+    ) -> int:
+        """
+        Create a new contractor from OEM dealer data.
+
+        Used when an OEM dealer doesn't match any existing contractor.
+
+        Args:
+            oem_record: Dict with OEM dealer fields (name, phone, domain, etc.)
+            oem_name: OEM source (e.g., 'Generac', 'Carrier')
+            source_type: Source type to set (default 'oem_dealer')
+
+        Returns:
+            ID of the newly created contractor
+        """
+        # Extract and normalize fields
+        company_name = oem_record.get('name', '').strip()
+        phone = normalize_phone(oem_record.get('phone', ''))
+        email = normalize_email(oem_record.get('email', ''))
+        domain = oem_record.get('domain', '') or extract_domain(email)
+        street = oem_record.get('street', '') or oem_record.get('address', '')
+        city = oem_record.get('city', '').strip()
+        state = oem_record.get('state', '').upper().strip()
+        zip_code = oem_record.get('zip', '').strip()
+        normalized_name = normalize_company_name(company_name)
+
+        # OEM-specific fields
+        tier = oem_record.get('tier', '')
+        scraped_from_zip = oem_record.get('scraped_from_zip', '')
+        website = oem_record.get('website', '') or oem_record.get('website_url', '')
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Create contractor
+            cursor.execute("""
+                INSERT INTO contractors
+                (company_name, normalized_name, street, city, state, zip,
+                 primary_phone, primary_email, primary_domain, source_type, website_url)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                company_name, normalized_name, street, city, state, zip_code,
+                phone, email, domain, source_type, website
+            ))
+            contractor_id = cursor.lastrowid
+
+            # Add OEM certification
+            cursor.execute("""
+                INSERT OR IGNORE INTO oem_certifications
+                (contractor_id, oem_name, certification_tier, scraped_from_zip)
+                VALUES (?, ?, ?, ?)
+            """, (contractor_id, oem_name, tier, scraped_from_zip))
+
+            return contractor_id
+
+    def find_matching_contractor(
+        self,
+        phone: str,
+        domain: str,
+        name: str,
+        state: str
+    ) -> Optional[int]:
+        """
+        Find a matching contractor by phone, domain, or fuzzy name.
+
+        Public wrapper around _find_duplicate for OEM import use.
+
+        Args:
+            phone: Normalized phone number
+            domain: Company domain
+            name: Company name
+            state: State code
+
+        Returns:
+            contractor_id if found, None otherwise
+        """
+        normalized_name = normalize_company_name(name)
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            contractor_id, _, _ = self._find_duplicate(
+                cursor,
+                normalize_phone(phone),
+                '',
+                domain,
+                normalized_name,
+                state
+            )
+            return contractor_id
+
     def start_pipeline_run(
         self,
         state: str,

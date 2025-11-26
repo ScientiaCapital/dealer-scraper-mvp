@@ -179,6 +179,8 @@ class UnifiedOEMProcessor:
             "matched_by_name": 0,
             "unmatched": 0,
             "new_certifications": 0,
+            "new_contractors_created": 0,
+            "source_type_both": 0,
         }
 
     def connect(self):
@@ -251,6 +253,45 @@ class UnifiedOEMProcessor:
             print(f"   ⚠️ Error adding certification: {e}")
             return False
 
+    def update_source_type_to_both(self, contractor_id: int) -> None:
+        """Update contractor source_type to 'both' when matched from OEM"""
+        try:
+            # Only update if currently 'state_license' (not already 'both')
+            self.conn.execute("""
+                UPDATE contractors SET source_type = 'both', updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND source_type = 'state_license'
+            """, (contractor_id,))
+        except Exception as e:
+            print(f"   ⚠️ Error updating source_type: {e}")
+
+    def create_contractor_from_oem(self, row: dict, oem_name: str, config: dict) -> int:
+        """Create a new contractor from OEM dealer data"""
+        try:
+            # Extract fields
+            name = row.get(config["name_col"], "").strip()
+            phone = normalize_phone(row.get(config["phone_col"], ""))
+            domain = normalize_domain(row.get(config["domain_col"], ""))
+            street = row.get("street", "") or row.get("address", "")
+            city = row.get("city", "").strip()
+            state = row.get("state", "").upper().strip()
+            zip_code = row.get("zip", "").strip()
+            website = row.get("website", "") or row.get("website_url", "")
+            normalized_name = normalize_name(name)
+
+            cursor = self.conn.execute("""
+                INSERT INTO contractors
+                (company_name, normalized_name, street, city, state, zip,
+                 primary_phone, primary_domain, source_type, website_url)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'oem_dealer', ?)
+            """, (name, normalized_name, street, city, state, zip_code,
+                  phone, domain, website))
+
+            contractor_id = cursor.lastrowid
+            return contractor_id
+        except Exception as e:
+            print(f"   ⚠️ Error creating contractor: {e}")
+            return None
+
     def import_oem_file(self, oem_name: str, config: dict) -> dict:
         """Import a single OEM CSV file"""
         file_path = OEM_DATA_DIR / config["file"]
@@ -299,13 +340,27 @@ class UnifiedOEMProcessor:
                         self.stats["matched_by_name"] += 1
 
                 if contractor_id:
+                    # Matched existing contractor!
                     stats["matched"] += 1
+                    # Update source_type to 'both' (contractor in BOTH state license AND OEM network)
+                    self.update_source_type_to_both(contractor_id)
+                    self.stats["source_type_both"] += 1
                     if self.add_oem_certification(contractor_id, oem_name, tier, scraped_zip):
                         stats["new_certs"] += 1
                         self.stats["new_certifications"] += 1
                 else:
-                    stats["unmatched"] += 1
-                    self.stats["unmatched"] += 1
+                    # No match - CREATE new contractor with source_type='oem_dealer'
+                    new_contractor_id = self.create_contractor_from_oem(row, oem_name, config)
+                    if new_contractor_id:
+                        stats["created"] = stats.get("created", 0) + 1
+                        self.stats["new_contractors_created"] += 1
+                        # Add OEM certification to new contractor
+                        if self.add_oem_certification(new_contractor_id, oem_name, tier, scraped_zip):
+                            stats["new_certs"] += 1
+                            self.stats["new_certifications"] += 1
+                    else:
+                        stats["unmatched"] += 1
+                        self.stats["unmatched"] += 1
 
         self.stats["oem_records_loaded"] += stats["loaded"]
         return stats
@@ -326,8 +381,11 @@ class UnifiedOEMProcessor:
             stats = self.import_oem_file(oem_name, config)
 
             if stats["loaded"] > 0:
-                match_rate = (stats["matched"] / stats["loaded"]) * 100
-                print(f"   ✅ {stats['loaded']:,} records → {stats['matched']:,} matched ({match_rate:.1f}%)")
+                matched = stats["matched"]
+                created = stats.get("created", 0)
+                match_rate = (matched / stats["loaded"]) * 100
+                create_rate = (created / stats["loaded"]) * 100
+                print(f"   ✅ {stats['loaded']:,} records → {matched:,} matched ({match_rate:.1f}%) + {created:,} created ({create_rate:.1f}%)")
                 print(f"      New certifications: {stats['new_certs']:,}")
             print()
 
@@ -336,12 +394,18 @@ class UnifiedOEMProcessor:
         print("\n" + "-" * 70)
         print("IMPORT SUMMARY")
         print("-" * 70)
-        print(f"   Total OEM records: {self.stats['oem_records_loaded']:,}")
-        print(f"   Matched by phone:  {self.stats['matched_by_phone']:,}")
-        print(f"   Matched by domain: {self.stats['matched_by_domain']:,}")
-        print(f"   Matched by name:   {self.stats['matched_by_name']:,}")
-        print(f"   Unmatched:         {self.stats['unmatched']:,}")
-        print(f"   New certifications: {self.stats['new_certifications']:,}")
+        print(f"   Total OEM records:     {self.stats['oem_records_loaded']:,}")
+        print(f"   Matched by phone:      {self.stats['matched_by_phone']:,}")
+        print(f"   Matched by domain:     {self.stats['matched_by_domain']:,}")
+        print(f"   Matched by name:       {self.stats['matched_by_name']:,}")
+        total_matched = self.stats['matched_by_phone'] + self.stats['matched_by_domain'] + self.stats['matched_by_name']
+        print(f"   ---")
+        print(f"   TOTAL MATCHED:         {total_matched:,} (→ source_type='both')")
+        print(f"   NEW CONTRACTORS:       {self.stats['new_contractors_created']:,} (→ source_type='oem_dealer')")
+        print(f"   Failed:                {self.stats['unmatched']:,}")
+        print(f"   ---")
+        print(f"   New certifications:    {self.stats['new_certifications']:,}")
+        print(f"   Updated to 'both':     {self.stats['source_type_both']:,}")
 
     def calculate_icp_scores(self) -> dict:
         """Calculate enhanced ICP scores with OEM data"""
@@ -360,6 +424,7 @@ class UnifiedOEMProcessor:
                 c.city,
                 c.state,
                 c.zip,
+                c.source_type,
                 -- License counts by category
                 (SELECT COUNT(DISTINCT license_category) FROM licenses l WHERE l.contractor_id = c.id) as license_count,
                 (SELECT COUNT(*) FROM licenses l WHERE l.contractor_id = c.id AND l.license_category = 'HVAC') as hvac_license_count,
@@ -479,6 +544,7 @@ class UnifiedOEMProcessor:
                 "city": c.get("city", ""),
                 "state": c.get("state", ""),
                 "zip": c.get("zip", ""),
+                "source_type": c.get("source_type", "state_license"),
 
                 # License capabilities
                 "license_count": license_count,
@@ -525,6 +591,17 @@ class UnifiedOEMProcessor:
             pct = (count / len(scored)) * 100 if scored else 0
             print(f"   {tier}: {count:,} ({pct:.1f}%)")
 
+        # Source type distribution
+        source_counts = {"state_license": 0, "oem_dealer": 0, "both": 0}
+        for s in scored:
+            src = s.get("source_type", "state_license")
+            source_counts[src] = source_counts.get(src, 0) + 1
+
+        print("\n📊 Source Type Distribution:")
+        for src, count in source_counts.items():
+            pct = (count / len(scored)) * 100 if scored else 0
+            print(f"   {src}: {count:,} ({pct:.1f}%)")
+
         return scored
 
     def export_sales_agent_format(self, scored_data: list):
@@ -541,6 +618,7 @@ class UnifiedOEMProcessor:
         # Define sales-agent compatible columns
         columns = [
             "company_name", "domain", "phone", "email", "city", "state", "zip",
+            "source_type",  # 'state_license', 'oem_dealer', 'both'
             "license_count", "has_hvac", "has_electrical", "has_plumbing",
             "has_roofing", "has_solar", "has_battery", "has_generator",
             "oems_certified", "oem_tiers", "total_oem_count",
