@@ -203,28 +203,140 @@ def create_browserbase_connection(playwright_instance):
         return None, None, None
 
 
-def dismiss_cookie_consent(page: Page):
-    """Dismiss OneTrust cookie consent if present."""
-    try:
-        cookie_selectors = [
-            '#onetrust-accept-btn-handler',
-            'button:has-text("Accept All")',
-            'button:has-text("Accept")',
-            '.onetrust-close-btn-handler',
-        ]
+def nuke_cookie_overlay(page: Page) -> bool:
+    """
+    NUCLEAR cookie overlay removal - completely eliminates OneTrust elements.
 
-        for selector in cookie_selectors:
-            try:
-                btn = page.locator(selector)
-                if btn.count() > 0 and btn.first.is_visible(timeout=2000):
-                    print(f"    Dismissing cookie dialog...")
-                    btn.first.click(timeout=3000)
-                    time.sleep(1)
-                    return True
-            except:
-                continue
-    except:
-        pass
+    OneTrust overlays are notorious for intercepting pointer events even after
+    clicking "Accept". This function:
+    1. Injects CSS to disable ALL pointer events on OneTrust elements
+    2. Clicks accept button via JavaScript
+    3. REMOVES all OneTrust elements from DOM entirely
+    4. Verifies removal before returning
+
+    Call this BEFORE any form interaction, not just once at page load.
+    """
+    try:
+        # Step 1: Inject CSS to disable pointer events on ALL OneTrust elements
+        page.evaluate("""
+            () => {
+                // Create style element if not exists
+                if (!document.querySelector('#onetrust-killer')) {
+                    const style = document.createElement('style');
+                    style.id = 'onetrust-killer';
+                    style.textContent = `
+                        #onetrust-consent-sdk,
+                        #onetrust-banner-sdk,
+                        .onetrust-pc-dark-filter,
+                        .ot-sdk-container,
+                        .ot-sdk-row,
+                        [class*="onetrust"],
+                        [id*="onetrust"] {
+                            display: none !important;
+                            visibility: hidden !important;
+                            pointer-events: none !important;
+                            opacity: 0 !important;
+                            z-index: -9999 !important;
+                        }
+                    `;
+                    document.head.appendChild(style);
+                }
+            }
+        """)
+
+        # Step 2: Try to click accept button (helps set cookies to prevent reappear)
+        dismissed = page.evaluate("""
+            () => {
+                const acceptBtn = document.querySelector('#onetrust-accept-btn-handler');
+                if (acceptBtn) {
+                    try { acceptBtn.click(); } catch(e) {}
+                    return 'accepted';
+                }
+                const rejectBtn = document.querySelector('#onetrust-reject-all-handler');
+                if (rejectBtn) {
+                    try { rejectBtn.click(); } catch(e) {}
+                    return 'rejected';
+                }
+                return 'none';
+            }
+        """)
+
+        if dismissed != 'none':
+            print(f"    🍪 Cookie consent: {dismissed}")
+
+        # Step 3: Wait a moment, then REMOVE all OneTrust elements from DOM
+        time.sleep(1)
+
+        removed_count = page.evaluate("""
+            () => {
+                const selectors = [
+                    '#onetrust-consent-sdk',
+                    '#onetrust-banner-sdk',
+                    '.onetrust-pc-dark-filter',
+                    '.ot-sdk-container',
+                    '[class*="onetrust"]',
+                    '[id*="onetrust"]'
+                ];
+
+                let count = 0;
+                selectors.forEach(selector => {
+                    document.querySelectorAll(selector).forEach(el => {
+                        el.remove();
+                        count++;
+                    });
+                });
+
+                return count;
+            }
+        """)
+
+        if removed_count > 0:
+            print(f"    🗑️  Removed {removed_count} OneTrust elements from DOM")
+
+        # Step 4: Verify no OneTrust elements remain
+        remaining = page.evaluate("""
+            () => {
+                return document.querySelectorAll('[class*="onetrust"], [id*="onetrust"]').length;
+            }
+        """)
+
+        if remaining > 0:
+            print(f"    ⚠️  {remaining} OneTrust elements still remain")
+            # Try one more aggressive removal
+            page.evaluate("""
+                () => {
+                    document.querySelectorAll('[class*="onetrust"], [id*="onetrust"], .ot-sdk-row').forEach(el => el.remove());
+                }
+            """)
+
+        return True
+
+    except Exception as e:
+        print(f"    ⚠️ Cookie nuke error: {e}")
+        return False
+
+
+def dismiss_cookie_consent(page: Page):
+    """
+    Dismiss OneTrust cookie consent if present.
+
+    This is a wrapper that calls the nuclear option.
+    """
+    return nuke_cookie_overlay(page)
+
+
+def wait_for_dropdown_options(iframe, select_index: int, min_options: int = 2, timeout: int = 15):
+    """Wait for dropdown to have at least min_options (including empty)."""
+    start = time.time()
+    while time.time() - start < timeout:
+        try:
+            select = iframe.locator('select').nth(select_index)
+            options = select.locator('option').all()
+            if len(options) >= min_options:
+                return True
+        except:
+            pass
+        time.sleep(0.5)
     return False
 
 
@@ -245,13 +357,19 @@ def fill_cummins_form(page: Page, iframe, zip_code: str) -> bool:
         print(f"    Selecting Product: Power Generation")
         product_select = iframe.locator('select').first
         product_select.select_option(label='Power Generation')
-        time.sleep(random.uniform(1.5, 2.5))
+        time.sleep(random.uniform(2.0, 3.0))
+
+        # Wait for market dropdown to load options
+        print(f"    Waiting for Market options to load...")
+        if not wait_for_dropdown_options(iframe, 1, min_options=2):
+            print(f"    ⚠ Market options slow to load, retrying...")
+            time.sleep(3)
 
         # MARKET APPLICATION: Home And Small Business
         print(f"    Selecting Market: Home And Small Business")
         market_select = iframe.locator('select').nth(1)
         market_select.select_option(label='Home And Small Business')
-        time.sleep(random.uniform(1.5, 2.5))
+        time.sleep(random.uniform(2.0, 3.0))
 
         # SERVICE LEVEL: First non-empty option
         print(f"    Selecting Service Level")
@@ -275,9 +393,61 @@ def fill_cummins_form(page: Page, iframe, zip_code: str) -> bool:
         postal_input.fill(zip_code)
         time.sleep(random.uniform(1.0, 1.5))
 
-        # DISTANCE: 100 Miles
+        # CRITICAL: Nuke cookie overlay again before radio button (most problematic element)
+        nuke_cookie_overlay(page)
+        time.sleep(0.5)
+
+        # DISTANCE: 100 Miles - Use JavaScript click to bypass any overlay issues
         print(f"    Selecting Distance: 100 Miles")
-        iframe.locator('input[value="100"]').check()
+        try:
+            # First try: force click with Playwright
+            iframe.locator('input[value="100"]').check(force=True, timeout=10000)
+        except Exception as check_error:
+            print(f"    ⚠️ Playwright check failed, trying JS click...")
+            # Second try: JavaScript click through the iframe
+            try:
+                # Get the actual frame to execute JS
+                frame = None
+                for f in page.frames:
+                    if 'dealer' in f.url.lower() or 'locator' in f.url.lower() or 'cummins' in f.url.lower():
+                        frame = f
+                        break
+
+                if frame:
+                    frame.evaluate("""
+                        () => {
+                            const radio = document.querySelector('input[value="100"]');
+                            if (radio) {
+                                radio.checked = true;
+                                radio.dispatchEvent(new Event('change', { bubbles: true }));
+                                radio.dispatchEvent(new Event('click', { bubbles: true }));
+                            }
+                        }
+                    """)
+                    print(f"    ✓ Radio button set via JavaScript")
+                else:
+                    # Last resort: try clicking via page context
+                    page.evaluate("""
+                        () => {
+                            const iframes = document.querySelectorAll('iframe');
+                            for (const iframe of iframes) {
+                                try {
+                                    const doc = iframe.contentDocument || iframe.contentWindow.document;
+                                    const radio = doc.querySelector('input[value="100"]');
+                                    if (radio) {
+                                        radio.checked = true;
+                                        radio.dispatchEvent(new Event('change', { bubbles: true }));
+                                        return true;
+                                    }
+                                } catch(e) {}
+                            }
+                            return false;
+                        }
+                    """)
+            except Exception as js_error:
+                print(f"    ❌ JS click also failed: {js_error}")
+                raise check_error
+
         time.sleep(random.uniform(0.5, 1.0))
 
         return True
@@ -322,11 +492,18 @@ def scrape_cummins_zip(page: Page, zip_code: str) -> List[Dict]:
         # Navigate to Cummins dealer page
         print(f"    Navigating to Cummins page...")
         page.goto(CUMMINS_URL, timeout=60000, wait_until='domcontentloaded')
-        time.sleep(random.uniform(3.0, 5.0))
 
-        # Dismiss cookie consent
+        # Wait for page to fully stabilize before cookie nuke
+        try:
+            page.wait_for_load_state('load', timeout=15000)
+        except Exception:
+            pass  # Continue even if load state times out
+
+        time.sleep(random.uniform(4.0, 6.0))  # Extra wait for OneTrust to fully load
+
+        # Nuke cookie consent overlay (aggressive removal)
         dismiss_cookie_consent(page)
-        time.sleep(random.uniform(1.0, 2.0))
+        time.sleep(random.uniform(1.5, 2.5))
 
         # Find the iframe
         print(f"    Finding form iframe...")

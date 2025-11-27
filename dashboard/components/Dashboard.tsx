@@ -193,18 +193,19 @@ function MetricCard({ title, value, subtitle }: { title: string; value: string |
 
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
-    WORKING: 'bg-green-100 text-green-800',
-    BROKEN: 'bg-red-100 text-red-800',
-    UNTESTED: 'bg-gray-100 text-gray-600',
+    WORKING: 'bg-green-100 text-green-800 border-green-200',
+    BROKEN: 'bg-red-100 text-red-800 border-red-200',
+    UNTESTED: 'bg-gray-100 text-gray-600 border-gray-200',
   }
   const icons: Record<string, string> = {
-    WORKING: '🟢',
-    BROKEN: '🔴',
-    UNTESTED: '⚪',
+    WORKING: '✓',
+    BROKEN: '✗',
+    UNTESTED: '?',
   }
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors[status] || colors.UNTESTED}`}>
-      {icons[status]} {status}
+    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${colors[status] || colors.UNTESTED}`}>
+      <span className="font-bold">{icons[status]}</span>
+      {status}
     </span>
   )
 }
@@ -353,41 +354,56 @@ export default function Dashboard({ data }: { data: DashboardData }) {
       {/* Scraper Health */}
       <section>
         <h3 className="text-lg font-semibold text-gray-900 mb-4">🔧 Scraper Health</h3>
-        <div className="bg-white rounded-lg shadow p-4 mb-4">
-          <div className="flex gap-6 text-sm">
-            <span>🟢 <strong>{health.scrapers_working}</strong> Working</span>
-            <span>🔴 <strong>{health.scrapers_broken}</strong> Broken</span>
-            <span>⚪ <strong>{health.scrapers_untested}</strong> Untested</span>
-            <span className="text-gray-400">Total: {health.scrapers_total}</span>
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <div className="grid grid-cols-4 gap-4">
+            <div className="text-center">
+              <div className="text-3xl font-bold text-green-600">{health.scrapers_working}</div>
+              <div className="text-sm text-gray-500 uppercase tracking-wide mt-1">Working</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-red-600">{health.scrapers_broken}</div>
+              <div className="text-sm text-gray-500 uppercase tracking-wide mt-1">Broken</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-gray-400">{health.scrapers_untested}</div>
+              <div className="text-sm text-gray-500 uppercase tracking-wide mt-1">Untested</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-gray-900">{health.scrapers_total}</div>
+              <div className="text-sm text-gray-500 uppercase tracking-wide mt-1">Total</div>
+            </div>
           </div>
         </div>
 
         {Object.entries(scrapersByType).map(([type, items]) => (
           <div key={type} className="mb-6">
-            <h4 className="font-medium text-gray-700 mb-2">{type} ({items.length})</h4>
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-base font-semibold text-gray-900">{type}</h4>
+              <span className="text-sm text-gray-500">{items.length} scrapers</span>
+            </div>
             <div className="bg-white rounded-lg shadow overflow-hidden">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Records</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Run</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Records</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Run</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-96">Notes</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-gray-200 bg-white">
                   {items.map((s) => (
-                    <tr key={s.scraper_name} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium text-gray-900">{s.scraper_name}</td>
-                      <td className="px-4 py-3"><StatusBadge status={s.status} /></td>
-                      <td className="px-4 py-3 text-gray-600">
+                    <tr key={s.scraper_name} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{s.scraper_name}</td>
+                      <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={s.status} /></td>
+                      <td className="px-6 py-4 text-gray-600 whitespace-nowrap">
                         {s.total_records_lifetime ? formatNumber(s.total_records_lifetime) : '-'}
                       </td>
-                      <td className="px-4 py-3 text-gray-600">
+                      <td className="px-6 py-4 text-gray-600 whitespace-nowrap text-sm">
                         {s.last_successful_run ? s.last_successful_run.slice(0, 10) : 'Never'}
                       </td>
-                      <td className="px-4 py-3 text-gray-500 text-sm truncate max-w-xs">
+                      <td className="px-6 py-4 text-gray-600 text-sm">
                         {s.notes || '-'}
                       </td>
                     </tr>
@@ -406,33 +422,33 @@ export default function Dashboard({ data }: { data: DashboardData }) {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Records</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quality</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Source</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Records</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quality</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-gray-200 bg-white">
               {inventory
                 .filter(item => formatSourceName(item.source_name) !== '')
                 .slice(0, 15)
                 .map((item) => (
-                <tr key={`${item.source_name}-${item.source_type}`} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-900">{formatSourceName(item.source_name)}</td>
-                  <td className="px-4 py-3 text-gray-600">{formatSourceName(item.source_type)}</td>
-                  <td className="px-4 py-3 text-gray-900 font-medium">{formatNumber(item.record_count)}</td>
-                  <td className="px-4 py-3 text-gray-600">
+                <tr key={`${item.source_name}-${item.source_type}`} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{formatSourceName(item.source_name)}</td>
+                  <td className="px-6 py-4 text-gray-600 whitespace-nowrap">{formatSourceName(item.source_type)}</td>
+                  <td className="px-6 py-4 text-gray-900 font-semibold whitespace-nowrap">{formatNumber(item.record_count)}</td>
+                  <td className="px-6 py-4 text-gray-600 whitespace-nowrap">
                     {item.with_email_count ? formatNumber(item.with_email_count) : '-'}
                   </td>
-                  <td className="px-4 py-3 text-gray-600">
+                  <td className="px-6 py-4 text-gray-600 whitespace-nowrap">
                     {item.with_phone_count ? formatNumber(item.with_phone_count) : '-'}
                   </td>
-                  <td className="px-4 py-3">
-                    <span className={`font-medium ${
-                      item.quality_score >= 70 ? 'text-green-600' :
-                      item.quality_score >= 40 ? 'text-yellow-600' : 'text-red-600'
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                      item.quality_score >= 70 ? 'bg-green-100 text-green-800' :
+                      item.quality_score >= 40 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
                     }`}>
                       {item.quality_score}%
                     </span>
