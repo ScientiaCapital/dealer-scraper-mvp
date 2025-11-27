@@ -1,28 +1,39 @@
 #!/usr/bin/env python3
 """
-Schneider Electric Solar Installer Scraper
+Schneider Electric EcoXpert System Integrator Scraper
 
-Scrapes the Schneider Electric solar installer directory to find contractors.
-Target URL: https://solar.se.com/us/en/find-a-preferred-installer/
+Scrapes the Schneider Electric EcoXpert network to find certified contractors/installers.
+Target URL: https://www.se.com/us/en/locate/5-find-a-system-integrator-ecoxpert
 
-PRODUCTION READY - GEOLOCATION + AJAX RESULTS:
-- Address/ZIP search with geolocation API
-- Distance radius selector (25, 50, 100, 100+ miles)
-- AJAX results with installer cards
-- Name, phone, website, address extraction
-- Commercial solar + energy management focus
+NOTE (Nov 2025):
+- Old solar.se.com URL discontinued (404)
+- The /locate/257-us-distributor-locator is for DISTRIBUTORS (suppliers like Graybar, Home Depot)
+- EcoXpert locator has actual INSTALLERS/CONTRACTORS who do building automation
+- Uses Svelte-based UI with Google Places autocomplete (must click autocomplete result)
+
+Page Structure:
+- Svelte-based UI with pl-* class prefixes
+- Google Places autocomplete for address search
+- Must click autocomplete result (not just Enter) to trigger search
+- Results show company name, city, distance
+
+Certifications Available:
+- EcoXpert Building Automation (Certified/Master)
+- EcoXpert Building Security (Certified/Master)
+- EcoXpert Power Distribution (Master)
+- EcoXpert Power Management (Certified/Master)
+- EcoXpert Critical IT Infrastructure (Master)
 
 Business Context:
 - Schneider Electric = Fortune 500, global energy management leader
-- Product lines: Solar inverters, smart panels, energy management systems
-- Commercial + residential contractors (resimercial signal)
-- Sophisticated MEP contractors handling multi-product installations
+- EcoXperts are certified system integrators who INSTALL (not just sell)
+- Commercial building automation + power management focus
 - Strong ICP signals: Multi-trade capability, complex projects, technology leadership
 
 OEM Value Propositions:
-- Complete energy solutions (solar + panels + management)
+- Building automation integration expertise
+- Power distribution and management projects
 - Commercial/industrial focus = larger projects
-- Multi-product installations = system integration expertise
 - Technology early adopters = cutting-edge MEP firms
 """
 
@@ -40,22 +51,22 @@ from scrapers.scraper_factory import ScraperFactory
 
 
 class SchneiderElectricScraper(BaseDealerScraper):
-    """Scraper for Schneider Electric solar installer network."""
+    """Scraper for Schneider Electric EcoXpert system integrator network."""
 
     OEM_NAME = "Schneider Electric"
-    DEALER_LOCATOR_URL = "https://solar.se.com/us/en/find-a-preferred-installer/"
+    DEALER_LOCATOR_URL = "https://www.se.com/us/en/locate/5-find-a-system-integrator-ecoxpert"
     PRODUCT_LINES = [
-        "Solar Inverters (Conext series)",
-        "Smart Panels",
-        "Energy Management Systems",
-        "Battery Storage Integration",
-        "EV Charging Solutions",
-        "Commercial Energy Solutions",
+        "Building Automation Systems",
+        "Building Security Systems",
+        "Power Distribution",
+        "Power Management",
+        "Critical IT Infrastructure",
+        "Energy Monitoring",
     ]
 
     def get_base_url(self) -> str:
-        """Return the base URL for Schneider Electric installer locator."""
-        return "https://solar.se.com/us/en/find-a-preferred-installer/"
+        """Return the base URL for Schneider Electric EcoXpert locator."""
+        return "https://www.se.com/us/en/locate/5-find-a-system-integrator-ecoxpert"
 
     def get_brand_name(self) -> str:
         """Return the brand name."""
@@ -67,132 +78,107 @@ class SchneiderElectricScraper(BaseDealerScraper):
 
     def get_extraction_script(self) -> str:
         """
-        JavaScript extraction for Schneider Electric installers.
+        JavaScript extraction for Schneider Electric EcoXpert system integrators.
 
-        Extracts from AJAX-loaded installer cards.
-        Expected fields: name, phone, website, address, services.
+        EcoXpert page uses Svelte-based UI with company name, city, and distance.
+        Results appear as text blocks after search, not structured cards.
         """
         return r"""
 () => {
   const dealers = [];
+  const body = document.body.innerText;
+  const lines = body.split('\n').map(l => l.trim()).filter(l => l);
 
-  // Find all installer cards (adjust selectors based on actual HTML)
-  const installerCards = Array.from(document.querySelectorAll(
-    '.installer-card, [class*="installer"], [class*="result-item"], .result-card, article, .card'
-  )).filter(card => {
-    const text = card.textContent || '';
-    // Filter for cards with substantial content (likely installer cards)
-    return text.length > 100 && !text.includes('No results');
-  });
+  // Find where results section starts (after "X Results")
+  let resultStartIdx = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^\d+\s*Results?$/i.test(lines[i])) {
+      resultStartIdx = i;
+      break;
+    }
+  }
 
-  console.log(`[Schneider] Found ${installerCards.length} installer cards`);
+  if (resultStartIdx === -1) {
+    console.log('[Schneider] No results section found');
+    return dealers;
+  }
 
-  installerCards.forEach((card) => {
-    try {
-      // Extract name (look for headings or prominent text)
-      const nameEl = card.querySelector('h1, h2, h3, h4, h5, [class*="name"], [class*="title"], strong');
-      const name = nameEl ? nameEl.textContent.trim() : '';
+  // Parse results - format is: Company Name, City, Distance
+  let i = resultStartIdx + 1;
+  while (i < lines.length && dealers.length < 100) {
+    const line = lines[i];
 
-      if (!name || name.length < 3) return;
+    // Skip menu/filter items
+    if (line.startsWith('Sort by') || line.startsWith('Search by') ||
+        line.startsWith('Filter') || line.startsWith('Zip code') ||
+        line.startsWith('Distance') || line.length < 3) {
+      i++;
+      continue;
+    }
 
-      // Extract phone from tel: link
-      const phoneLink = card.querySelector('a[href^="tel:"]');
-      let phone = '';
-      if (phoneLink) {
-        phone = phoneLink.href.replace('tel:', '').replace(/[^0-9]/g, '');
-        // Remove country code if present
-        if (phone.length === 11 && phone.startsWith('1')) {
-          phone = phone.substring(1);
-        }
-      }
+    // Check if this looks like a company name
+    const isCompanyName = /Inc\.?|LLC|Corp\.?|Associates|Systems|Solutions|Technologies|Integration|Automation/i.test(line) ||
+                          (line.length > 5 && /^[A-Z]/.test(line) && !/^\d/.test(line) && !line.includes('EcoXpert'));
 
-      // Extract website
-      const websiteLink = Array.from(card.querySelectorAll('a[href^="http"]'))
-        .find(link => {
-          const href = link.href;
-          return !href.includes('google') && !href.includes('facebook') &&
-                 !href.includes('se.com') && !href.includes('schneider');
-        });
-      const website = websiteLink ? websiteLink.href : '';
-      let domain = '';
-      if (website) {
-        try {
-          const url = new URL(website);
-          domain = url.hostname.replace(/^www\./, '');
-        } catch(e) {}
-      }
+    if (isCompanyName && i + 2 < lines.length) {
+      const cityLine = lines[i + 1];
+      const distanceLine = lines[i + 2];
 
-      // Extract address
-      let street = '', city = '', state = '', zip = '';
-      const addressEl = card.querySelector('[class*="address"]');
-      if (addressEl) {
-        const addressText = addressEl.textContent.trim();
-        // Parse address patterns
-        const addressMatch = addressText.match(/^(.+?),\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),?\s*([A-Z]{2})\s*(\d{5})/);
-        if (addressMatch) {
-          street = addressMatch[1].trim();
-          city = addressMatch[2];
-          state = addressMatch[3];
-          zip = addressMatch[4];
-        } else {
-          // Fallback: just city, state, ZIP
-          const cityStateMatch = addressText.match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),?\s*([A-Z]{2})\s*(\d{5})/);
-          if (cityStateMatch) {
-            city = cityStateMatch[1];
-            state = cityStateMatch[2];
-            zip = cityStateMatch[3];
+      // Check if we have city and distance pattern
+      // City is typically just a city name, distance is "XX km" or "XX mi"
+      const distanceMatch = distanceLine.match(/([\d.]+)\s*(km|mi)/i) ||
+                           cityLine.match(/([\d.]+)\s*(km|mi)/i);
+
+      if (distanceMatch || (cityLine && !cityLine.includes('Results') && !cityLine.includes('Sort'))) {
+        let distance_miles = 0;
+        let distance = '';
+
+        if (distanceMatch) {
+          const value = parseFloat(distanceMatch[1]);
+          const unit = distanceMatch[2].toLowerCase();
+          if (unit === 'km') {
+            distance_miles = value * 0.621371;
+            distance = `${distance_miles.toFixed(1)} mi`;
+          } else {
+            distance_miles = value;
+            distance = `${value} mi`;
           }
         }
-      }
 
-      // Extract services/certifications
-      const services = [];
-      const serviceItems = card.querySelectorAll('li, [class*="service"], [class*="certification"]');
-      serviceItems.forEach(item => {
-        const text = item.textContent.trim();
-        if (text && text.length < 100) {
-          services.push(text);
+        // Extract city (first line after company that's not a distance)
+        let city = '';
+        if (!cityLine.match(/^\d/)) {
+          city = cityLine.replace(/,.*$/, '').trim();
         }
-      });
 
-      // Extract distance (if shown)
-      let distance = '', distance_miles = 0;
-      const distanceMatch = card.textContent.match(/([\d.]+)\s*(mi|miles|km)/i);
-      if (distanceMatch) {
-        const value = parseFloat(distanceMatch[1]);
-        const unit = distanceMatch[2].toLowerCase();
-        if (unit.includes('km')) {
-          distance_miles = value * 0.621371;
-          distance = `${distance_miles.toFixed(1)} mi`;
-        } else {
-          distance_miles = value;
-          distance = `${value} mi`;
-        }
+        dealers.push({
+          name: line,
+          phone: '',
+          domain: '',
+          website: '',
+          street: '',
+          city: city,
+          state: '',  // State not shown in results
+          zip: '',
+          address_full: city,
+          rating: 0.0,
+          review_count: 0,
+          tier: 'EcoXpert',
+          certifications: ['EcoXpert Certified'],
+          distance: distance,
+          distance_miles: distance_miles,
+          oem_source: 'Schneider Electric'
+        });
+
+        i += 3;
+        continue;
       }
-
-      dealers.push({
-        name: name,
-        phone: phone,
-        domain: domain,
-        website: website,
-        street: street,
-        city: city,
-        state: state,
-        zip: zip,
-        address_full: street && city && state ? `${street}, ${city}, ${state} ${zip}` : `${city}, ${state} ${zip}`,
-        rating: 0.0,  // Not typically shown
-        review_count: 0,
-        tier: services.length > 0 ? 'Preferred Installer' : 'Standard',
-        certifications: services,
-        distance: distance,
-        distance_miles: distance_miles,
-        oem_source: 'Schneider Electric'
-      });
-    } catch (error) {
-      console.log(`[Schneider] Error parsing card: ${error.message}`);
     }
-  });
 
+    i++;
+  }
+
+  console.log(`[Schneider] Extracted ${dealers.length} EcoXpert integrators`);
   return dealers;
 }
 """
@@ -201,7 +187,10 @@ class SchneiderElectricScraper(BaseDealerScraper):
         self, zip_code: str
     ) -> List[StandardizedDealer]:
         """
-        Scrape Schneider Electric installers using Playwright.
+        Scrape Schneider Electric EcoXpert system integrators using Playwright.
+
+        The EcoXpert page uses a Svelte-based UI with Google Places autocomplete.
+        Must click the autocomplete result (not just press Enter) to trigger search.
 
         Args:
             zip_code: ZIP code to search
@@ -225,54 +214,56 @@ class SchneiderElectricScraper(BaseDealerScraper):
                 )
                 page = context.new_page()
 
-                # Navigate to installer finder
+                # Navigate to EcoXpert locator
                 print(f"  → Navigating to {self.get_base_url()}")
                 page.goto(self.get_base_url(), timeout=60000)
-                time.sleep(3)
+                time.sleep(4)
 
-                # Fill address field with ZIP code
-                print(f"  → Filling address field with ZIP: {zip_code}")
+                # Accept cookie banner first (blocks visibility of elements)
                 try:
-                    # Try various address field selectors
-                    address_input = page.locator(
-                        'input[placeholder*="address" i], input[placeholder*="ZIP" i], '
-                        'input[placeholder*="location" i], input[type="text"], input[name*="address"]'
-                    ).first
-                    address_input.fill(zip_code)
-                    time.sleep(1)
-                except Exception as e:
-                    print(f"  ❌ Error filling address: {e}")
-                    browser.close()
-                    return []
-
-                # Click search button or trigger submit
-                print(f"  → Clicking search button...")
-                try:
-                    search_button = page.locator(
-                        'button:has-text("Search"), button:has-text("Find"), '
-                        'input[type="submit"], button[type="submit"]'
-                    ).first
-                    search_button.click()
-                    time.sleep(4)  # Wait for AJAX results
-                except Exception as e:
-                    # Some forms auto-submit on Enter
-                    print(f"  → Trying Enter key submit...")
-                    page.keyboard.press("Enter")
-                    time.sleep(4)
-
-                # Wait for results to load
-                print(f"  → Waiting for results...")
-                try:
-                    # Wait for some content to appear (adjust selector based on actual HTML)
-                    page.wait_for_selector(
-                        '.installer-card, [class*="result"], article, .card',
-                        timeout=10000
-                    )
-                    time.sleep(2)
+                    cookie_btn = page.query_selector("#onetrust-accept-btn-handler")
+                    if cookie_btn and cookie_btn.is_visible():
+                        print(f"  → Accepting cookies...")
+                        cookie_btn.click()
+                        time.sleep(2)
                 except Exception:
-                    print(f"  ⚠️  No results found for ZIP {zip_code}")
-                    browser.close()
-                    return []
+                    pass  # Cookie banner may not be present
+
+                # Find the VISIBLE search input (class='qds-input')
+                print(f"  → Finding search input for ZIP: {zip_code}")
+                visible_input = None
+
+                # Try multiple times as Svelte may still be loading
+                for attempt in range(3):
+                    inputs = page.query_selector_all("input[placeholder='Search by address']")
+                    for inp in inputs:
+                        if inp.is_visible():
+                            visible_input = inp
+                            break
+                    if visible_input:
+                        break
+                    time.sleep(2)
+
+                if visible_input:
+                    # Fill ZIP code and wait for autocomplete
+                    visible_input.click()
+                    visible_input.fill(zip_code)
+                    print(f"  → Waiting for autocomplete...")
+                    time.sleep(2)
+
+                    # Click the autocomplete result (REQUIRED - Enter doesn't work)
+                    autocomplete_result = page.query_selector(".pl-result-item button")
+                    if autocomplete_result:
+                        print(f"  → Clicking autocomplete result...")
+                        autocomplete_result.click()
+                        time.sleep(5)  # Wait for results to load
+                    else:
+                        print(f"  ⚠️  No autocomplete result found, trying Enter...")
+                        visible_input.press("Enter")
+                        time.sleep(5)
+                else:
+                    print(f"  ⚠️  No search input found, extracting all visible results...")
+                    time.sleep(2)  # Allow page to settle
 
                 # Execute extraction script
                 print(f"  → Executing extraction script...")

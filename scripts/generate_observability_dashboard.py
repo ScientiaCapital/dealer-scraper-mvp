@@ -149,7 +149,7 @@ def get_scraper_health(conn: sqlite3.Connection) -> list:
 
     cursor.execute("""
         SELECT
-            scraper_name,
+            COALESCE(display_name, scraper_name) as scraper_name,
             scraper_type,
             status,
             fix_difficulty,
