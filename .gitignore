@@ -27,6 +27,7 @@ output/
 !example_output.json
 !test_input.json
 !**/examples/*.json
+!dashboard/public/data/dashboard_data.json
 
 # Databases - NEVER commit (contains PII)
 *.db
@@ -47,6 +48,10 @@ docker-compose.override.yml
 
 # Patchright stealth browser
 patchright-chrome-profile/
+
+# Next.js build output
+.next/
+dashboard/.next/
 
 # IDE
 .vscode/

@@ -1,0 +1,1501 @@
+{
+  "pipeline_health": {
+    "total_contractors": 217392,
+    "with_email": 64772,
+    "with_phone": 57312,
+    "email_rate": 29.8,
+    "phone_rate": 26.4,
+    "multi_license_count": 19394,
+    "unicorn_count": 3602,
+    "multi_oem_count": 408,
+    "scrapers_working": 14,
+    "scrapers_broken": 19,
+    "scrapers_untested": 1,
+    "scrapers_total": 34,
+    "generated_at": "2025-11-28T14:15:00.000000"
+  },
+  "scraper_health": [
+    {
+      "scraper_name": "Carrier",
+      "scraper_type": "OEM",
+      "status": "WORKING",
+      "fix_difficulty": null,
+      "total_records_lifetime": 2618,
+      "last_successful_run": "2025-11-26T10:57:23.387274",
+      "source_url": "https://www.carrier.com/residential/en/us/find-a-dealer/",
+      "notes": "2,618 contractors | 54 states | 99% phone | 1% email"
+    },
+    {
+      "scraper_name": "Cummins",
+      "scraper_type": "OEM",
+      "status": "WORKING",
+      "fix_difficulty": "HARD",
+      "total_records_lifetime": 702,
+      "last_successful_run": "2025-11-27 01:22:12",
+      "source_url": "https://www.cummins.com/parts-and-service/dealer-locator",
+      "notes": "702 contractors | 72 states | 99% phone | 1% email"
+    },
+    {
+      "scraper_name": "Delta",
+      "scraper_type": "OEM",
+      "status": "BROKEN",
+      "fix_difficulty": "HARD",
+      "total_records_lifetime": 0,
+      "last_successful_run": null,
+      "source_url": "https://www.delta-americas.com/en-US/products/solar-inverters",
+      "notes": "Solar inverters - no dealer locator found on website"
+    },
+    {
+      "scraper_name": "Enphase",
+      "scraper_type": "OEM",
+      "status": "WORKING",
+      "fix_difficulty": null,
+      "total_records_lifetime": 26,
+      "last_successful_run": "2025-11-26T10:57:27.797009",
+      "source_url": "https://enphase.com/installer-locator",
+      "notes": "26 contractors | 2 states | 96% phone"
+    },
+    {
+      "scraper_name": "Fronius",
+      "scraper_type": "OEM",
+      "status": "BROKEN",
+      "fix_difficulty": "HARD",
+      "total_records_lifetime": 0,
+      "last_successful_run": null,
+      "source_url": "https://www.fronius.com/en-us/usa/solar-energy/home-owners/contact/find-installers",
+      "notes": "Solar inverters - website requires JS rendering, scraper needs update"
+    },
+    {
+      "scraper_name": "Generac",
+      "scraper_type": "OEM",
+      "status": "WORKING",
+      "fix_difficulty": null,
+      "total_records_lifetime": 1706,
+      "last_successful_run": "2025-11-26T10:57:30.675066",
+      "source_url": "https://www.generac.com/service-support/dealer-locator",
+      "notes": "1,706 contractors | 27 states | 98% phone | 2% email"
+    },
+    {
+      "scraper_name": "Johnson Controls",
+      "scraper_type": "OEM",
+      "status": "BROKEN",
+      "fix_difficulty": "HARD",
+      "total_records_lifetime": 0,
+      "last_successful_run": null,
+      "source_url": "https://www.johnsoncontrols.com/",
+      "notes": "Building automation - no public dealer locator found"
+    },
+    {
+      "scraper_name": "Kohler",
+      "scraper_type": "OEM",
+      "status": "BROKEN",
+      "fix_difficulty": "HARD",
+      "total_records_lifetime": 0,
+      "last_successful_run": null,
+      "source_url": "https://www.kohlergenerators.com/find-a-dealer",
+      "notes": "Backup generators - dealer locator needs Browserbase"
+    },
+    {
+      "scraper_name": "Mitsubishi",
+      "scraper_type": "OEM",
+      "status": "WORKING",
+      "fix_difficulty": null,
+      "total_records_lifetime": 1799,
+      "last_successful_run": "2025-11-26T10:57:43.369513",
+      "source_url": "https://www.mitsubishicomfort.com/find-a-contractor",
+      "notes": "1,799 contractors | 53 states | 99% phone | 1% email"
+    },
+    {
+      "scraper_name": "ABB",
+      "scraper_type": "OEM",
+      "status": "BROKEN",
+      "fix_difficulty": "HARD",
+      "total_records_lifetime": 0,
+      "last_successful_run": null,
+      "source_url": "https://new.abb.com/ev-charging/installers",
+      "notes": "Solar inverters - website changed, needs URL update"
+    },
+    {
+      "scraper_name": "Briggs & Stratton",
+      "scraper_type": "OEM",
+      "status": "BROKEN",
+      "fix_difficulty": "HARD",
+      "total_records_lifetime": 782,
+      "last_successful_run": null,
+      "source_url": "https://www.briggsandstratton.com/na/en_us/dealer-locator.html",
+      "notes": "782 contractors | 51 states | 99% phone | 1% email"
+    },
+    {
+      "scraper_name": "GoodWe",
+      "scraper_type": "OEM",
+      "status": "BROKEN",
+      "fix_difficulty": "HARD",
+      "total_records_lifetime": 0,
+      "last_successful_run": null,
+      "source_url": "https://en.goodwe.com/Partners",
+      "notes": "Solar inverters - website changed, needs URL update"
+    },
+    {
+      "scraper_name": "Growatt",
+      "scraper_type": "OEM",
+      "status": "BROKEN",
+      "fix_difficulty": "HARD",
+      "total_records_lifetime": 0,
+      "last_successful_run": null,
+      "source_url": "https://www.growatt-us.com/installers/",
+      "notes": "Solar inverters - website down or moved"
+    },
+    {
+      "scraper_name": "Honeywell",
+      "scraper_type": "OEM",
+      "status": "BROKEN",
+      "fix_difficulty": "HARD",
+      "total_records_lifetime": 0,
+      "last_successful_run": null,
+      "source_url": "https://www.honeywellhome.com/en/professional-locator",
+      "notes": "Smart thermostats - website changed, needs URL update"
+    },
+    {
+      "scraper_name": "Lennox",
+      "scraper_type": "OEM",
+      "status": "BROKEN",
+      "fix_difficulty": "HARD",
+      "total_records_lifetime": 0,
+      "last_successful_run": null,
+      "source_url": "https://www.lennox.com/find-a-dealer",
+      "notes": "HVAC systems - website changed, needs URL update"
+    },
+    {
+      "scraper_name": "Rheem",
+      "scraper_type": "OEM",
+      "status": "BROKEN",
+      "fix_difficulty": "HARD",
+      "total_records_lifetime": 1648,
+      "last_successful_run": null,
+      "source_url": "https://www.rheem.com/find-a-contractor/",
+      "notes": "1,648 contractors | 44 states | 100% phone"
+    },
+    {
+      "scraper_name": "SMA Solar",
+      "scraper_type": "OEM",
+      "status": "BROKEN",
+      "fix_difficulty": "HARD",
+      "total_records_lifetime": 43,
+      "last_successful_run": null,
+      "source_url": "https://www.sma-america.com/service-support/installer-search.html",
+      "notes": "43 contractors | 16 states | 100% phone"
+    },
+    {
+      "scraper_name": "Schneider Electric",
+      "scraper_type": "OEM",
+      "status": "WORKING",
+      "fix_difficulty": null,
+      "total_records_lifetime": 143,
+      "last_successful_run": "2025-11-28T10:16:37.216715",
+      "source_url": "https://www.se.com/us/en/partners/partner-locator/",
+      "notes": "143 contractors | 21 states | 66% phone | 77% email"
+    },
+    {
+      "scraper_name": "Sensi",
+      "scraper_type": "OEM",
+      "status": "BROKEN",
+      "fix_difficulty": "HARD",
+      "total_records_lifetime": 0,
+      "last_successful_run": null,
+      "source_url": "https://sensi.emerson.com/en-us/contractors",
+      "notes": "Smart thermostats - website changed, needs URL update"
+    },
+    {
+      "scraper_name": "SimpliPhi",
+      "scraper_type": "OEM",
+      "status": "BROKEN",
+      "fix_difficulty": "HARD",
+      "total_records_lifetime": 0,
+      "last_successful_run": null,
+      "source_url": "https://simpliphipower.com/find-an-installer/",
+      "notes": "Battery storage - connection timeout, may be discontinued"
+    },
+    {
+      "scraper_name": "Sol-Ark",
+      "scraper_type": "OEM",
+      "status": "BROKEN",
+      "fix_difficulty": "HARD",
+      "total_records_lifetime": 0,
+      "last_successful_run": null,
+      "source_url": "https://www.sol-ark.com/installers/",
+      "notes": "Hybrid inverters - website changed, needs URL update"
+    },
+    {
+      "scraper_name": "SolarEdge",
+      "scraper_type": "OEM",
+      "status": "BROKEN",
+      "fix_difficulty": "HARD",
+      "total_records_lifetime": 0,
+      "last_successful_run": null,
+      "source_url": "https://www.solaredge.com/us/installers-locator",
+      "notes": "Solar inverters - website changed, needs URL update"
+    },
+    {
+      "scraper_name": "Sungrow",
+      "scraper_type": "OEM",
+      "status": "BROKEN",
+      "fix_difficulty": "HARD",
+      "total_records_lifetime": 0,
+      "last_successful_run": null,
+      "source_url": "https://en.sungrowpower.com/partnerSearch",
+      "notes": "Solar inverters - Chinese manufacturer, website changed"
+    },
+    {
+      "scraper_name": "Tesla",
+      "scraper_type": "OEM",
+      "status": "BROKEN",
+      "fix_difficulty": "HARD",
+      "total_records_lifetime": 67,
+      "last_successful_run": null,
+      "source_url": "https://www.tesla.com/support/certified-installers",
+      "notes": "67 contractors | 11 states | 96% phone | 4% email"
+    },
+    {
+      "scraper_name": "Tigo",
+      "scraper_type": "OEM",
+      "status": "BROKEN",
+      "fix_difficulty": "HARD",
+      "total_records_lifetime": 0,
+      "last_successful_run": null,
+      "source_url": "https://www.tigoenergy.com/find-installer",
+      "notes": "Solar optimizers - website changed, needs URL update"
+    },
+    {
+      "scraper_name": "Trane",
+      "scraper_type": "OEM",
+      "status": "WORKING",
+      "fix_difficulty": null,
+      "total_records_lifetime": 2802,
+      "last_successful_run": "2025-11-26T10:57:23.387274",
+      "source_url": "https://www.trane.com/residential/en/find-dealer/",
+      "notes": "2,802 contractors | 58 states | 0% phone (location only)"
+    },
+    {
+      "scraper_name": "York",
+      "scraper_type": "OEM",
+      "status": "WORKING",
+      "fix_difficulty": null,
+      "total_records_lifetime": 90,
+      "last_successful_run": "2025-11-26T10:57:23.387274",
+      "source_url": "https://www.york.com/for-your-home/find-a-dealer",
+      "notes": "90 contractors | 31 states | 100% phone"
+    },
+    {
+      "scraper_name": "California Licenses",
+      "scraper_type": "STATE_LICENSE",
+      "status": "WORKING",
+      "fix_difficulty": null,
+      "total_records_lifetime": 36355,
+      "last_successful_run": "2025-11-28 14:00:00",
+      "source_url": "https://www.cslb.ca.gov/",
+      "notes": "36,355 contractors | 99% phone | 0.7% email"
+    },
+    {
+      "scraper_name": "Florida Licenses",
+      "scraper_type": "STATE_LICENSE",
+      "status": "WORKING",
+      "fix_difficulty": null,
+      "total_records_lifetime": 58504,
+      "last_successful_run": "2025-11-28 14:00:00",
+      "source_url": "https://www.myfloridalicense.com/",
+      "notes": "58,504 contractors | 96.8% email | 1.1% phone"
+    },
+    {
+      "scraper_name": "NYC DOB Licenses",
+      "scraper_type": "STATE_LICENSE",
+      "status": "WORKING",
+      "fix_difficulty": null,
+      "total_records_lifetime": 2269,
+      "last_successful_run": "2025-11-28 14:00:00",
+      "source_url": "https://a810-bisweb.nyc.gov/bisweb/LicenseTypeServlet",
+      "notes": "2,269 contractors | 15.3% phone | 13.7% email"
+    },
+    {
+      "scraper_name": "Texas Licenses",
+      "scraper_type": "STATE_LICENSE",
+      "status": "WORKING",
+      "fix_difficulty": null,
+      "total_records_lifetime": 101085,
+      "last_successful_run": "2025-11-28 14:00:00",
+      "source_url": "https://www.tdlr.texas.gov/",
+      "notes": "101,085 contractors | 11.2% phone | 0.7% email"
+    },
+    {
+      "scraper_name": "New Jersey Licenses",
+      "scraper_type": "STATE_LICENSE",
+      "status": "UNTESTED",
+      "fix_difficulty": null,
+      "total_records_lifetime": 0,
+      "last_successful_run": null,
+      "source_url": "https://newjersey.mylicense.com/",
+      "notes": "New Jersey - Requires county-level scraping (state portal has limited MEP data)"
+    },
+    {
+      "scraper_name": "Amicus Solar",
+      "scraper_type": "THIRD_PARTY",
+      "status": "WORKING",
+      "fix_difficulty": null,
+      "total_records_lifetime": 104,
+      "last_successful_run": "2025-11-26T07:38:06",
+      "source_url": null,
+      "notes": "Amicus Solar Cooperative - 104 premium solar contractors (89 solar, 52 O&M)"
+    },
+    {
+      "scraper_name": "Solar Power World",
+      "scraper_type": "THIRD_PARTY",
+      "status": "WORKING",
+      "fix_difficulty": null,
+      "total_records_lifetime": 659,
+      "last_successful_run": "2025-11-27 01:27:23",
+      "source_url": "https://www.solarpowerworldonline.com/",
+      "notes": "Solar Power World - Top Solar Contractors database (401 master list + 258 commercial)"
+    }
+  ],
+  "data_inventory": [
+    {
+      "source_name": "state_license",
+      "source_type": "CONTRACTOR_DB",
+      "record_count": 203960,
+      "with_email_count": 64710,
+      "with_phone_count": 48328,
+      "quality_score": 27,
+      "last_updated": "2025-11-26T10:28:11.798761",
+      "notes": "From contractors table (source_type=state_license)"
+    },
+    {
+      "source_name": "tx_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 101085,
+      "with_email_count": 726,
+      "with_phone_count": 11290,
+      "quality_score": 12,
+      "last_updated": "2025-11-28T14:00:00.000000",
+      "notes": "Texas TDLR - 11.2% phone, 0.7% email (state portal limitation)"
+    },
+    {
+      "source_name": "fl_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 58504,
+      "with_email_count": 56639,
+      "with_phone_count": 669,
+      "quality_score": 98,
+      "last_updated": "2025-11-28T14:00:00.000000",
+      "notes": "Florida DBPR - 96.8% email, 1.1% phone (state portal limitation)"
+    },
+    {
+      "source_name": "ca_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 36355,
+      "with_email_count": 271,
+      "with_phone_count": 36007,
+      "quality_score": 99,
+      "last_updated": "2025-11-28T14:00:00.000000",
+      "notes": "California CSLB - 99.0% phone, 0.7% email (state portal limitation)"
+    },
+    {
+      "source_name": "ny_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 2269,
+      "with_email_count": 311,
+      "with_phone_count": 348,
+      "quality_score": 29,
+      "last_updated": "2025-11-28T14:00:00.000000",
+      "notes": "New York - 15.3% phone, 13.7% email (county-level licensing)"
+    },
+    {
+      "source_name": "oem_dealer",
+      "source_type": "CONTRACTOR_DB",
+      "record_count": 11518,
+      "with_email_count": 0,
+      "with_phone_count": 8714,
+      "quality_score": 76,
+      "last_updated": "2025-11-26T10:28:11.798751",
+      "notes": "OEM dealer locators provide phone (76%), no email (dealer pages don't expose emails)"
+    },
+    {
+      "source_name": "trane",
+      "source_type": "OEM",
+      "record_count": 2802,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 30,
+      "last_updated": "2025-11-26T10:28:11.799169",
+      "notes": "HVAC dealers - NO phone data available"
+    },
+    {
+      "source_name": "carrier",
+      "source_type": "OEM",
+      "record_count": 2618,
+      "with_email_count": 0,
+      "with_phone_count": 2603,
+      "quality_score": 99,
+      "last_updated": "2025-11-26T10:28:11.799176",
+      "notes": "HVAC dealers - 99% phone coverage"
+    },
+    {
+      "source_name": "mitsubishi",
+      "source_type": "OEM",
+      "record_count": 1799,
+      "with_email_count": 0,
+      "with_phone_count": 1788,
+      "quality_score": 99,
+      "last_updated": "2025-11-26T10:28:11.799182",
+      "notes": "VRF/HVAC dealers - 99% phone (high-value commercial)"
+    },
+    {
+      "source_name": "generac",
+      "source_type": "OEM",
+      "record_count": 1706,
+      "with_email_count": 0,
+      "with_phone_count": 1677,
+      "quality_score": 98,
+      "last_updated": "2025-11-26T10:28:11.799188",
+      "notes": "Generator dealers - 98% phone coverage"
+    },
+    {
+      "source_name": "rheem",
+      "source_type": "OEM",
+      "record_count": 1648,
+      "with_email_count": 0,
+      "with_phone_count": 1648,
+      "quality_score": 100,
+      "last_updated": "2025-11-26T10:28:11.799194",
+      "notes": "HVAC dealers - 100% phone coverage"
+    },
+    {
+      "source_name": "ga_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 1548,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798790",
+      "notes": "1823 licenses, categories: HVAC,GENERAL,BUILDING,ROOFING,FIRE,UTILITY,PLUMBING,LOW_VOLTAGE,SPECIALTY,ELECTRICAL,ENGINEERING,APPLIANCE"
+    },
+    {
+      "source_name": "briggs_&_stratton",
+      "source_type": "OEM",
+      "record_count": 782,
+      "with_email_count": 0,
+      "with_phone_count": 778,
+      "quality_score": 99,
+      "last_updated": "2025-11-26T10:28:11.799201",
+      "notes": "Generator dealers - 99% phone coverage"
+    },
+    {
+      "source_name": "cummins",
+      "source_type": "OEM",
+      "record_count": 702,
+      "with_email_count": 0,
+      "with_phone_count": 697,
+      "quality_score": 99,
+      "last_updated": "2025-11-26T10:28:11.799207",
+      "notes": "Generator dealers - 99% phone coverage"
+    },
+    {
+      "source_name": "al_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 643,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798797",
+      "notes": "774 licenses, categories: HVAC,FIRE,ROOFING,BUILDING,GENERAL,ELECTRICAL,UTILITY,SPECIALTY,PLUMBING,REFRIGERATION,ENGINEERING,LOW_VOLTAGE"
+    },
+    {
+      "source_name": "nc_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 622,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798803",
+      "notes": "719 licenses, categories: HVAC,FIRE,BUILDING,GENERAL,UTILITY,SPECIALTY,ROOFING,ELECTRICAL,APPLIANCE,ENGINEERING,PLUMBING,LOW_VOLTAGE,REFRIGERATION,HAZMAT"
+    },
+    {
+      "source_name": "tn_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 491,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798809",
+      "notes": "573 licenses, categories: HVAC,BUILDING,FIRE,GENERAL,ROOFING,ELECTRICAL,UTILITY,SPECIALTY,PLUMBING,ENGINEERING,LOW_VOLTAGE"
+    },
+    {
+      "source_name": "la_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 475,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798815",
+      "notes": "559 licenses, categories: HVAC,ROOFING,ELECTRICAL,BUILDING,FIRE,GENERAL,UTILITY,PLUMBING,SPECIALTY,ENGINEERING,LOW_VOLTAGE,HAZMAT,BOILER,REFRIGERATION,APPLIANCE"
+    },
+    {
+      "source_name": "oh_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 404,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798821",
+      "notes": "475 licenses, categories: HVAC,BUILDING,FIRE,GENERAL,ROOFING,ELECTRICAL,PLUMBING,ENGINEERING,SPECIALTY,UTILITY,LOW_VOLTAGE"
+    },
+    {
+      "source_name": "spw_master",
+      "source_type": "THIRD_PARTY",
+      "record_count": 401,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 90,
+      "last_updated": "2025-11-26T10:28:11.799244",
+      "notes": "0 matched to contractors"
+    },
+    {
+      "source_name": "ny_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 389,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798827",
+      "notes": "442 licenses, categories: GENERAL,HVAC,BUILDING,FIRE,SPECIALTY,ROOFING,UTILITY,ENGINEERING,PLUMBING,LOW_VOLTAGE,ELECTRICAL,BOILER,APPLIANCE"
+    },
+    {
+      "source_name": "il_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 366,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798834",
+      "notes": "440 licenses, categories: ROOFING,HVAC,ELECTRICAL,FIRE,BUILDING,GENERAL,ENGINEERING,HAZMAT,UTILITY,SPECIALTY,PLUMBING,LOW_VOLTAGE,BOILER"
+    },
+    {
+      "source_name": "both",
+      "source_type": "CONTRACTOR_DB",
+      "record_count": 332,
+      "with_email_count": 62,
+      "with_phone_count": 270,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798579",
+      "notes": "From contractors table (source_type=both)"
+    },
+    {
+      "source_name": "az_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 325,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798840",
+      "notes": "396 licenses, categories: ROOFING,HVAC,BUILDING,FIRE,GENERAL,ELECTRICAL,PLUMBING,ENGINEERING,SPECIALTY,LOW_VOLTAGE,REFRIGERATION,SOLAR"
+    },
+    {
+      "source_name": "mi_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 315,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798846",
+      "notes": "374 licenses, categories: HVAC,GENERAL,ROOFING,BUILDING,FIRE,UTILITY,SPECIALTY,LOW_VOLTAGE,ELECTRICAL,ENGINEERING,PLUMBING,REFRIGERATION"
+    },
+    {
+      "source_name": "pa_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 307,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798852",
+      "notes": "356 licenses, categories: HVAC,BUILDING,ROOFING,GENERAL,FIRE,UTILITY,PLUMBING,SPECIALTY,ELECTRICAL,ENGINEERING,HAZMAT,LOW_VOLTAGE"
+    },
+    {
+      "source_name": "nv_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 305,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798858",
+      "notes": "350 licenses, categories: HVAC,BUILDING,GENERAL,FIRE,ROOFING,PLUMBING,SPECIALTY,ELECTRICAL,ENGINEERING,REFRIGERATION,SOLAR,LOW_VOLTAGE,BOILER"
+    },
+    {
+      "source_name": "sc_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 290,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798864",
+      "notes": "324 licenses, categories: HVAC,ROOFING,FIRE,SPECIALTY,BUILDING,GENERAL,ELECTRICAL,PLUMBING,UTILITY,ENGINEERING,LOW_VOLTAGE"
+    },
+    {
+      "source_name": "nj_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 258,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798870",
+      "notes": "307 licenses, categories: HVAC,FIRE,BUILDING,ROOFING,GENERAL,UTILITY,SPECIALTY,BOILER,PLUMBING,REFRIGERATION,ENGINEERING,SOLAR,LOW_VOLTAGE,ELECTRICAL,HAZMAT"
+    },
+    {
+      "source_name": "mo_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 258,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798876",
+      "notes": "299 licenses, categories: HVAC,GENERAL,SPECIALTY,BUILDING,ROOFING,ENGINEERING,UTILITY,FIRE,PLUMBING,HAZMAT,LOW_VOLTAGE,ELECTRICAL"
+    },
+    {
+      "source_name": "spw_commercial",
+      "source_type": "THIRD_PARTY",
+      "record_count": 258,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 90,
+      "last_updated": "2025-11-26T10:28:11.799237",
+      "notes": "0 matched to contractors"
+    },
+    {
+      "source_name": "co_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 254,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798884",
+      "notes": "301 licenses, categories: HVAC,BUILDING,GENERAL,ROOFING,FIRE,ELECTRICAL,UTILITY,SPECIALTY,ENGINEERING,LOW_VOLTAGE,HAZMAT,PLUMBING,REFRIGERATION,SOLAR"
+    },
+    {
+      "source_name": "va_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 226,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798890",
+      "notes": "276 licenses, categories: HVAC,BUILDING,FIRE,GENERAL,ELECTRICAL,ROOFING,UTILITY,PLUMBING,SPECIALTY,ENGINEERING,LOW_VOLTAGE,REFRIGERATION"
+    },
+    {
+      "source_name": "in_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 225,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798897",
+      "notes": "271 licenses, categories: HVAC,FIRE,GENERAL,PLUMBING,ELECTRICAL,BUILDING,UTILITY,ROOFING,SPECIALTY,ENGINEERING,SOLAR,LOW_VOLTAGE"
+    },
+    {
+      "source_name": "mn_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 193,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798903",
+      "notes": "238 licenses, categories: BUILDING,ROOFING,GENERAL,FIRE,HVAC,SPECIALTY,REFRIGERATION,UTILITY,ENGINEERING,ELECTRICAL,LOW_VOLTAGE,HAZMAT,PLUMBING,BOILER,APPLIANCE"
+    },
+    {
+      "source_name": "ma_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 177,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798910",
+      "notes": "201 licenses, categories: HVAC,BUILDING,FIRE,GENERAL,UTILITY,ROOFING,SPECIALTY,PLUMBING,SOLAR,ASBESTOS,ENGINEERING,ELECTRICAL"
+    },
+    {
+      "source_name": "ok_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 165,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798916",
+      "notes": "186 licenses, categories: HVAC,BUILDING,ROOFING,GENERAL,FIRE,SPECIALTY,ELECTRICAL,UTILITY,ENGINEERING,LOW_VOLTAGE,PLUMBING"
+    },
+    {
+      "source_name": "md_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 165,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798922",
+      "notes": "203 licenses, categories: HVAC,GENERAL,ROOFING,FIRE,BUILDING,SPECIALTY,UTILITY,PLUMBING,ELECTRICAL,ENGINEERING,HAZMAT,LOW_VOLTAGE"
+    },
+    {
+      "source_name": "ms_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 162,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798928",
+      "notes": "200 licenses, categories: HVAC,ROOFING,FIRE,GENERAL,BUILDING,SPECIALTY,ELECTRICAL,PLUMBING,UTILITY,ENGINEERING,LOW_VOLTAGE"
+    },
+    {
+      "source_name": "wi_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 157,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798934",
+      "notes": "209 licenses, categories: HVAC,ROOFING,GENERAL,UTILITY,BUILDING,SPECIALTY,FIRE,ENGINEERING,PLUMBING,ELECTRICAL,HAZMAT,LOW_VOLTAGE,APPLIANCE"
+    },
+    {
+      "source_name": "ky_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 156,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798940",
+      "notes": "180 licenses, categories: HVAC,GENERAL,ROOFING,BUILDING,FIRE,SPECIALTY,UTILITY,ENGINEERING,ELECTRICAL,LOW_VOLTAGE"
+    },
+    {
+      "source_name": "ut_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 146,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798947",
+      "notes": "170 licenses, categories: HVAC,ROOFING,BUILDING,GENERAL,ELECTRICAL,FIRE,PLUMBING,ENGINEERING,BOILER,LOW_VOLTAGE,ASBESTOS,HAZMAT"
+    },
+    {
+      "source_name": "wa_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 136,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798953",
+      "notes": "184 licenses, categories: HVAC,BUILDING,ELECTRICAL,ROOFING,FIRE,GENERAL,SPECIALTY,APPLIANCE,ENGINEERING,LOW_VOLTAGE,BOILER,PLUMBING,REFRIGERATION,HAZMAT,ASBESTOS"
+    },
+    {
+      "source_name": "ar_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 133,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798959",
+      "notes": "149 licenses, categories: HVAC,FIRE,BUILDING,ROOFING,GENERAL,ELECTRICAL,UTILITY,SPECIALTY,PLUMBING,APPLIANCE"
+    },
+    {
+      "source_name": "nm_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 106,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798966",
+      "notes": "110 licenses, categories: HVAC,BUILDING,GENERAL,UTILITY,ROOFING,ENGINEERING,HAZMAT,ELECTRICAL"
+    },
+    {
+      "source_name": "or_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 100,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798975",
+      "notes": "112 licenses, categories: HVAC,ELECTRICAL,BUILDING,ROOFING,GENERAL,SPECIALTY,LOW_VOLTAGE,SOLAR,BOILER,REFRIGERATION,ENGINEERING,PLUMBING,HAZMAT"
+    },
+    {
+      "source_name": "ks_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 94,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798981",
+      "notes": "118 licenses, categories: HVAC,ROOFING,BUILDING,GENERAL,FIRE,UTILITY,SPECIALTY,ELECTRICAL,ENGINEERING"
+    },
+    {
+      "source_name": "ct_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 90,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798987",
+      "notes": "101 licenses, categories: HVAC,ROOFING,FIRE,GENERAL,UTILITY,BUILDING,ELECTRICAL,ENGINEERING"
+    },
+    {
+      "source_name": "york",
+      "source_type": "OEM",
+      "record_count": 90,
+      "with_email_count": 0,
+      "with_phone_count": 90,
+      "quality_score": 100,
+      "last_updated": "2025-11-26T10:28:11.799213",
+      "notes": "90 certifications from York"
+    },
+    {
+      "source_name": "ia_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 69,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798993",
+      "notes": "80 licenses, categories: HVAC,ROOFING,BUILDING,GENERAL,SPECIALTY,ENGINEERING,LOW_VOLTAGE,ELECTRICAL"
+    },
+    {
+      "source_name": "tesla",
+      "source_type": "OEM",
+      "record_count": 67,
+      "with_email_count": 0,
+      "with_phone_count": 64,
+      "quality_score": 96,
+      "last_updated": "2025-11-26T10:28:11.799219",
+      "notes": "67 certifications from Tesla"
+    },
+    {
+      "source_name": "id_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 65,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.798999",
+      "notes": "72 licenses, categories: HVAC,BUILDING,ROOFING,GENERAL,UTILITY,SPECIALTY,ENGINEERING,ELECTRICAL,LOW_VOLTAGE,PLUMBING"
+    },
+    {
+      "source_name": "ne_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 53,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.799006",
+      "notes": "78 licenses, categories: HVAC,FIRE,BUILDING,ROOFING,GENERAL,UTILITY,ELECTRICAL,SPECIALTY,ENGINEERING,PLUMBING,LOW_VOLTAGE"
+    },
+    {
+      "source_name": "sma",
+      "source_type": "OEM",
+      "record_count": 43,
+      "with_email_count": 0,
+      "with_phone_count": 43,
+      "quality_score": 100,
+      "last_updated": "2025-11-26T10:28:11.799225",
+      "notes": "43 certifications from SMA"
+    },
+    {
+      "source_name": "nh_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 42,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.799012",
+      "notes": "49 licenses, categories: HVAC,BUILDING,ROOFING,FIRE,GENERAL,SPECIALTY,ELECTRICAL"
+    },
+    {
+      "source_name": "mt_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 34,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.799018",
+      "notes": "45 licenses, categories: HVAC,BUILDING,ROOFING,GENERAL,UTILITY,ENGINEERING,ELECTRICAL,HAZMAT"
+    },
+    {
+      "source_name": "wv_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 32,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.799024",
+      "notes": "34 licenses, categories: HVAC,BUILDING,FIRE,ROOFING,GENERAL,ELECTRICAL,SPECIALTY"
+    },
+    {
+      "source_name": "enphase",
+      "source_type": "OEM",
+      "record_count": 26,
+      "with_email_count": 0,
+      "with_phone_count": 25,
+      "quality_score": 96,
+      "last_updated": "2025-11-26T10:28:11.799231",
+      "notes": "26 certifications from Enphase"
+    },
+    {
+      "source_name": "de_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 25,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.799030",
+      "notes": "32 licenses, categories: HVAC,ROOFING,BUILDING,GENERAL,SPECIALTY,ENGINEERING,HAZMAT,LOW_VOLTAGE,PLUMBING,ELECTRICAL"
+    },
+    {
+      "source_name": "wy_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 23,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.799036",
+      "notes": "24 licenses, categories: GENERAL,ROOFING,UTILITY,FIRE,ELECTRICAL,ENGINEERING"
+    },
+    {
+      "source_name": "sd_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 22,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.799042",
+      "notes": "30 licenses, categories: BUILDING,GENERAL,HVAC,UTILITY,ROOFING,ENGINEERING,ELECTRICAL"
+    },
+    {
+      "source_name": "pr_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 21,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.799048",
+      "notes": "26 licenses, categories: ROOFING,FIRE,GENERAL,UTILITY,HVAC,SPECIALTY"
+    },
+    {
+      "source_name": "hi_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 19,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.799054",
+      "notes": "24 licenses, categories: HVAC,FIRE,BUILDING,ROOFING,GENERAL,SOLAR,ELECTRICAL,ENGINEERING"
+    },
+    {
+      "source_name": "ri_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 18,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.799060",
+      "notes": "19 licenses, categories: HVAC,BUILDING,GENERAL,ROOFING"
+    },
+    {
+      "source_name": "me_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 18,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.799067",
+      "notes": "23 licenses, categories: GENERAL,BUILDING,ROOFING,SPECIALTY,ENGINEERING,ELECTRICAL"
+    },
+    {
+      "source_name": "nd_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 15,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.799073",
+      "notes": "19 licenses, categories: HVAC,BUILDING,FIRE,GENERAL,ELECTRICAL,ROOFING,ENGINEERING"
+    },
+    {
+      "source_name": "vt_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 11,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.799079",
+      "notes": "11 licenses, categories: BUILDING,GENERAL,ROOFING,ENGINEERING"
+    },
+    {
+      "source_name": "on_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 9,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.799085",
+      "notes": "10 licenses, categories: BUILDING,FIRE,GENERAL,PLUMBING,UTILITY,ROOFING"
+    },
+    {
+      "source_name": "99_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 9,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.799091",
+      "notes": "9 licenses, categories: BUILDING,GENERAL,ROOFING"
+    },
+    {
+      "source_name": "dc_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 8,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.799097",
+      "notes": "8 licenses, categories: BUILDING,GENERAL,ROOFING,LOW_VOLTAGE,ELECTRICAL"
+    },
+    {
+      "source_name": "ak_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 8,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.799103",
+      "notes": "8 licenses, categories: BUILDING,GENERAL,ELECTRICAL,ENGINEERING"
+    },
+    {
+      "source_name": "qc_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 5,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.799109",
+      "notes": "5 licenses, categories: BUILDING,GENERAL,ROOFING"
+    },
+    {
+      "source_name": "-_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 4,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.799115",
+      "notes": "4 licenses, categories: BUILDING,ROOFING"
+    },
+    {
+      "source_name": "bc_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 3,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.799121",
+      "notes": "3 licenses, categories: GENERAL"
+    },
+    {
+      "source_name": "ab_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 2,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.799128",
+      "notes": "2 licenses, categories: GENERAL"
+    },
+    {
+      "source_name": "vi_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 1,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.799134",
+      "notes": "1 licenses, categories: BUILDING"
+    },
+    {
+      "source_name": "mb_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 1,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.799139",
+      "notes": "1 licenses, categories: ROOFING"
+    },
+    {
+      "source_name": "fp_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 1,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.799145",
+      "notes": "1 licenses, categories: GENERAL"
+    },
+    {
+      "source_name": "fa_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 1,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.799151",
+      "notes": "1 licenses, categories: GENERAL"
+    },
+    {
+      "source_name": "ap_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 1,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.799157",
+      "notes": "1 licenses, categories: BUILDING"
+    },
+    {
+      "source_name": "ae_license",
+      "source_type": "STATE_LICENSE",
+      "record_count": 1,
+      "with_email_count": 0,
+      "with_phone_count": 0,
+      "quality_score": 50,
+      "last_updated": "2025-11-26T10:28:11.799163",
+      "notes": "1 licenses, categories: GENERAL"
+    },
+    {
+      "source_name": "schneider",
+      "source_type": "OEM",
+      "record_count": 190,
+      "with_email_count": 161,
+      "with_phone_count": 146,
+      "quality_score": 90,
+      "last_updated": "2025-11-28T10:16:37.216727",
+      "notes": "EcoXpert Partners - Building automation (84.7% email!)"
+    }
+  ],
+  "state_coverage": [
+    {
+      "state": "TX",
+      "contractor_count": 101083,
+      "with_email": 724,
+      "with_phone": 11288
+    },
+    {
+      "state": "FL",
+      "contractor_count": 58502,
+      "with_email": 56637,
+      "with_phone": 667
+    },
+    {
+      "state": "CA",
+      "contractor_count": 36355,
+      "with_email": 271,
+      "with_phone": 36007
+    },
+    {
+      "state": "NY",
+      "contractor_count": 2269,
+      "with_email": 311,
+      "with_phone": 348
+    },
+    {
+      "state": "",
+      "contractor_count": 1713,
+      "with_email": 0,
+      "with_phone": 1713
+    },
+    {
+      "state": "GA",
+      "contractor_count": 1642,
+      "with_email": 1333,
+      "with_phone": 213
+    },
+    {
+      "state": "AL",
+      "contractor_count": 741,
+      "with_email": 553,
+      "with_phone": 147
+    },
+    {
+      "state": "NC",
+      "contractor_count": 729,
+      "with_email": 520,
+      "with_phone": 180
+    },
+    {
+      "state": "OH",
+      "contractor_count": 697,
+      "with_email": 322,
+      "with_phone": 347
+    },
+    {
+      "state": "IL",
+      "contractor_count": 690,
+      "with_email": 266,
+      "with_phone": 401
+    },
+    {
+      "state": "PA",
+      "contractor_count": 629,
+      "with_email": 222,
+      "with_phone": 368
+    },
+    {
+      "state": "TN",
+      "contractor_count": 563,
+      "with_email": 410,
+      "with_phone": 133
+    },
+    {
+      "state": "LA",
+      "contractor_count": 548,
+      "with_email": 232,
+      "with_phone": 308
+    },
+    {
+      "state": "NJ",
+      "contractor_count": 503,
+      "with_email": 206,
+      "with_phone": 284
+    },
+    {
+      "state": "MI",
+      "contractor_count": 433,
+      "with_email": 237,
+      "with_phone": 172
+    },
+    {
+      "state": "MA",
+      "contractor_count": 429,
+      "with_email": 143,
+      "with_phone": 272
+    },
+    {
+      "state": "VA",
+      "contractor_count": 417,
+      "with_email": 171,
+      "with_phone": 229
+    },
+    {
+      "state": "AZ",
+      "contractor_count": 378,
+      "with_email": 111,
+      "with_phone": 258
+    },
+    {
+      "state": "SC",
+      "contractor_count": 368,
+      "with_email": 242,
+      "with_phone": 118
+    },
+    {
+      "state": "CO",
+      "contractor_count": 360,
+      "with_email": 136,
+      "with_phone": 210
+    }
+  ],
+  "oem_coverage": [
+    {
+      "oem_name": "Trane",
+      "contractor_count": 2802,
+      "states_covered": 58,
+      "with_phone": 0,
+      "with_email": 0
+    },
+    {
+      "oem_name": "Carrier",
+      "contractor_count": 2618,
+      "states_covered": 54,
+      "with_phone": 2603,
+      "with_email": 15
+    },
+    {
+      "oem_name": "Mitsubishi",
+      "contractor_count": 1799,
+      "states_covered": 53,
+      "with_phone": 1788,
+      "with_email": 11
+    },
+    {
+      "oem_name": "Generac",
+      "contractor_count": 1706,
+      "states_covered": 27,
+      "with_phone": 1677,
+      "with_email": 28
+    },
+    {
+      "oem_name": "Rheem",
+      "contractor_count": 1648,
+      "states_covered": 44,
+      "with_phone": 1648,
+      "with_email": 0
+    },
+    {
+      "oem_name": "Briggs & Stratton",
+      "contractor_count": 782,
+      "states_covered": 51,
+      "with_phone": 778,
+      "with_email": 4
+    },
+    {
+      "oem_name": "Cummins",
+      "contractor_count": 702,
+      "states_covered": 72,
+      "with_phone": 697,
+      "with_email": 5
+    },
+    {
+      "oem_name": "Schneider Electric",
+      "contractor_count": 143,
+      "states_covered": 21,
+      "with_phone": 95,
+      "with_email": 110
+    },
+    {
+      "oem_name": "York",
+      "contractor_count": 90,
+      "states_covered": 31,
+      "with_phone": 90,
+      "with_email": 0
+    },
+    {
+      "oem_name": "Tesla",
+      "contractor_count": 67,
+      "states_covered": 11,
+      "with_phone": 64,
+      "with_email": 3
+    },
+    {
+      "oem_name": "SMA",
+      "contractor_count": 43,
+      "states_covered": 16,
+      "with_phone": 43,
+      "with_email": 0
+    },
+    {
+      "oem_name": "Enphase",
+      "contractor_count": 26,
+      "states_covered": 2,
+      "with_phone": 25,
+      "with_email": 0
+    }
+  ],
+  "recent_imports": [],
+  "roi_metrics": {
+    "total_investment_usd": 350.0,
+    "monthly_burn_rate_usd": 350.0,
+    "project_start_date": "2025-11-01",
+    "cost_per_lead_usd": 0.0016,
+    "cost_per_enriched_lead_usd": 0.0029,
+    "total_contractors": 217392,
+    "with_contact_info": 122084,
+    "contact_rate_pct": 56.2,
+    "tool_costs": [
+      {
+        "tool_name": "Anthropic (Claude)",
+        "category": "AI/LLM",
+        "monthly_cost_usd": 200.0,
+        "description": "Claude Code + API calls for scraping orchestration",
+        "percentage": 57.1
+      },
+      {
+        "tool_name": "Browserbase",
+        "category": "Infrastructure",
+        "monthly_cost_usd": 100.0,
+        "description": "Cloud browser for scraping dealer locators",
+        "percentage": 28.6
+      },
+      {
+        "tool_name": "Hunter.io",
+        "category": "Enrichment",
+        "monthly_cost_usd": 50.0,
+        "description": "Email finder for contractor enrichment",
+        "percentage": 14.3
+      }
+    ],
+    "value_metrics": {
+      "pipeline_value_usd": 0,
+      "closed_won_count": 0,
+      "closed_won_value_usd": 0,
+      "roi_percentage": -100.0,
+      "break_even_deals_needed": 1
+    },
+    "conversion_rates": [
+      {
+        "conversion": "Raw \u2192 Enriched",
+        "numerator": 122084,
+        "denominator": 217392,
+        "conversion_rate_pct": 56.2
+      },
+      {
+        "conversion": "Enriched \u2192 Contacted",
+        "numerator": 0,
+        "denominator": 122084,
+        "conversion_rate_pct": 0
+      },
+      {
+        "conversion": "Contacted \u2192 Response",
+        "numerator": 0,
+        "denominator": 0,
+        "conversion_rate_pct": null
+      },
+      {
+        "conversion": "Response \u2192 Demo",
+        "numerator": 0,
+        "denominator": 0,
+        "conversion_rate_pct": null
+      },
+      {
+        "conversion": "Demo \u2192 Closed Won",
+        "numerator": 0,
+        "denominator": 0,
+        "conversion_rate_pct": null
+      }
+    ],
+    "funnel_stages": []
+  },
+  "recent_successes": [
+    {
+      "scraper_name": "Schneider Electric EcoXpert",
+      "date": "2025-11-28",
+      "contractors_extracted": 190,
+      "email_count": 161,
+      "phone_count": 146,
+      "email_rate_pct": 84.7,
+      "phone_rate_pct": 76.8,
+      "gold_tier_count": 3,
+      "silver_tier_count": 9,
+      "highlight": "Highest email rate of any OEM (84.7%)"
+    },
+    {
+      "scraper_name": "Cummins Generators",
+      "date": "2025-11-27",
+      "contractors_extracted": 200,
+      "email_count": 0,
+      "phone_count": 198,
+      "email_rate_pct": 0,
+      "phone_rate_pct": 99.0,
+      "gold_tier_count": 0,
+      "silver_tier_count": 0,
+      "highlight": "Browserbase cloud browser validated - 17 states"
+    },
+    {
+      "scraper_name": "Florida State Licenses",
+      "date": "2025-11-26",
+      "contractors_extracted": 57899,
+      "email_count": 56637,
+      "phone_count": 667,
+      "email_rate_pct": 96.8,
+      "phone_rate_pct": 1.1,
+      "gold_tier_count": 0,
+      "silver_tier_count": 0,
+      "highlight": "Massive FL DBPR import - 97% email coverage"
+    }
+  ]
+}

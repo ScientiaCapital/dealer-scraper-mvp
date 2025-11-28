@@ -48,30 +48,58 @@ interface StateCoverage {
 interface OEMCoverage {
   oem_name: string
   contractor_count: number
+  states_covered?: number
+  with_phone?: number
+  with_email?: number
 }
 
-interface ROIMetrics {
-  total_investment_usd: number
-  infrastructure_cost: number
-  enrichment_cost: number
-  outreach_cost: number
-  labor_cost: number
-  cost_per_lead_usd: number
+interface ToolCost {
+  tool_name: string
+  category: string
+  monthly_cost_usd: number
+  description: string
+  percentage: number
+}
+
+interface ValueMetrics {
   pipeline_value_usd: number
   closed_won_count: number
   closed_won_value_usd: number
   roi_percentage: number | null
+  break_even_deals_needed: number
+}
+
+interface ROIMetrics {
+  total_investment_usd: number
+  monthly_burn_rate_usd: number
+  project_start_date: string
+  cost_per_lead_usd: number
+  cost_per_enriched_lead_usd: number
+  total_contractors: number
+  with_contact_info: number
+  contact_rate_pct: number
+  tool_costs: ToolCost[]
+  value_metrics: ValueMetrics
   conversion_rates: Array<{
     conversion: string
     numerator: number
     denominator: number
     conversion_rate_pct: number | null
   }>
-  monthly_costs: Array<{
-    month: string
-    category: string
-    total_cost_usd: number
-  }>
+  funnel_stages: Array<unknown>
+}
+
+interface RecentSuccess {
+  scraper_name: string
+  date: string
+  contractors_extracted: number
+  email_count: number
+  phone_count: number
+  email_rate_pct: number
+  phone_rate_pct: number
+  gold_tier_count: number
+  silver_tier_count: number
+  highlight: string
 }
 
 interface DashboardData {
@@ -81,6 +109,7 @@ interface DashboardData {
   state_coverage: StateCoverage[]
   oem_coverage: OEMCoverage[]
   roi_metrics?: ROIMetrics
+  recent_successes?: RecentSuccess[]
 }
 
 function formatNumber(n: number): string {
@@ -214,98 +243,167 @@ function formatCurrency(n: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
 }
 
-function ROISection({ roi, totalLeads }: { roi: ROIMetrics; totalLeads: number }) {
-  const leadsPerDollar = roi.total_investment_usd > 0 ? totalLeads / roi.total_investment_usd : 0
+function ROISection({ roi, pipelineHealth, recentSuccesses }: { roi: ROIMetrics; pipelineHealth: PipelineHealth; recentSuccesses?: RecentSuccess[] }) {
+  const leadsPerDollar = roi.monthly_burn_rate_usd > 0 ? roi.total_contractors / roi.monthly_burn_rate_usd : 0
   const efficiencyMultiple = roi.cost_per_lead_usd > 0 ? Math.round(5 / roi.cost_per_lead_usd) : 0
 
+  // Category colors for tool costs
+  const categoryColors: Record<string, string> = {
+    'AI/LLM': 'bg-purple-500',
+    'Infrastructure': 'bg-blue-500',
+    'Enrichment': 'bg-green-500',
+  }
+
   return (
-    <section className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">💰 ROI Dashboard</h3>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-sm text-gray-500">Total Investment</div>
-          <div className="text-2xl font-bold text-gray-900">{formatCurrency(roi.total_investment_usd)}</div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-sm text-gray-500">Cost per Lead</div>
-          <div className="text-2xl font-bold text-green-600">{formatCurrency(roi.cost_per_lead_usd)}</div>
-          <div className="text-xs text-gray-400">Industry avg: $5-50</div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-sm text-gray-500">Leads per $1</div>
-          <div className="text-2xl font-bold text-blue-600">{formatNumber(Math.round(leadsPerDollar))}</div>
-          <div className="text-xs text-gray-400">Industry avg: 0.02-0.2</div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-sm text-gray-500">Efficiency vs Market</div>
-          <div className="text-2xl font-bold text-purple-600">
-            {efficiencyMultiple > 0 ? `${formatNumber(efficiencyMultiple)}x` : '∞'}
+    <section className="space-y-6">
+      {/* Monthly Burn Rate - Hero Section */}
+      <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-lg p-6 text-white">
+        <h3 className="text-lg font-semibold mb-4">Monthly Burn Rate</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div>
+            <div className="text-3xl font-bold">{formatCurrency(roi.monthly_burn_rate_usd)}</div>
+            <div className="text-sm text-slate-400">per month</div>
           </div>
-          <div className="text-xs text-gray-400">Better than avg</div>
-        </div>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* Investment Breakdown */}
-        <div className="bg-white rounded-lg shadow p-4">
-          <h4 className="font-medium text-gray-700 mb-3">Investment Breakdown</h4>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Infrastructure</span>
-              <span className="font-medium">{formatCurrency(roi.infrastructure_cost)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Labor</span>
-              <span className="font-medium">{formatCurrency(roi.labor_cost)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Enrichment</span>
-              <span className="font-medium">{formatCurrency(roi.enrichment_cost)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Outreach</span>
-              <span className="font-medium">{formatCurrency(roi.outreach_cost)}</span>
-            </div>
-            <div className="border-t pt-2 flex justify-between font-bold">
-              <span>Total</span>
-              <span>{formatCurrency(roi.total_investment_usd)}</span>
-            </div>
+          <div>
+            <div className="text-3xl font-bold text-green-400">{formatCurrency(roi.cost_per_lead_usd)}</div>
+            <div className="text-sm text-slate-400">per lead (vs $5-50 industry)</div>
           </div>
-        </div>
-
-        {/* Pipeline Status */}
-        <div className="bg-white rounded-lg shadow p-4">
-          <h4 className="font-medium text-gray-700 mb-3">Pipeline Status</h4>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Total Leads</span>
-              <span className="font-medium">{formatNumber(totalLeads)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Open Pipeline</span>
-              <span className="font-medium">{formatCurrency(roi.pipeline_value_usd)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Closed Won</span>
-              <span className="font-medium text-green-600">{roi.closed_won_count} ({formatCurrency(roi.closed_won_value_usd)})</span>
-            </div>
-            <div className="border-t pt-2 flex justify-between">
-              <span className="font-bold">ROI</span>
-              <span className={`font-bold ${roi.roi_percentage && roi.roi_percentage > 0 ? 'text-green-600' : 'text-gray-400'}`}>
-                {roi.roi_percentage !== null ? `${roi.roi_percentage.toFixed(1)}%` : 'Tracking...'}
-              </span>
-            </div>
+          <div>
+            <div className="text-3xl font-bold text-blue-400">{formatNumber(Math.round(leadsPerDollar))}</div>
+            <div className="text-sm text-slate-400">leads per $1</div>
+          </div>
+          <div>
+            <div className="text-3xl font-bold text-purple-400">{efficiencyMultiple > 0 ? `${formatNumber(efficiencyMultiple)}x` : '∞'}</div>
+            <div className="text-sm text-slate-400">better than market</div>
           </div>
         </div>
       </div>
 
-      {roi.closed_won_count === 0 && (
-        <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+      {/* Tool Costs Breakdown */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h4 className="font-semibold text-gray-900 mb-4">Tool Costs by Service</h4>
+        <div className="space-y-4">
+          {roi.tool_costs.map((tool) => (
+            <div key={tool.tool_name} className="space-y-2">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <span className={`inline-block w-3 h-3 rounded-full ${categoryColors[tool.category] || 'bg-gray-500'}`}></span>
+                  <div>
+                    <span className="font-medium text-gray-900">{tool.tool_name}</span>
+                    <span className="ml-2 text-xs text-gray-500">{tool.category}</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="font-bold text-gray-900">{formatCurrency(tool.monthly_cost_usd)}</span>
+                  <span className="text-gray-500 text-sm ml-2">({tool.percentage.toFixed(0)}%)</span>
+                </div>
+              </div>
+              <div className="ml-6">
+                <div className="w-full bg-gray-100 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full ${categoryColors[tool.category] || 'bg-gray-500'}`}
+                    style={{ width: `${tool.percentage}%` }}
+                  ></div>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">{tool.description}</p>
+              </div>
+            </div>
+          ))}
+          <div className="border-t pt-3 flex justify-between items-center">
+            <span className="font-bold text-gray-900">Total Monthly</span>
+            <span className="font-bold text-xl text-gray-900">{formatCurrency(roi.monthly_burn_rate_usd)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Pipeline Health Snapshot */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h4 className="font-semibold text-gray-900 mb-4">Pipeline Health Snapshot</h4>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-slate-50 rounded-lg p-4 text-center">
+            <div className="text-2xl font-bold text-gray-900">{formatNumber(pipelineHealth.total_contractors)}</div>
+            <div className="text-sm text-gray-500">Total Contractors</div>
+          </div>
+          <div className="bg-green-50 rounded-lg p-4 text-center">
+            <div className="text-2xl font-bold text-green-600">{formatNumber(pipelineHealth.with_email)}</div>
+            <div className="text-sm text-gray-500">With Email ({pipelineHealth.email_rate}%)</div>
+          </div>
+          <div className="bg-blue-50 rounded-lg p-4 text-center">
+            <div className="text-2xl font-bold text-blue-600">{formatNumber(pipelineHealth.with_phone)}</div>
+            <div className="text-sm text-gray-500">With Phone ({pipelineHealth.phone_rate}%)</div>
+          </div>
+          <div className="bg-purple-50 rounded-lg p-4 text-center">
+            <div className="text-2xl font-bold text-purple-600">{formatNumber(pipelineHealth.multi_license_count)}</div>
+            <div className="text-sm text-gray-500">Multi-License (2+ trades)</div>
+          </div>
+        </div>
+        <div className="mt-4 grid grid-cols-3 gap-4">
+          <div className="text-center p-3 bg-amber-50 rounded-lg">
+            <div className="text-xl font-bold text-amber-600">{formatNumber(pipelineHealth.unicorn_count)}</div>
+            <div className="text-xs text-gray-500">Unicorns (3+ trades)</div>
+          </div>
+          <div className="text-center p-3 bg-indigo-50 rounded-lg">
+            <div className="text-xl font-bold text-indigo-600">{formatNumber(pipelineHealth.multi_oem_count)}</div>
+            <div className="text-xs text-gray-500">Multi-OEM (2+ brands)</div>
+          </div>
+          <div className="text-center p-3 bg-teal-50 rounded-lg">
+            <div className="text-xl font-bold text-teal-600">{pipelineHealth.scrapers_working}/{pipelineHealth.scrapers_total}</div>
+            <div className="text-xs text-gray-500">Scrapers Working</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Wins */}
+      {recentSuccesses && recentSuccesses.length > 0 && (
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-6 border border-green-200">
+          <h4 className="font-semibold text-gray-900 mb-4">Recent Wins</h4>
+          <div className="space-y-4">
+            {recentSuccesses.slice(0, 3).map((success, idx) => (
+              <div key={success.scraper_name} className={`bg-white rounded-lg p-4 shadow-sm ${idx === 0 ? 'ring-2 ring-green-400' : ''}`}>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      {idx === 0 && <span className="text-green-500 text-lg">🎉</span>}
+                      <span className="font-bold text-gray-900">{success.scraper_name}</span>
+                      <span className="text-xs text-gray-400">{success.date}</span>
+                    </div>
+                    <p className="text-sm text-green-700 mt-1">{success.highlight}</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xl font-bold text-gray-900">{formatNumber(success.contractors_extracted)}</div>
+                    <div className="text-xs text-gray-500">contractors</div>
+                  </div>
+                </div>
+                <div className="mt-3 flex gap-4 text-sm">
+                  {success.email_count > 0 && (
+                    <span className="text-green-600">
+                      ✉️ {formatNumber(success.email_count)} emails ({success.email_rate_pct}%)
+                    </span>
+                  )}
+                  {success.phone_count > 0 && (
+                    <span className="text-blue-600">
+                      📞 {formatNumber(success.phone_count)} phones ({success.phone_rate_pct}%)
+                    </span>
+                  )}
+                  {(success.gold_tier_count > 0 || success.silver_tier_count > 0) && (
+                    <span className="text-amber-600">
+                      ⭐ {success.gold_tier_count} Gold, {success.silver_tier_count} Silver
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Next Milestone */}
+      {roi.value_metrics.closed_won_count === 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <p className="text-sm text-yellow-800">
-            🎯 <strong>Next milestone:</strong> First closed deal will unlock ROI tracking.
-            With {formatNumber(totalLeads)} leads at {formatCurrency(roi.cost_per_lead_usd)} each,
-            closing a single $5K deal = {roi.total_investment_usd > 0 ? Math.round((5000 - roi.total_investment_usd) / roi.total_investment_usd * 100) : 0}% ROI.
+            🎯 <strong>Next milestone:</strong> First closed deal unlocks ROI tracking.
+            At {formatCurrency(roi.cost_per_lead_usd)} per lead, closing a single $20K deal = massive ROI.
+            Break-even: {roi.value_metrics.break_even_deals_needed} deal(s).
           </p>
         </div>
       )}
@@ -314,185 +412,218 @@ function ROISection({ roi, totalLeads }: { roi: ROIMetrics; totalLeads: number }
 }
 
 export default function Dashboard({ data }: { data: DashboardData }) {
-  const { pipeline_health: health, scraper_health: scrapers, data_inventory: inventory, state_coverage: states, oem_coverage: oems, roi_metrics: roi } = data
+  const { pipeline_health: health, scraper_health: scrapers, data_inventory: inventory, state_coverage: states, oem_coverage: oems, roi_metrics: roi, recent_successes: successes } = data
 
   const generatedDate = new Date(health.generated_at).toLocaleString()
 
-  // Group scrapers by type
+  // Group scrapers by type, then sort: WORKING first, then BROKEN, then UNTESTED
+  const statusOrder: Record<string, number> = { 'WORKING': 0, 'BROKEN': 1, 'UNTESTED': 2 }
   const scrapersByType = scrapers.reduce((acc, s) => {
     if (!acc[s.scraper_type]) acc[s.scraper_type] = []
     acc[s.scraper_type].push(s)
     return acc
   }, {} as Record<string, ScraperHealth[]>)
 
+  // Sort each group by status (WORKING first)
+  Object.keys(scrapersByType).forEach(type => {
+    scrapersByType[type].sort((a, b) =>
+      (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3)
+    )
+  })
+
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center border-b pb-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Pipeline Overview</h2>
-          <p className="text-gray-500">Last updated: {generatedDate}</p>
+          <h2 className="text-2xl font-bold text-gray-900">Coperniq Partner Prospecting</h2>
+          <p className="text-gray-500">Executive Dashboard • Last updated: {generatedDate}</p>
+        </div>
+        <div className="text-right">
+          <div className="text-3xl font-bold text-gray-900">{formatNumber(health.total_contractors)}</div>
+          <div className="text-sm text-gray-500">Total Contractors</div>
         </div>
       </div>
 
-      {/* Executive Summary */}
-      <section>
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">📊 Executive Summary</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          <MetricCard title="Total Contractors" value={health.total_contractors} />
-          <MetricCard title="With Email" value={health.with_email} subtitle={`${health.email_rate}%`} />
-          <MetricCard title="With Phone" value={health.with_phone} subtitle={`${health.phone_rate}%`} />
-          <MetricCard title="Multi-License" value={health.multi_license_count} subtitle="2+ trades" />
-          <MetricCard title="Unicorns" value={health.unicorn_count} subtitle="3+ trades" />
-          <MetricCard title="Multi-OEM" value={health.multi_oem_count} subtitle="2+ brands" />
-        </div>
-      </section>
+      {/* ROI Dashboard - Primary Section for CEO/CTO */}
+      {roi && <ROISection roi={roi} pipelineHealth={health} recentSuccesses={successes} />}
 
-      {/* ROI Dashboard */}
-      {roi && <ROISection roi={roi} totalLeads={health.total_contractors} />}
-
-      {/* Scraper Health */}
-      <section>
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">🔧 Scraper Health</h3>
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <div className="grid grid-cols-4 gap-4">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-green-600">{health.scrapers_working}</div>
-              <div className="text-sm text-gray-500 uppercase tracking-wide mt-1">Working</div>
+      {/* Technical Details - Collapsible for Internal Use */}
+      <details className="group">
+        <summary className="cursor-pointer list-none">
+          <div className="flex items-center justify-between bg-slate-100 rounded-lg p-4 hover:bg-slate-200 transition-colors">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🔧</span>
+              <span className="font-semibold text-gray-700">Technical Details</span>
+              <span className="text-sm text-gray-500">(Scraper Health, Data Inventory)</span>
             </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-red-600">{health.scrapers_broken}</div>
-              <div className="text-sm text-gray-500 uppercase tracking-wide mt-1">Broken</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-gray-400">{health.scrapers_untested}</div>
-              <div className="text-sm text-gray-500 uppercase tracking-wide mt-1">Untested</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-gray-900">{health.scrapers_total}</div>
-              <div className="text-sm text-gray-500 uppercase tracking-wide mt-1">Total</div>
-            </div>
+            <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
           </div>
-        </div>
-
-        {Object.entries(scrapersByType).map(([type, items]) => (
-          <div key={type} className="mb-6">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-base font-semibold text-gray-900">{type}</h4>
-              <span className="text-sm text-gray-500">{items.length} scrapers</span>
+        </summary>
+        <div className="mt-4 space-y-8">
+          {/* Scraper Health */}
+          <section>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Scraper Health</h3>
+            <div className="bg-white rounded-lg shadow p-6 mb-6">
+              <div className="grid grid-cols-4 gap-4">
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-green-600">{health.scrapers_working}</div>
+                  <div className="text-sm text-gray-500 uppercase tracking-wide mt-1">Working</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-red-600">{health.scrapers_broken}</div>
+                  <div className="text-sm text-gray-500 uppercase tracking-wide mt-1">Broken</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-gray-400">{health.scrapers_untested}</div>
+                  <div className="text-sm text-gray-500 uppercase tracking-wide mt-1">Untested</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-gray-900">{health.scrapers_total}</div>
+                  <div className="text-sm text-gray-500 uppercase tracking-wide mt-1">Total</div>
+                </div>
+              </div>
             </div>
+
+            {Object.entries(scrapersByType).map(([type, items]) => (
+              <div key={type} className="mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-base font-semibold text-gray-900">{type}</h4>
+                  <span className="text-sm text-gray-500">{items.length} scrapers</span>
+                </div>
+                <div className="bg-white rounded-lg shadow overflow-hidden">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Records</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Run</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-96">Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 bg-white">
+                      {items.map((s) => (
+                        <tr key={s.scraper_name} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{s.scraper_name}</td>
+                          <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={s.status} /></td>
+                          <td className="px-6 py-4 text-gray-600 whitespace-nowrap">
+                            {s.total_records_lifetime ? formatNumber(s.total_records_lifetime) : '-'}
+                          </td>
+                          <td className="px-6 py-4 text-gray-600 whitespace-nowrap text-sm">
+                            {s.last_successful_run ? s.last_successful_run.slice(0, 10) : 'Never'}
+                          </td>
+                          <td className="px-6 py-4 text-gray-600 text-sm">
+                            {s.notes || '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
+          </section>
+
+          {/* Data Inventory */}
+          <section>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Data Inventory (Top 15)</h3>
             <div className="bg-white rounded-lg shadow overflow-hidden">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Source</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Records</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Run</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-96">Notes</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quality</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 bg-white">
-                  {items.map((s) => (
-                    <tr key={s.scraper_name} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{s.scraper_name}</td>
-                      <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={s.status} /></td>
+                  {inventory
+                    .filter(item => formatSourceName(item.source_name) !== '')
+                    .sort((a, b) => b.quality_score - a.quality_score)
+                    .slice(0, 15)
+                    .map((item) => (
+                    <tr key={`${item.source_name}-${item.source_type}`} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{formatSourceName(item.source_name)}</td>
+                      <td className="px-6 py-4 text-gray-600 whitespace-nowrap">{formatSourceName(item.source_type)}</td>
+                      <td className="px-6 py-4 text-gray-900 font-semibold whitespace-nowrap">{formatNumber(item.record_count)}</td>
                       <td className="px-6 py-4 text-gray-600 whitespace-nowrap">
-                        {s.total_records_lifetime ? formatNumber(s.total_records_lifetime) : '-'}
+                        {item.with_email_count ? formatNumber(item.with_email_count) : '-'}
                       </td>
-                      <td className="px-6 py-4 text-gray-600 whitespace-nowrap text-sm">
-                        {s.last_successful_run ? s.last_successful_run.slice(0, 10) : 'Never'}
+                      <td className="px-6 py-4 text-gray-600 whitespace-nowrap">
+                        {item.with_phone_count ? formatNumber(item.with_phone_count) : '-'}
                       </td>
-                      <td className="px-6 py-4 text-gray-600 text-sm">
-                        {s.notes || '-'}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                          item.quality_score >= 70 ? 'bg-green-100 text-green-800' :
+                          item.quality_score >= 40 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {item.quality_score}%
+                        </span>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </div>
-        ))}
-      </section>
+          </section>
 
-      {/* Data Inventory */}
-      <section>
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">📦 Data Inventory (Top 15)</h3>
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Source</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Records</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quality</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 bg-white">
-              {inventory
-                .filter(item => formatSourceName(item.source_name) !== '')
-                .slice(0, 15)
-                .map((item) => (
-                <tr key={`${item.source_name}-${item.source_type}`} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{formatSourceName(item.source_name)}</td>
-                  <td className="px-6 py-4 text-gray-600 whitespace-nowrap">{formatSourceName(item.source_type)}</td>
-                  <td className="px-6 py-4 text-gray-900 font-semibold whitespace-nowrap">{formatNumber(item.record_count)}</td>
-                  <td className="px-6 py-4 text-gray-600 whitespace-nowrap">
-                    {item.with_email_count ? formatNumber(item.with_email_count) : '-'}
-                  </td>
-                  <td className="px-6 py-4 text-gray-600 whitespace-nowrap">
-                    {item.with_phone_count ? formatNumber(item.with_phone_count) : '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                      item.quality_score >= 70 ? 'bg-green-100 text-green-800' :
-                      item.quality_score >= 40 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
-                    }`}>
-                      {item.quality_score}%
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {/* State & OEM Coverage */}
+          <div className="grid md:grid-cols-2 gap-8">
+            <section>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Top States</h3>
+              <div className="bg-white rounded-lg shadow p-4">
+                <div className="space-y-2">
+                  {states
+                    .filter(s => s.state && s.state.trim() !== '')
+                    .slice(0, 10)
+                    .map((s) => (
+                    <div key={s.state} className="flex justify-between items-center">
+                      <span className="font-medium">{s.state}</span>
+                      <span className="text-gray-600">{formatNumber(s.contractor_count)} contractors</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            <section>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">OEM Certifications</h3>
+              <div className="bg-white rounded-lg shadow overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">OEM</th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Contractors</th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">States</th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Phone</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {oems.map((o) => (
+                      <tr key={o.oem_name} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 font-medium text-gray-900">{formatSourceName(o.oem_name)}</td>
+                        <td className="px-4 py-2 text-right text-gray-900 font-semibold">{formatNumber(o.contractor_count)}</td>
+                        <td className="px-4 py-2 text-right text-gray-600">{o.states_covered || '-'}</td>
+                        <td className="px-4 py-2 text-right">
+                          {o.with_phone && o.contractor_count > 0 ? (
+                            <span className={`text-sm ${Math.round(o.with_phone / o.contractor_count * 100) >= 90 ? 'text-green-600' : 'text-gray-600'}`}>
+                              {Math.round(o.with_phone / o.contractor_count * 100)}%
+                            </span>
+                          ) : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
         </div>
-      </section>
-
-      {/* State & OEM Coverage */}
-      <div className="grid md:grid-cols-2 gap-8">
-        <section>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">🗺️ Top States</h3>
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="space-y-2">
-              {states
-                .filter(s => s.state && s.state.trim() !== '')
-                .slice(0, 10)
-                .map((s) => (
-                <div key={s.state} className="flex justify-between items-center">
-                  <span className="font-medium">{s.state}</span>
-                  <span className="text-gray-600">{formatNumber(s.contractor_count)} contractors</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">🏭 OEM Certifications</h3>
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="space-y-2">
-              {oems.map((o) => (
-                <div key={o.oem_name} className="flex justify-between items-center">
-                  <span className="font-medium">{formatSourceName(o.oem_name)}</span>
-                  <span className="text-gray-600">{formatNumber(o.contractor_count)} contractors</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      </div>
+      </details>
     </div>
   )
 }
