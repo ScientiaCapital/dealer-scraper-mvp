@@ -46,13 +46,11 @@ class SalesAgentExporter:
             c.normalized_name,
             c.primary_phone as phone,
             c.primary_email as email,
-            c.website,
-            c.domain,
+            c.website_url as website,
+            c.primary_domain as domain,
             c.city,
             c.state,
             c.zip,
-            c.icp_score,
-            c.icp_tier,
             -- License flags (from licenses table)
             EXISTS(SELECT 1 FROM licenses l WHERE l.contractor_id = c.id AND l.license_category = 'HVAC') as has_hvac,
             EXISTS(SELECT 1 FROM licenses l WHERE l.contractor_id = c.id AND l.license_category = 'ELECTRICAL') as has_electrical,
@@ -195,8 +193,6 @@ class SalesAgentExporter:
 
             # Scores
             'mep_e_score': df['mep_e_score'],
-            'icp_score': df['icp_score'],
-            'icp_tier': df['icp_tier'],
         })
 
         # Filter to only records with company name (THE ANCHOR)
