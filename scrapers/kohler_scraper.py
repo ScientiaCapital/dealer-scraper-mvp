@@ -74,72 +74,73 @@ class KohlerScraper(BaseDealerScraper):
         """
         JavaScript extraction script for Kohler dealer data.
 
-        ⚠️ PLACEHOLDER - Needs manual DOM inspection ⚠️
-
-        To complete this script:
-        1. Run this scraper in PLAYWRIGHT mode
-        2. Navigate to dealer locator and search a ZIP code
-        3. Inspect the dealer cards in browser DevTools
-        4. Identify selectors for: name, address, phone, website, tier, distance
-        5. Update this script with correct DOM traversal logic
-
-        Expected return format:
-        [
-          {
-            name: "DEALER NAME",
-            phone: "(555) 555-5555",
-            website: "https://example.com",
-            domain: "example.com",
-            street: "123 Main St",
-            city: "City",
-            state: "ST",
-            zip: "12345",
-            address_full: "123 Main St, City, ST 12345",
-            rating: 4.5,
-            review_count: 42,
-            tier: "Certified Installer",
-            certifications: ["Certified Installer"],
-            distance: "5.2 mi",
-            distance_miles: 5.2
-          }
-        ]
+        Validated 2025-11-28 against kohlerhomeenergy.rehlko.com/find-a-dealer
+        Tested on ZIP 94102 - extracts name, phone, address, tier, website, distance.
         """
         return """
 () => {
-  // TODO: Inspect Kohler dealer locator DOM structure
-  // This is a PLACEHOLDER extraction script
+  // Find dealer cards by Tailwind class
+  const dealerCards = document.querySelectorAll('li.list-none');
 
-  console.warn("Kohler extraction script needs manual DOM inspection");
+  const dealers = [];
+  const seen = new Set(); // Track unique dealers by phone
 
-  // Example pattern (update based on actual site structure):
-  const dealerCards = Array.from(document.querySelectorAll('.dealer, .location, [class*="dealer"], [class*="location"]'));
-
-  const dealers = dealerCards.map(card => {
-    // Extract dealer name
-    const nameEl = card.querySelector('h2, h3, h4, .dealer-name, .location-name, [class*="name"]');
-    const name = nameEl ? nameEl.textContent.trim() : '';
-
-    // Extract phone
+  dealerCards.forEach(card => {
+    // Skip cards that don't have a phone link (not dealer cards)
     const phoneLink = card.querySelector('a[href^="tel:"]');
-    const phone = phoneLink ? phoneLink.textContent.trim() : '';
+    if (!phoneLink) return;
 
-    // Extract address
-    const addressEl = card.querySelector('.address, [class*="address"]');
-    const addressText = addressEl ? addressEl.textContent.trim() : '';
+    // Skip the header phone number (844 main line)
+    const phone = phoneLink.textContent?.trim() || '';
+    if (phone.includes('844')) return;
 
-    // Parse address components (adjust regex based on format)
-    const streetMatch = addressText.match(/(\\d+\\s+[^,\\n]+)/);
-    const street = streetMatch ? streetMatch[1].trim() : '';
+    // Dedupe by phone
+    if (seen.has(phone)) return;
+    seen.add(phone);
 
-    const cityStateZip = addressText.match(/([^,]+),\\s*([A-Z]{2})\\s+(\\d{5})/);
-    const city = cityStateZip ? cityStateZip[1].trim() : '';
-    const state = cityStateZip ? cityStateZip[2] : '';
-    const zip = cityStateZip ? cityStateZip[3] : '';
+    // Get all text content
+    const fullText = card.textContent || '';
+
+    // Extract company name (first line before distance)
+    const nameMatch = fullText.match(/^([A-Z][A-Z\\s&\\.]+?)(\\d+\\.?\\d*\\s*miles)/);
+    const name = nameMatch ? nameMatch[1].trim() : '';
+
+    // Extract distance
+    const distanceMatch = fullText.match(/(\\d+\\.?\\d*)\\s*miles/);
+    const distanceMiles = distanceMatch ? parseFloat(distanceMatch[1]) : 0;
+    const distance = distanceMatch ? `${distanceMatch[1]} miles` : '';
+
+    // Extract tier (Gold, Silver, Bronze)
+    let tier = '';
+    if (fullText.includes('Gold Dealer')) tier = 'Gold Dealer';
+    else if (fullText.includes('Silver Dealer')) tier = 'Silver Dealer';
+    else if (fullText.includes('Bronze Dealer')) tier = 'Bronze Dealer';
+
+    // Extract address - find address after tier info or miles
+    const addressMatch = fullText.match(/(?:Certified|miles)(\\d+[^,]+),\\s*([^,]+),\\s*([A-Z]{2})\\s+(\\d{5})/);
+    let street = '', city = '', state = '', zip = '';
+
+    if (addressMatch) {
+      street = addressMatch[1].trim();
+      city = addressMatch[2].trim();
+      state = addressMatch[3];
+      zip = addressMatch[4];
+    } else {
+      // Fallback: find any address pattern
+      const fallbackMatch = fullText.match(/(\\d+\\s+[A-Za-z0-9\\s\\.]+(?:Lane|Road|Ave|St|Cir|Dr|Way|Blvd)[^,]*),\\s*([^,]+),\\s*([A-Z]{2})\\s+(\\d{5})/i);
+      if (fallbackMatch) {
+        street = fallbackMatch[1].trim();
+        city = fallbackMatch[2].trim();
+        state = fallbackMatch[3].toUpperCase();
+        zip = fallbackMatch[4];
+      }
+    }
+
+    const addressFull = street ? `${street}, ${city}, ${state} ${zip}` : '';
 
     // Extract website
-    const websiteLink = card.querySelector('a[href^="http"]:not([href*="tel:"]):not([href*="google"]):not([href*="facebook"])');
-    const website = websiteLink ? websiteLink.href : '';
-
+    const websiteLink = card.querySelector('a[href^="http"]');
+    const website = websiteLink?.href || '';
     let domain = '';
     if (website) {
       try {
@@ -148,34 +149,28 @@ class KohlerScraper(BaseDealerScraper):
       } catch (e) {}
     }
 
-    // Extract distance
-    const distanceEl = card.querySelector('.distance, [class*="distance"], [class*="miles"]');
-    const distance = distanceEl ? distanceEl.textContent.trim() : '';
-    const distanceMiles = parseFloat(distance) || 0;
-
-    // Extract tier (may not be shown on Kohler site)
-    const tier = 'Certified Installer';
-
-    return {
-      name: name,
-      phone: phone,
-      website: website,
-      domain: domain,
-      street: street,
-      city: city,
-      state: state,
-      zip: zip,
-      address_full: street && city ? `${street}, ${city}, ${state} ${zip}` : '',
-      rating: 0,  // Kohler may not show ratings
-      review_count: 0,
-      tier: tier,
-      certifications: [tier],
-      distance: distance,
-      distance_miles: distanceMiles
-    };
+    if (name && phone) {
+      dealers.push({
+        name,
+        phone,
+        website,
+        domain,
+        street,
+        city,
+        state,
+        zip,
+        address_full: addressFull,
+        tier: tier || 'Certified Installer',
+        distance,
+        distance_miles: distanceMiles,
+        certifications: tier ? [tier] : ['Certified Installer'],
+        rating: 0,
+        review_count: 0
+      });
+    }
   });
 
-  return dealers.filter(d => d && d.name && d.phone);
+  return dealers;
 }
 """
 

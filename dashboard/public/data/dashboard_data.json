@@ -1,18 +1,18 @@
 {
   "pipeline_health": {
-    "total_contractors": 217392,
-    "with_email": 64772,
-    "with_phone": 57312,
-    "email_rate": 29.8,
-    "phone_rate": 26.4,
+    "total_contractors": 217523,
+    "with_email": 64874,
+    "with_phone": 57403,
     "multi_license_count": 19394,
     "unicorn_count": 3602,
-    "multi_oem_count": 408,
-    "scrapers_working": 14,
-    "scrapers_broken": 19,
+    "multi_oem_count": 409,
+    "email_rate": 29.8,
+    "phone_rate": 26.4,
+    "generated_at": "2025-11-28T11:24:29.142846",
+    "scrapers_working": 18,
+    "scrapers_broken": 15,
     "scrapers_untested": 1,
-    "scrapers_total": 34,
-    "generated_at": "2025-11-28T14:15:00.000000"
+    "scrapers_total": 34
   },
   "scraper_health": [
     {
@@ -21,7 +21,7 @@
       "status": "WORKING",
       "fix_difficulty": null,
       "total_records_lifetime": 2618,
-      "last_successful_run": "2025-11-26T10:57:23.387274",
+      "last_successful_run": "2025-11-26 14:42:28",
       "source_url": "https://www.carrier.com/residential/en/us/find-a-dealer/",
       "notes": "2,618 contractors | 54 states | 99% phone | 1% email"
     },
@@ -29,9 +29,9 @@
       "scraper_name": "Cummins",
       "scraper_type": "OEM",
       "status": "WORKING",
-      "fix_difficulty": "HARD",
+      "fix_difficulty": null,
       "total_records_lifetime": 702,
-      "last_successful_run": "2025-11-27 01:22:12",
+      "last_successful_run": "2025-11-26 14:42:17",
       "source_url": "https://www.cummins.com/parts-and-service/dealer-locator",
       "notes": "702 contractors | 72 states | 99% phone | 1% email"
     },
@@ -51,9 +51,9 @@
       "status": "WORKING",
       "fix_difficulty": null,
       "total_records_lifetime": 26,
-      "last_successful_run": "2025-11-26T10:57:27.797009",
+      "last_successful_run": "2025-11-26 14:42:33",
       "source_url": "https://enphase.com/installer-locator",
-      "notes": "26 contractors | 2 states | 96% phone"
+      "notes": "26 contractors | 2 states | 96% phone | 0% email"
     },
     {
       "scraper_name": "Fronius",
@@ -71,7 +71,7 @@
       "status": "WORKING",
       "fix_difficulty": null,
       "total_records_lifetime": 1706,
-      "last_successful_run": "2025-11-26T10:57:30.675066",
+      "last_successful_run": "2025-11-26 14:41:49",
       "source_url": "https://www.generac.com/service-support/dealer-locator",
       "notes": "1,706 contractors | 27 states | 98% phone | 2% email"
     },
@@ -91,9 +91,9 @@
       "status": "BROKEN",
       "fix_difficulty": "HARD",
       "total_records_lifetime": 0,
-      "last_successful_run": null,
-      "source_url": "https://www.kohlergenerators.com/find-a-dealer",
-      "notes": "Backup generators - dealer locator needs Browserbase"
+      "last_successful_run": "2025-11-28T18:00:00",
+      "source_url": "https://www.kohlerhomeenergy.rehlko.com/find-a-dealer",
+      "notes": "Extraction script VALIDATED - needs Browserbase production run"
     },
     {
       "scraper_name": "Mitsubishi",
@@ -101,7 +101,7 @@
       "status": "WORKING",
       "fix_difficulty": null,
       "total_records_lifetime": 1799,
-      "last_successful_run": "2025-11-26T10:57:43.369513",
+      "last_successful_run": "2025-11-26 14:42:32",
       "source_url": "https://www.mitsubishicomfort.com/find-a-contractor",
       "notes": "1,799 contractors | 53 states | 99% phone | 1% email"
     },
@@ -118,10 +118,10 @@
     {
       "scraper_name": "Briggs & Stratton",
       "scraper_type": "OEM",
-      "status": "BROKEN",
-      "fix_difficulty": "HARD",
+      "status": "WORKING",
+      "fix_difficulty": null,
       "total_records_lifetime": 782,
-      "last_successful_run": null,
+      "last_successful_run": "2025-11-26 14:42:17",
       "source_url": "https://www.briggsandstratton.com/na/en_us/dealer-locator.html",
       "notes": "782 contractors | 51 states | 99% phone | 1% email"
     },
@@ -168,22 +168,22 @@
     {
       "scraper_name": "Rheem",
       "scraper_type": "OEM",
-      "status": "BROKEN",
-      "fix_difficulty": "HARD",
+      "status": "WORKING",
+      "fix_difficulty": null,
       "total_records_lifetime": 1648,
-      "last_successful_run": null,
+      "last_successful_run": "2025-11-26 14:42:32",
       "source_url": "https://www.rheem.com/find-a-contractor/",
-      "notes": "1,648 contractors | 44 states | 100% phone"
+      "notes": "1,648 contractors | 44 states | 100% phone | 0% email"
     },
     {
       "scraper_name": "SMA Solar",
       "scraper_type": "OEM",
-      "status": "BROKEN",
-      "fix_difficulty": "HARD",
+      "status": "WORKING",
+      "fix_difficulty": null,
       "total_records_lifetime": 43,
-      "last_successful_run": null,
+      "last_successful_run": "2025-11-26 14:42:33",
       "source_url": "https://www.sma-america.com/service-support/installer-search.html",
-      "notes": "43 contractors | 16 states | 100% phone"
+      "notes": "43 contractors | 16 states | 100% phone | 0% email"
     },
     {
       "scraper_name": "Schneider Electric",
@@ -191,7 +191,7 @@
       "status": "WORKING",
       "fix_difficulty": null,
       "total_records_lifetime": 143,
-      "last_successful_run": "2025-11-28T10:16:37.216715",
+      "last_successful_run": "2025-11-28 16:16:37",
       "source_url": "https://www.se.com/us/en/partners/partner-locator/",
       "notes": "143 contractors | 21 states | 66% phone | 77% email"
     },
@@ -248,10 +248,10 @@
     {
       "scraper_name": "Tesla",
       "scraper_type": "OEM",
-      "status": "BROKEN",
-      "fix_difficulty": "HARD",
+      "status": "WORKING",
+      "fix_difficulty": null,
       "total_records_lifetime": 67,
-      "last_successful_run": null,
+      "last_successful_run": "2025-11-26 14:42:33",
       "source_url": "https://www.tesla.com/support/certified-installers",
       "notes": "67 contractors | 11 states | 96% phone | 4% email"
     },
@@ -271,9 +271,9 @@
       "status": "WORKING",
       "fix_difficulty": null,
       "total_records_lifetime": 2802,
-      "last_successful_run": "2025-11-26T10:57:23.387274",
+      "last_successful_run": "2025-11-26 14:42:32",
       "source_url": "https://www.trane.com/residential/en/find-dealer/",
-      "notes": "2,802 contractors | 58 states | 0% phone (location only)"
+      "notes": "2,802 contractors | 58 states | 0% phone | 0% email"
     },
     {
       "scraper_name": "York",
@@ -281,9 +281,9 @@
       "status": "WORKING",
       "fix_difficulty": null,
       "total_records_lifetime": 90,
-      "last_successful_run": "2025-11-26T10:57:23.387274",
+      "last_successful_run": "2025-11-26 14:42:32",
       "source_url": "https://www.york.com/for-your-home/find-a-dealer",
-      "notes": "90 contractors | 31 states | 100% phone"
+      "notes": "90 contractors | 31 states | 100% phone | 0% email"
     },
     {
       "scraper_name": "California Licenses",
@@ -1181,15 +1181,15 @@
   "state_coverage": [
     {
       "state": "TX",
-      "contractor_count": 101083,
-      "with_email": 724,
-      "with_phone": 11288
+      "contractor_count": 101085,
+      "with_email": 726,
+      "with_phone": 11290
     },
     {
       "state": "FL",
-      "contractor_count": 58502,
-      "with_email": 56637,
-      "with_phone": 667
+      "contractor_count": 58504,
+      "with_email": 56639,
+      "with_phone": 669
     },
     {
       "state": "CA",
@@ -1205,9 +1205,9 @@
     },
     {
       "state": "",
-      "contractor_count": 1713,
-      "with_email": 0,
-      "with_phone": 1713
+      "contractor_count": 1826,
+      "with_email": 86,
+      "with_phone": 1789
     },
     {
       "state": "GA",
@@ -1241,9 +1241,9 @@
     },
     {
       "state": "PA",
-      "contractor_count": 629,
-      "with_email": 222,
-      "with_phone": 368
+      "contractor_count": 630,
+      "with_email": 223,
+      "with_phone": 369
     },
     {
       "state": "TN",
@@ -1265,9 +1265,9 @@
     },
     {
       "state": "MI",
-      "contractor_count": 433,
-      "with_email": 237,
-      "with_phone": 172
+      "contractor_count": 434,
+      "with_email": 238,
+      "with_phone": 173
     },
     {
       "state": "MA",
