@@ -6,13 +6,64 @@
 
 **Data Flow**: `dealer-scraper-mvp` → `sales-agent` (Supabase) → `Close CRM`
 
-## Current Status (Nov 28, 2025 - End of Day)
+---
+
+## ✅ COMPLETED TODAY - Nov 28, 2025
+
+### Supabase Push COMPLETE
+- **14,204 leads** now in `icp_gold_leads` table
+- **12,426 OEM-certified contractors** from SQLite pushed successfully
+- Script: `scripts/push_sqlite_to_supabase.py`
+- Zero errors on final push
+
+### Close CRM Integration Plan READY
+- Documented all 36 existing custom fields
+- Identified gap: NO OEM tracking fields exist
+- Created implementation plan for:
+  - "OEM Certifications" multi-value field
+  - "State Licenses" multi-value field
+  - "OEM Count" number field
+  - Smart Views for campaign filtering
+- Plan file: `~/.claude/plans/streamed-moseying-moon.md`
+
+### Key Metrics Today
+| Source | Records | Status |
+|--------|---------|--------|
+| SQLite | 217,523 contractors | Master database |
+| Supabase icp_gold_leads | 14,204 | ✅ Ready for sales-agent |
+| Close CRM | 6,031 leads, $2.67M pipeline | Ready for sync |
+
+---
+
+## 🎯 TOMORROW'S PRIORITIES - Nov 29, 2025
+
+### Priority 1: Implement Close CRM Custom Fields
+1. Create OEM Certifications, State Licenses, OEM Count fields
+2. Create `scripts/sync_to_close_crm.py`
+3. Test with 5 leads (Tim Kipper as owner)
+4. Create Smart Views for OEM filtering
+
+### Priority 2: Continue OEM Scrapers
+- Background scrapers running: Carrier, Rheem, Mitsubishi, Generac
+- Kohler: VALIDATED, needs Browserbase production run
+- Fix remaining 15 broken scrapers
+
+---
+
+## Philosophy: "NAME IS THE ANCHOR"
+- Company name is the PRIMARY field - sales-agent enriches from there
+- Grab phones if visible (EXCLUDE toll-free: 800/888/877/866/855/844/833)
+- Multi-trade detection: `is_multi_trade`, `mep_e_trade_count` (HVAC+Plumbing=MEP, HVAC+Fire/Security=GOLD)
+
+---
+
+## Current Database State
 
 ### Database
 - **SQLite**: `output/pipeline.db` (217,523 contractors, ~101MB)
 - **Failsafe Archive**: `output/_failsafe_archive/20251128_110403/` (489 files, 2.2GB, SHA256 checksums)
 
-### Data Quality
+### Data Quality by State
 | State | Records | Email % | Phone % |
 |-------|---------|---------|---------|
 | TX | 101,085 | 0.7% | 11.2% |
@@ -20,21 +71,26 @@
 | CA | 36,355 | 0.7% | 99.0% |
 | NY | 2,269 | 13.7% | 15.3% |
 
-### OEMs in Database (12 total, 12,426 records)
-| OEM | Count | Phone % | Status | Notes |
-|-----|-------|---------|--------|-------|
-| Trane | 2,802 | 0% | ENRICHMENT-READY | Has Google ratings/reviews on detail pages |
-| Carrier | 2,618 | 99% | WORKING | |
-| Mitsubishi | 1,799 | 99% | WORKING | VRF/HVAC - high commercial value |
-| Generac | 1,706 | 98% | WORKING | |
-| Rheem | 1,648 | 100% | WORKING | |
-| Briggs & Stratton | 782 | 99% | WORKING | |
-| Cummins | 702 | 99% | WORKING | Browserbase validated |
-| Schneider Electric | 143 | 66% | WORKING | 77% email! EcoXpert partners |
-| York | 90 | 100% | WORKING | |
-| Tesla | 67 | 96% | WORKING | |
-| SMA | 43 | 100% | WORKING | |
-| Enphase | 26 | 96% | WORKING | |
+### OEM Scraper Status (Post-Audit)
+| OEM | Expected | Phone % | Status | Notes |
+|-----|----------|---------|--------|-------|
+| Carrier | ~2,618 | 99% | ✅ RUNNING | Production in progress |
+| Mitsubishi | ~1,799 | 99% | ✅ RUNNING | VRF/HVAC - high commercial value |
+| Rheem | ~1,648 | 100% | ✅ RUNNING | Production in progress |
+| Generac | ~1,706 | 98% | 🔧 FIXING | Extraction script needs update |
+| Trane | ~2,802 | 0% | ENRICHMENT-READY | 866 = call center, not dealer |
+| Briggs & Stratton | ~782 | 99% | ⏳ PENDING | Next in queue |
+| Cummins | ~702 | 99% | ⏳ PENDING | Browserbase validated |
+| Schneider Electric | ~143 | 66% | ⏳ PENDING | 77% email! |
+| York | ~90 | 100% | ⏳ PENDING | |
+| Tesla | ~67 | 96% | ⏳ PENDING | |
+| SMA | ~43 | 100% | ⏳ PENDING | |
+| Enphase | ~26 | 96% | ⏳ PENDING | |
+
+### Broken Scrapers (Need Investigation)
+- **Generac**: PLAYWRIGHT mode was printing manual instructions instead of launching browser - FIXED, testing
+- Kohler: Extraction validated, needs Browserbase production run
+- Lennox, ABB, Delta, Fronius, GoodWe, Growatt, Honeywell, Sensi, SimpliPhi, Sol-Ark, SolarEdge, Sungrow, Tigo, Johnson Controls
 
 ### Dashboard
 - **URL**: Vercel deployment (check `vercel project ls`)
@@ -43,7 +99,7 @@
 
 ---
 
-## WEEKEND PRIORITIES (Nov 29 - Dec 1, 2025)
+## PRIORITIES (Starting Nov 28, 2025)
 
 ### Priority 1: Trane Enrichment Strategy
 **Problem**: 2,802 records with 0% contact info (phone shows 1-866-953-1673 = Trane call center, NOT dealer)

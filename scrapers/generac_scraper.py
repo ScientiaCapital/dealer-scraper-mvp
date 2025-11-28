@@ -121,111 +121,131 @@ class GeneracScraper(BaseDealerScraper):
                 # Join and wrap in IIFE
                 return "() => {\n" + "".join(function_lines) + "\n}"
 
-        # Fallback inline version (validated)
+        # Updated extraction script (Nov 28, 2025) - matches current Generac DOM
         return """
         () => {
           function extractGeneracDealers() {
-            console.log('[Generac] Starting dealer extraction...');
+            console.log('[Generac] Starting dealer extraction v2...');
 
-            const phoneLinks = Array.from(document.querySelectorAll('a[href^="tel:"]'))
-              .filter(link => !link.closest('footer') && !link.closest('[class*="footer"]'));
+            // Find dealer list items - they are li elements containing phone links
+            const listItems = Array.from(document.querySelectorAll('li'))
+              .filter(li => {
+                const phoneLink = li.querySelector('a[href^="tel:"]');
+                // Exclude footer phone links and ensure it's in the results area
+                return phoneLink && !li.closest('footer') && !li.closest('[class*="footer"]');
+              });
 
-            console.log(`[Generac] Found ${phoneLinks.length} phone links (excluding footer)`);
+            console.log(`[Generac] Found ${listItems.length} dealer list items`);
 
-            const dealers = phoneLinks.map((phoneLink, index) => {
-              let container = phoneLink;
-              for (let i = 0; i < 10; i++) {
-                container = container.parentElement;
-                if (!container) break;
-                const hasDistance = container.querySelector('.ms-auto.text-end.text-nowrap');
-                if (hasDistance) break;
-              }
+            const dealers = listItems.map((li) => {
+              try {
+                // Get all text content for parsing
+                const fullText = li.textContent || '';
 
-              if (!container) return null;
-
-              const allDivs = Array.from(container.querySelectorAll('div'));
-              let dealerName = '';
-              for (const div of allDivs) {
-                const text = div.textContent.trim();
-                if (text && text.length > 5 && text.length < 100 &&
-                    !text.includes('(') && !text.includes('http') &&
-                    !text.includes('mi') && text === text.toUpperCase()) {
-                  dealerName = text;
-                  break;
+                // Extract dealer name - look for ALL CAPS text
+                const allDivs = Array.from(li.querySelectorAll('div'));
+                let dealerName = '';
+                for (const div of allDivs) {
+                  const text = div.textContent.trim();
+                  // Dealer name is ALL CAPS, 3-100 chars, first substantial all-caps block
+                  if (text && text.length >= 3 && text.length < 100 &&
+                      text === text.toUpperCase() &&
+                      !/^\\d/.test(text) &&  // Not starting with number
+                      !/mi$/.test(text) &&   // Not a distance
+                      !text.includes('(') && !text.includes('http') &&
+                      !text.includes('STAR') && !text.includes('REVIEW')) {
+                    dealerName = text;
+                    break;
+                  }
                 }
-              }
 
-              const fullText = container.textContent;
-              const phoneText = phoneLink.textContent.trim();
-              const beforePhone = fullText.substring(0, fullText.indexOf(phoneText));
+                // Extract phone number
+                const phoneLink = li.querySelector('a[href^="tel:"]');
+                const phoneText = phoneLink ? phoneLink.textContent.trim() : '';
 
-              const ratingMatch = fullText.match(/(\\d+\\.\\d+)\\s*\\((\\d+)\\)/);
-              const rating = ratingMatch ? parseFloat(ratingMatch[1]) : 0;
-              const reviewCount = ratingMatch ? parseInt(ratingMatch[2]) : 0;
+                // Extract rating and review count - pattern like "4.4" and "(54)"
+                const ratingMatch = fullText.match(/(\\d+\\.\\d+)\\s*out of\\s*\\d+\\s*stars/i);
+                const reviewMatch = fullText.match(/(\\d+)\\s*reviews?/i) || fullText.match(/\\((\\d+)\\)/);
+                const rating = ratingMatch ? parseFloat(ratingMatch[1]) : 0;
+                const reviewCount = reviewMatch ? parseInt(reviewMatch[1]) : 0;
 
-              const isPremier = fullText.includes('Premier Dealers demonstrate');
-              const isElitePlus = fullText.includes('Elite Plus');
-              const isElite = fullText.includes('Elite Dealers offer');
+                // Extract distance
+                const distanceMatch = fullText.match(/(\\d+\\.?\\d*)\\s*mi/);
+                const distance = distanceMatch ? distanceMatch[0] : '';
+                const distanceMiles = distanceMatch ? parseFloat(distanceMatch[1]) : 0;
 
-              let tier = 'Standard';
-              if (isPremier) tier = 'Premier';
-              else if (isElitePlus) tier = 'Elite Plus';
-              else if (isElite) tier = 'Elite';
+                // Detect tier from badge description text
+                let tier = 'Select';  // Default tier
+                const isPrestige = fullText.includes('Prestige dealers provide');
+                const isPremier = fullText.includes('Premier Dealers demonstrate');
+                const isElitePlus = fullText.includes('Elite Plus Dealers provide');
+                const isElite = fullText.includes('Elite Dealers offer');
 
-              const isPowerProPremier = fullText.includes('PowerPro') || fullText.includes('Premier');
+                if (isPrestige) tier = 'Prestige';
+                else if (isPremier) tier = 'Premier';
+                else if (isElitePlus) tier = 'Elite Plus';
+                else if (isElite) tier = 'Elite';
 
-              const streetMatch = beforePhone.match(/(\\d+\\s+[nsew]?\\d*\\s*[^\\n,]*(?:st|street|dr|drive|rd|road|ave|avenue|ct|court|blvd|ln|way|pl)\\.?)/i);
-              let street = streetMatch ? streetMatch[1].trim() : '';
-              street = street.replace(/^.*?out of \\d+ stars\\.\\s*\\d*\\s*reviews?\\s*/i, '');
-              street = street.replace(/^\\d+\\.\\d+\\s*\\(\\d+\\)/, '');
-              street = street.replace(/^\\d+\\.\\d+\\s*mi/, '');
+                // PowerPro designation
+                const isPowerProPremier = fullText.includes('PowerPro');
 
-              const afterStreet = street ? beforePhone.substring(beforePhone.lastIndexOf(street) + street.length) : beforePhone;
-              const cityStateZip = afterStreet.match(/([a-z\\s]+),?\\s*([A-Z]{2})\\s+(\\d{5})/i);
+                // Extract address - find street, city, state, zip
+                // Street typically has numbers and common suffixes
+                const streetMatch = fullText.match(/(\\d+[^,\\n]*(?:st|street|dr|drive|rd|road|ave|avenue|ct|court|blvd|boulevard|ln|lane|way|pl|place|pkwy|parkway|hwy|highway|fwy|freeway)[^,\\n]*)/i);
+                let street = streetMatch ? streetMatch[1].trim().toLowerCase() : '';
 
-              const city = cityStateZip ? cityStateZip[1].trim() : '';
-              const state = cityStateZip ? cityStateZip[2] : '';
-              const zip = cityStateZip ? cityStateZip[3] : '';
+                // Clean up street - remove numbers that are actually other data
+                street = street.replace(/^"/, '').replace(/"$/, '');
 
-              const websiteLink = container.querySelector('a[href^="http"]:not([href*="google"]):not([href*="facebook"])');
-              const website = websiteLink?.href || '';
+                // City, State, ZIP pattern
+                const cityStateZipMatch = fullText.match(/([a-z][a-z\\s]+),\\s*([A-Z]{2})\\s+(\\d{5})/i);
+                const city = cityStateZipMatch ? cityStateZipMatch[1].trim().toLowerCase() : '';
+                const state = cityStateZipMatch ? cityStateZipMatch[2].toUpperCase() : '';
+                const zip = cityStateZipMatch ? cityStateZipMatch[3] : '';
 
-              let domain = '';
-              if (website) {
-                try {
-                  const url = new URL(website);
-                  domain = url.hostname.replace('www.', '');
-                } catch (e) {
-                  domain = '';
+                // Extract website (exclude social media and google)
+                const websiteLink = li.querySelector('a[href^="http"]:not([href*="google"]):not([href*="facebook"]):not([href*="twitter"]):not([href*="linkedin"])');
+                const website = websiteLink?.href || '';
+
+                let domain = '';
+                if (website) {
+                  try {
+                    const url = new URL(website);
+                    domain = url.hostname.replace('www.', '');
+                  } catch (e) {
+                    domain = '';
+                  }
                 }
+
+                // Build address_full
+                const addressFull = street && city ? `${street}, ${city}, ${state} ${zip}`.trim() : '';
+
+                return {
+                  name: dealerName,
+                  rating: rating,
+                  review_count: reviewCount,
+                  tier: tier,
+                  is_power_pro_premier: isPowerProPremier,
+                  street: street,
+                  city: city,
+                  state: state,
+                  zip: zip,
+                  address_full: addressFull,
+                  phone: phoneText,
+                  website: website,
+                  domain: domain,
+                  distance: distance,
+                  distance_miles: distanceMiles,
+                  oem_source: 'Generac'
+                };
+              } catch (e) {
+                console.log('[Generac] Error parsing dealer:', e);
+                return null;
               }
-
-              const distanceEl = container.querySelector('.ms-auto.text-end.text-nowrap');
-              const distance = distanceEl?.textContent?.trim() || '';
-              const distanceMiles = parseFloat(distance) || 0;
-
-              return {
-                name: dealerName,
-                rating: rating,
-                review_count: reviewCount,
-                tier: tier,
-                is_power_pro_premier: isPowerProPremier,
-                street: street,
-                city: city,
-                state: state,
-                zip: zip,
-                address_full: street && city ? `${street}, ${city}, ${state} ${zip}` : '',
-                phone: phoneText,
-                website: website,
-                domain: domain,
-                distance: distance,
-                distance_miles: distanceMiles,
-                oem_source: 'Generac'
-              };
             });
 
-            const validDealers = dealers.filter(d => d && d.name);
-            console.log(`[Generac] Successfully extracted ${validDealers.length} unique dealers`);
+            const validDealers = dealers.filter(d => d && d.name && d.name.length > 2);
+            console.log(`[Generac] Successfully extracted ${validDealers.length} dealers`);
             return validDealers;
           }
 
@@ -327,55 +347,124 @@ class GeneracScraper(BaseDealerScraper):
 
     def _scrape_with_playwright(self, zip_code: str) -> List[StandardizedDealer]:
         """
-        PLAYWRIGHT mode: Print manual MCP Playwright instructions.
+        PLAYWRIGHT mode: Automated headless browser scraping.
+
+        Launches a real Chromium browser, navigates to Generac dealer locator,
+        enters ZIP code, and extracts dealer data using the validated extraction script.
         """
-        print(f"\n{'='*70}")
-        print(f"Generac Authorized Dealer Network Scraper - PLAYWRIGHT Mode")
-        print(f"ZIP Code: {zip_code}")
-        print(f"{'='*70}\n")
+        import time
+        from playwright.sync_api import sync_playwright
 
-        print("⚠️  MANUAL WORKFLOW - Execute these MCP Playwright tools in order:\n")
+        dealers = []
 
-        print("1. Navigate to Generac dealer locator:")
-        print(f'   mcp__playwright__browser_navigate({{"url": "{self.DEALER_LOCATOR_URL}"}})\n')
+        with sync_playwright() as p:
+            try:
+                # Launch headless browser with stealth settings
+                browser = p.chromium.launch(
+                    headless=True,
+                    args=[
+                        '--disable-blink-features=AutomationControlled',
+                        '--disable-dev-shm-usage',
+                        '--no-sandbox',
+                    ]
+                )
+                context = browser.new_context(
+                    viewport={'width': 1920, 'height': 1080},
+                    user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+                )
+                page = context.new_page()
 
-        print("2. Wait for page to load:")
-        print('   mcp__playwright__browser_wait_for({"time": 3})\n')
+                # Navigate to Generac dealer locator
+                page.goto(self.DEALER_LOCATOR_URL, timeout=60000)
+                time.sleep(3)
 
-        print("3. Remove cookie banner (more reliable than clicking):")
-        print('   mcp__playwright__browser_evaluate({')
-        print('       "function": "() => { const banner = document.querySelector(\'#onetrust-consent-sdk\'); if (banner) banner.remove(); }"')
-        print('   })\n')
+                # Remove cookie banner (OneTrust) if present
+                try:
+                    page.evaluate("() => { const banner = document.querySelector('#onetrust-consent-sdk'); if (banner) banner.remove(); }")
+                except Exception:
+                    pass  # No banner
 
-        print("4. Wait for ZIP input to be visible:")
-        print('   mcp__playwright__browser_wait_for({"time": 2})\n')
+                time.sleep(1)
 
-        print("5. Enter ZIP code:")
-        print(f'   mcp__playwright__browser_type({{')
-        print(f'       "element": "ZIP code input",')
-        print(f'       "ref": "[from snapshot]",')
-        print(f'       "text": "{zip_code}"')
-        print(f'   }})\n')
+                # Find and fill ZIP input
+                zip_input_selectors = [
+                    'input[placeholder*="ZIP" i]',
+                    'input[placeholder*="zip" i]',
+                    'input[type="text"][placeholder*="location" i]',
+                    'input[type="text"]',
+                ]
 
-        print("6. Click 'Search' button:")
-        print('   mcp__playwright__browser_click({')
-        print('       "element": "Search button",')
-        print('       "ref": "[from snapshot]"')
-        print('   })\n')
+                zip_filled = False
+                for selector in zip_input_selectors:
+                    try:
+                        zip_input = page.locator(selector)
+                        if zip_input.count() > 0 and zip_input.first.is_visible():
+                            zip_input.first.fill(zip_code)
+                            time.sleep(0.5)
+                            zip_filled = True
+                            break
+                    except Exception:
+                        continue
 
-        print("7. Wait for results to load:")
-        print('   mcp__playwright__browser_wait_for({"time": 3})\n')
+                if not zip_filled:
+                    # Try to find any text input
+                    try:
+                        zip_input = page.locator('input[type="text"]').first
+                        zip_input.fill(zip_code)
+                        zip_filled = True
+                    except Exception:
+                        pass
 
-        print("8. Extract dealer data:")
-        extraction_script = self.get_extraction_script()
-        print(f'   mcp__playwright__browser_evaluate({{"function": """{extraction_script}"""}})\n')
+                if not zip_filled:
+                    browser.close()
+                    return []
 
-        print("9. Process results with:")
-        print(f'   generac_scraper.parse_results(results_json, "{zip_code}")\n')
+                # Click Search button
+                search_selectors = [
+                    'button:has-text("Search")',
+                    'button:has-text("Find")',
+                    'button[type="submit"]',
+                    'input[type="submit"]',
+                ]
 
-        print(f"{'='*70}\n")
+                search_clicked = False
+                for selector in search_selectors:
+                    try:
+                        search_btn = page.locator(selector)
+                        if search_btn.count() > 0 and search_btn.first.is_visible():
+                            search_btn.first.click()
+                            search_clicked = True
+                            break
+                    except Exception:
+                        continue
 
-        return []
+                if not search_clicked:
+                    # Try pressing Enter as fallback
+                    try:
+                        page.keyboard.press('Enter')
+                    except Exception:
+                        pass
+
+                # Wait for results to load
+                time.sleep(4)
+
+                # Execute extraction script
+                raw_results = page.evaluate(self.get_extraction_script())
+
+                browser.close()
+
+                if not raw_results:
+                    return []
+
+                # Parse results into StandardizedDealer objects
+                dealers = [self.parse_dealer_data(d, zip_code) for d in raw_results]
+
+                return dealers
+
+            except Exception as e:
+                if 'browser' in locals():
+                    browser.close()
+                return []
 
     def _scrape_with_runpod(self, zip_code: str) -> List[StandardizedDealer]:
         """

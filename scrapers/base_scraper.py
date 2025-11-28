@@ -37,12 +37,18 @@ class DealerCapabilities:
     has_microinverters: bool = False
     has_inverters: bool = False
     
-    # Trade capabilities
+    # Trade capabilities (MEP+E = Mechanical, Electrical, Plumbing + Energy)
     has_electrical: bool = False
-    has_hvac: bool = False
+    has_hvac: bool = False  # Mechanical/HVAC
     has_roofing: bool = False
     has_plumbing: bool = False
-    
+    has_fire_security: bool = False  # Fire protection, security systems, low-voltage
+
+    # Multi-trade signals (GOLD = 2+ MEP+E trades)
+    mep_e_trade_count: int = 0  # Count of MEP+E trades (2+ = high value)
+    is_multi_trade: bool = False  # Has 2+ trades = GOLD signal
+    multi_trade_combo: str = ""  # e.g., "HVAC+Plumbing", "HVAC+Fire/Security"
+
     # Business characteristics
     is_commercial: bool = False
     is_residential: bool = False
@@ -73,6 +79,10 @@ class DealerCapabilities:
         self.has_hvac = False
         self.has_roofing = False
         self.has_plumbing = False
+        self.has_fire_security = False
+        self.mep_e_trade_count = 0
+        self.is_multi_trade = False
+        self.multi_trade_combo = ""
         self.is_commercial = False
         self.is_residential = False
         self.is_gc = False
@@ -97,6 +107,10 @@ class DealerCapabilities:
             "has_hvac": self.has_hvac,
             "has_roofing": self.has_roofing,
             "has_plumbing": self.has_plumbing,
+            "has_fire_security": self.has_fire_security,
+            "mep_e_trade_count": self.mep_e_trade_count,
+            "is_multi_trade": self.is_multi_trade,
+            "multi_trade_combo": self.multi_trade_combo,
             "is_commercial": self.is_commercial,
             "is_residential": self.is_residential,
             "is_gc": self.is_gc,
@@ -138,7 +152,49 @@ class DealerCapabilities:
         if self.has_hvac: trades.append("HVAC")
         if self.has_roofing: trades.append("Roofing")
         if self.has_plumbing: trades.append("Plumbing")
+        if self.has_fire_security: trades.append("Fire/Security")
         return trades
+
+    def calculate_multi_trade_score(self) -> None:
+        """
+        Calculate multi-trade score and flag GOLD contractors.
+
+        **MEP+E Trades** (Mechanical, Electrical, Plumbing + Energy):
+        - HVAC/Mechanical
+        - Electrical
+        - Plumbing
+        - Fire/Security (low-voltage, fire protection)
+        - Solar/Energy
+
+        **GOLD Signal**: 2+ MEP+E trades = systems integrator
+        - HVAC + Plumbing = MEP signal
+        - HVAC + Fire/Security = GOLD (complex systems)
+        - Electrical + Solar = Energy contractor
+        - Any 2+ = Coperniq ICP fit
+
+        Updates:
+            self.mep_e_trade_count: Number of MEP+E trades
+            self.is_multi_trade: True if 2+ trades
+            self.multi_trade_combo: String describing combo (e.g., "HVAC+Plumbing")
+        """
+        # Count MEP+E trades
+        trades = []
+        if self.has_hvac:
+            trades.append("HVAC")
+        if self.has_electrical:
+            trades.append("Electrical")
+        if self.has_plumbing:
+            trades.append("Plumbing")
+        if self.has_fire_security:
+            trades.append("Fire/Security")
+        if self.has_solar or self.has_inverters or self.has_microinverters:
+            trades.append("Solar/Energy")
+        if self.has_generator or self.has_battery:
+            trades.append("Generator/Battery")
+
+        self.mep_e_trade_count = len(trades)
+        self.is_multi_trade = self.mep_e_trade_count >= 2
+        self.multi_trade_combo = "+".join(trades) if self.is_multi_trade else ""
 
     def detect_high_value_contractor_types(self, dealer_name: str, certifications: List[str], tier: str) -> None:
         """
@@ -179,6 +235,17 @@ class DealerCapabilities:
         has_mep_keywords = any(keyword in search_text for keyword in mep_keywords)
 
         self.is_mep_r_contractor = has_all_mep_r_trades or has_mep_keywords
+
+        # Fire/Security Detection (GOLD signal when combined with HVAC)
+        fire_security_keywords = [
+            "fire", "fire protection", "fire alarm", "sprinkler",
+            "security", "low voltage", "low-voltage", "access control",
+            "burglar", "alarm", "cctv", "surveillance", "life safety"
+        ]
+        self.has_fire_security = any(keyword in search_text for keyword in fire_security_keywords)
+
+        # Calculate multi-trade score (MUST be called after all trade flags are set)
+        self.calculate_multi_trade_score()
 
 
 @dataclass
@@ -249,6 +316,18 @@ class StandardizedDealer:
     has_ops_maintenance: bool = False # Offers O&M services (recurring revenue)
     is_resimercial: bool = False     # Does both residential AND commercial (diverse portfolio)
 
+    # Enrichment fields for detail page scraping (Trane, etc.)
+    # These provide pre-qualification signals before sales-agent enrichment
+    google_rating: float = 0.0           # Google Maps rating (e.g., 4.9)
+    google_review_count: int = 0         # Google review count (e.g., 1010)
+    business_hours: Dict[str, str] = field(default_factory=dict)  # Mon-Sun hours
+    areas_of_expertise: List[str] = field(default_factory=list)   # HVAC repair, AC install, etc.
+    dealer_certifications: List[str] = field(default_factory=list)  # Trane Comfort Specialist, NATE, etc.
+    has_emergency_service: bool = False  # 24/7 emergency service available
+    has_financing: bool = False          # Offers financing options
+    financing_provider: str = ""         # Wells Fargo, Synchrony, etc.
+    detail_page_url: str = ""            # URL to dealer detail page (for verification)
+
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON export"""
         return {
@@ -288,6 +367,16 @@ class StandardizedDealer:
             "mep_score": self.mep_score,
             "has_ops_maintenance": self.has_ops_maintenance,
             "is_resimercial": self.is_resimercial,
+            # Detail page enrichment fields
+            "google_rating": self.google_rating,
+            "google_review_count": self.google_review_count,
+            "business_hours": self.business_hours,
+            "areas_of_expertise": self.areas_of_expertise,
+            "dealer_certifications": self.dealer_certifications,
+            "has_emergency_service": self.has_emergency_service,
+            "has_financing": self.has_financing,
+            "financing_provider": self.financing_provider,
+            "detail_page_url": self.detail_page_url,
         }
 
 
@@ -622,6 +711,72 @@ class BaseDealerScraper(ABC):
         removed = len(self.dealers) - len(unique_dealers)
         print(f"Removed {removed} duplicate dealers (by {key})")
         self.dealers = unique_dealers
+
+    @staticmethod
+    def _is_valid_phone(phone: str) -> bool:
+        """
+        Check if phone is a valid dealer phone (not toll-free).
+
+        Toll-free prefixes to EXCLUDE: 800, 888, 877, 866, 855, 844, 833
+        These are often OEM call centers, not actual dealer phones.
+
+        Valid phone: 10-digit with local area code (e.g., 214-555-1234)
+
+        Args:
+            phone: Normalized 10-digit phone number
+
+        Returns:
+            True if valid dealer phone, False if toll-free or invalid
+        """
+        if not phone:
+            return False
+
+        # Strip non-digits
+        digits = re.sub(r'[^0-9]', '', phone)
+
+        # Handle 11-digit with leading 1
+        if len(digits) == 11 and digits.startswith('1'):
+            digits = digits[1:]
+
+        # Must be exactly 10 digits
+        if len(digits) != 10:
+            return False
+
+        # Toll-free prefixes to exclude
+        toll_free_prefixes = ['800', '888', '877', '866', '855', '844', '833']
+        area_code = digits[:3]
+
+        if area_code in toll_free_prefixes:
+            return False
+
+        return True
+
+    @staticmethod
+    def _normalize_phone(phone: str) -> str:
+        """
+        Normalize phone to 10-digit format.
+
+        Args:
+            phone: Raw phone string (any format)
+
+        Returns:
+            10-digit string or empty string if invalid
+        """
+        if not phone:
+            return ""
+
+        # Strip non-digits
+        digits = re.sub(r'[^0-9]', '', phone)
+
+        # Handle 11-digit with leading 1
+        if len(digits) == 11 and digits.startswith('1'):
+            digits = digits[1:]
+
+        # Return only valid 10-digit phones
+        if len(digits) == 10:
+            return digits
+
+        return ""
 
     @staticmethod
     def _normalize_company_name(name: str) -> str:
