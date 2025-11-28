@@ -1,0 +1,22 @@
+# Ignore everything except dashboard
+*
+!dashboard
+!dashboard/**
+!vercel.json
+
+# Ignore heavy directories
+output/
+venv/
+.git/
+__pycache__/
+*.db
+*.csv
+*.json
+!dashboard/**/*.json
+scrapers/
+scripts/
+database/
+docs/
+tests/
+.worktrees/
+node_modules/
