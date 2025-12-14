@@ -322,3 +322,115 @@ HUNTER_API_KEY=...
 - `LicenseValidateTool` - Validate state licenses
 
 Works standalone without conductor-ai.
+
+---
+
+## 🆕 STAR SCHEMA INTEGRATION (Nov 28, 2025)
+
+### Architecture Change: Push to `dim_companies` (Master List)
+
+**OLD**: Push directly to `icp_gold_leads` table
+**NEW**: Push to `dim_companies` (master list) - views handle tiering automatically
+
+### New Supabase Tables (Shared with sales-agent)
+
+| Table | Purpose | dealer-scraper writes? |
+|-------|---------|------------------------|
+| `dim_companies` | Master lead list (SOURCE OF TRUTH) | ✅ Yes |
+| `dim_contacts` | People at companies | ✅ Yes (from scraped data) |
+| `dim_sources` | Data origin tracking | ❌ No (pre-populated) |
+| `dim_users` | Team members | ❌ No (pre-populated) |
+| `fact_enrichments` | Enrichment events | ✅ Yes (log each scrape) |
+| `re_enrich_queue` | Cross-project queue | ✅ Yes (process pending) |
+| `mv_icp_gold_leads` | Gold tier view | ❌ No (auto-refreshed) |
+| `mv_bdr_work_queue` | BDR work queue | ❌ No (auto-refreshed) |
+
+### Updated Push Script: `push_to_supabase.py`
+
+**Changes Required**:
+1. Target table: `dim_companies` instead of `icp_gold_leads`
+2. Add `source_type = 'dealer_scraper'`
+3. Log to `fact_enrichments` for each push
+4. Call `refresh_star_schema_views()` after batch complete
+
+### New Script: `process_reenrich_queue.py`
+
+**Purpose**: Poll `re_enrich_queue` and re-scrape companies flagged by sales-agent
+
+```bash
+# Process pending re-enrichment requests
+./venv/bin/python3 scripts/process_reenrich_queue.py
+
+# Check queue status
+./venv/bin/python3 scripts/process_reenrich_queue.py --status
+```
+
+**Workflow**:
+1. Poll `re_enrich_queue WHERE status = 'pending'`
+2. For each company with domain:
+   - Run Hunter.io domain search
+   - Run Browserbase team page scrape (if enabled)
+   - Compare with existing `dim_contacts`
+   - Flag NEW contacts found
+3. Update queue: `status = 'completed'`, `result_summary = {...}`
+4. Push new contacts to `dim_contacts` with `source = 're_enrich'`
+5. Refresh materialized views
+
+### Re-Enrich Triggers
+
+| Trigger | Source | Priority |
+|---------|--------|----------|
+| `time_based` | pg_cron (30+ days stale) | 2 (medium) |
+| `manual_flag` | BDR dashboard button | 1 (high) |
+| `new_info_found` | BDR research notes | 1 (high) |
+
+### Data Flow Diagram
+
+```
+dealer-scraper-mvp                 SUPABASE (Shared)                    sales-agent
+─────────────────                 ─────────────────                    ───────────
+
+OEM Scrapers ───────────────────► dim_companies (master)
+State License Scrapers ──────────►        │
+                                          │
+                                          ├──► mv_icp_gold_leads (auto)
+                                          ├──► mv_bdr_work_queue (auto)
+                                          │
+process_reenrich_queue.py ◄──────── re_enrich_queue ◄────── BDR Dashboard
+        │                                 │                 (flag button)
+        │                                 │
+        └───────────────────────► dim_contacts (new contacts)
+                                          │
+                                          └──► fact_enrichments (log)
+```
+
+---
+
+## Scientia Capital AI Stack
+
+This project is part of the Scientia Capital AI Stack ecosystem.
+
+### Core Infrastructure Repositories
+- **lang-core** (Foundation): LangChain/LangGraph middleware, LLM providers, Redis, FastAPI
+  - https://github.com/ScientiaCapital/lang-core
+- **vlm-ai-core** (Vision): Qwen VL, Gemini Vision, Document AI, OCR
+  - https://github.com/ScientiaCapital/vlm-ai-core
+- **voice-ai-core** (Voice): Cartesia TTS, Deepgram STT, Twilio integration
+  - https://github.com/ScientiaCapital/voice-ai-core
+
+### Integration Pattern
+```bash
+# Infrastructure from lang-core
+python ~/lang-core/scripts/inline_to_project.py /your/project --modules middleware providers
+
+# Vision capabilities from vlm-ai-core
+python ~/vlm-ai-core/scripts/inline_to_project.py /your/project --modules providers preprocessing
+
+# Voice capabilities from voice-ai-core
+python ~/voice-ai-core/scripts/inline_to_project.py /your/project --modules providers types
+```
+
+### Stack Principles
+- **NO OpenAI** - Use Anthropic Claude, Google Gemini, DeepSeek, Qwen via OpenRouter
+- API keys ONLY in `.env` files, never hardcoded
+- Each repo has one domain - no duplication
