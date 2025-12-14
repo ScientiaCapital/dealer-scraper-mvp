@@ -41,3 +41,11 @@ pytest-asyncio>=0.21.0
 # Install with: pip install claude-agent-sdk
 # Requires: Python 3.10+, ANTHROPIC_API_KEY in .env
 claude-agent-sdk==0.1.5
+
+# Celery for background task processing and scheduled scraping
+# Required for autonomous OEM dealer network harvesting
+celery>=5.4.0
+redis>=5.0.0
+
+# Scientia Capital core infrastructure
+lang-core @ git+https://github.com/ScientiaCapital/lang-core.git
