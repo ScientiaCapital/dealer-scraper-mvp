@@ -1,7 +1,7 @@
 # BACKLOG.md - Project Task Board
 
 **Project**: Dealer Scraper MVP - OEM Dealer Intelligence Platform
-**Last Updated**: 2025-11-30
+**Last Updated**: 2025-12-24
 **Sprint**: Current
 
 ---
@@ -13,7 +13,7 @@
 | 🔴 Blocked | 0 |
 | 🟡 In Progress | 0 |
 | 🟢 Ready | 2 |
-| ✅ Done (this sprint) | 1 |
+| ✅ Done (this sprint) | 4 |
 
 ---
 
@@ -38,16 +38,18 @@
 - **Est. Time**: 4-6 hours
 - **Dependencies**: None
 
+**⚠️ PROJECT BOUNDARY NOTE**: This task will be MOVED to sales-agent repo for production deployment. dealer-scraper should only push to Supabase per project architecture.
+
 **Description**: Create OEM Certifications and State Licenses multi-value fields in Close CRM, create OEM Count number field, implement sync script, test with 5 leads, and create Smart Views for OEM filtering.
 
 **Acceptance Criteria**:
 - [ ] OEM Certifications multi-value field created in Close CRM
 - [ ] State Licenses multi-value field created in Close CRM
 - [ ] OEM Count number field created
-- [ ] `scripts/sync_to_close_crm.py` implemented
-- [ ] Tested with 5 leads (Tim Kipper as owner)
+- [x] `scripts/sync_to_close_crm.py` implemented (COMPLETE - 29 TDD tests)
+- [ ] Tested with 5 leads (Tim Kipper as owner) - READY for testing
 - [ ] Smart Views created for OEM filtering
-- [ ] All tests pass
+- [x] All tests pass (29/29 sync tests passing)
 - [ ] `/validate` passes
 
 ---
@@ -79,7 +81,6 @@
 |----|-------|----------|--------|
 | TASK-003 | Fix Broken Scrapers (16 OEMs) | High | `bug`, `scraping` |
 | TASK-004 | Implement Rate Limiting | Medium | `feature`, `performance` |
-| TASK-005 | Add Retry Logic for Failed Scrapes | Medium | `feature`, `reliability` |
 
 ---
 
@@ -88,6 +89,9 @@
 | ID | Title | Completed | By |
 |----|-------|-----------|-----|
 | TASK-000 | Context Engineering Setup | 2025-11-30 | Claude |
+| TASK-005 | Browserbase Retry Logic | 2025-12-24 | Claude |
+| TASK-006 | Colorado DORA Migration | 2025-12-24 | Claude |
+| TASK-007 | Close CRM Sync Script | 2025-12-24 | Claude |
 
 ---
 

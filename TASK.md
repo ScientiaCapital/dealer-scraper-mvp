@@ -1,6 +1,6 @@
 # Dealer Scraper MVP - Current Tasks
 
-**Last Updated**: 2025-11-30
+**Last Updated**: 2025-12-24
 
 **CRITICAL RULES:**
 - **NO OpenAI models** - Use DeepSeek, Qwen, Moonshot via OpenRouter
@@ -13,16 +13,21 @@
 
 ### 🔥 Priority 1: Close CRM Custom Fields Implementation
 
-**Status**: Not Started
+**Status**: Script Complete, Testing Pending
 **Effort**: 4-6 hours
 **PRP**: `PRPs/2025-11-30-close-crm-oem-fields.md` (if generated)
+
+**⚠️ PROJECT BOUNDARY NOTE**:
+Close CRM sync script (`sync_to_close_crm.py`) was developed in dealer-scraper for testing,
+but PRODUCTION use should be in the sales-agent repository. This script will be moved to
+sales-agent after validation. dealer-scraper's job is to push to Supabase ONLY.
 
 **Tasks**:
 - [ ] Create OEM Certifications multi-value field in Close CRM
 - [ ] Create State Licenses multi-value field in Close CRM
 - [ ] Create OEM Count number field
-- [ ] Create `scripts/sync_to_close_crm.py`
-- [ ] Test with 5 leads (Tim Kipper as owner)
+- [x] Create `scripts/sync_to_close_crm.py` (COMPLETE - 29 TDD tests passing)
+- [ ] Test with 5 leads (READY - script exists, needs integration test)
 - [ ] Create Smart Views for OEM filtering
 
 **Dependencies**:
@@ -178,6 +183,14 @@
 ---
 
 ## Completed Tasks
+
+### 2025-12-24
+- [x] Colorado DORA bulk migration (7,508 contractors, 114 multi-trade, 9 TDD tests)
+- [x] CO multi-trade export (290 PLATINUM business entities to CSV/JSON)
+- [x] Close CRM sync script (215 lines, 29 TDD tests passing)
+- [x] Browserbase retry logic (3 scrapers: Cummins, Schneider, Tesla)
+- [x] Doc cleanup (7 stale files archived to docs/_archive/)
+- [x] Supabase push script (push_to_supabase.py - 280 lines)
 
 ### 2025-11-30
 - [x] Created context engineering files (validate, generate-prp, execute-prp)
