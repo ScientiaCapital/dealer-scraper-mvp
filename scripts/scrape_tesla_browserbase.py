@@ -416,9 +416,52 @@ def scrape_tesla_production(test_mode=False, resume=False):
                         print("❌ Failed to connect to Browserbase - aborting")
                         return
 
-                # Scrape ZIP
+                # Scrape ZIP with retry on session timeout
                 print(f"\n[{i + 1}/{len(remaining_zips)}] Scraping Tesla - ZIP {zip_code}...")
-                installers = scrape_tesla_zip(page, zip_code)
+
+                max_retries = 3
+                retry_count = 0
+                installers = []
+
+                while retry_count < max_retries:
+                    try:
+                        installers = scrape_tesla_zip(page, zip_code)
+                        break  # Success - exit retry loop
+
+                    except Exception as e:
+                        error_msg = str(e).lower()
+                        is_session_error = any(term in error_msg for term in [
+                            'target page', 'session closed', 'connection closed',
+                            'browser has disconnected', 'page crashed', 'context closed'
+                        ])
+
+                        if is_session_error:
+                            retry_count += 1
+                            print(f"    ⚠️  Session error (retry {retry_count}/{max_retries}): {e}")
+
+                            if retry_count < max_retries:
+                                print(f"    🔄 Reconnecting to Browserbase...")
+
+                                # Close stale browser
+                                try:
+                                    browser.close()
+                                except:
+                                    pass
+
+                                # Wait before reconnect
+                                time.sleep(5)
+
+                                # Create new connection
+                                browser, context, page = create_browserbase_connection(p)
+                                if not browser:
+                                    print("    ❌ Failed to reconnect - skipping ZIP")
+                                    break
+                            else:
+                                print(f"    ❌ Max retries reached - skipping ZIP {zip_code}")
+                        else:
+                            # Non-session error - log and continue
+                            print(f"    ⚠️  Scraping error: {e}")
+                            break
 
                 batch_installers.extend(installers)
                 progress["completed_zips"].append(zip_code)
