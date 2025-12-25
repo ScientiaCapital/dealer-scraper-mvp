@@ -13,7 +13,36 @@ Usage:
 """
 
 from plugins.scraper_tools.base import BaseTool, ToolCategory, ToolDefinition, ToolResult
-from enrichment import ApolloEnricher, ClayEnricher, HunterEnricher
+
+# Lazy imports for enrichers (may not be implemented yet)
+ApolloEnricher = None
+ClayEnricher = None
+HunterEnricher = None
+
+def _get_enricher(enricher_type: str):
+    """Lazy load enricher classes."""
+    global ApolloEnricher, ClayEnricher, HunterEnricher
+
+    if ApolloEnricher is None:
+        try:
+            from enrichment import ApolloEnricher as _Apollo, ClayEnricher as _Clay, HunterEnricher as _Hunter
+            ApolloEnricher = _Apollo
+            ClayEnricher = _Clay
+            HunterEnricher = _Hunter
+        except ImportError:
+            raise ImportError(
+                "Enrichment module not found. Install with: pip install enrichment-sdk "
+                "or implement enrichment/apollo.py, enrichment/clay.py, enrichment/hunter.py"
+            )
+
+    if enricher_type == "apollo":
+        return ApolloEnricher()
+    elif enricher_type == "clay":
+        return ClayEnricher()
+    elif enricher_type == "hunter":
+        return HunterEnricher()
+    else:
+        raise ValueError(f"Unknown enricher: {enricher_type}")
 
 
 class ContractorEnrichTool(BaseTool):
@@ -71,14 +100,10 @@ class ContractorEnrichTool(BaseTool):
         enricher_type = arguments.get("enricher", "apollo")
 
         try:
-            # Select enricher
-            if enricher_type == "apollo":
-                enricher = ApolloEnricher()
-            elif enricher_type == "clay":
-                enricher = ClayEnricher()
-            elif enricher_type == "hunter":
-                enricher = HunterEnricher()
-            else:
+            # Select enricher using lazy loader
+            try:
+                enricher = _get_enricher(enricher_type)
+            except ValueError as e:
                 return ToolResult(
                     tool_name="contractor_enrich",
                     success=False,

@@ -5,13 +5,18 @@ Scrapes Tesla's Powerwall certified installer network for battery + solar instal
 Tesla Powerwall installers are strategic targets because they handle premium battery storage
 systems and often manage complex residential + commercial energy projects.
 
-Target URL: https://www.tesla.com/support/certified-installers
-(Updated Nov 2025 - old URL /certified-installers-powerwall redirects to new URL)
+Target URL: https://www.tesla.com/en_us/support/certified-installers
+(Updated Dec 2025 - uses /en_us/ locale to prevent geo-redirect)
+
+**GEO-REDIRECT FIX**: Tesla redirects based on IP geolocation (e.g., UK users get /en_gb/).
+We force US locale by using `/en_us/` in the URL path. For automated scraping, use
+BROWSERBASE mode with US residential proxy to ensure US results.
 
 **BOT DETECTION**: Tesla uses Cloudflare/bot protection. Requires Playwright with:
 - Stealth user agent
 - JavaScript execution
 - Realistic browsing patterns
+- Browserbase with residential proxy (recommended)
 
 Capabilities detected from Tesla certification:
 - Battery installation (Powerwall is their core product)
@@ -48,10 +53,15 @@ class TeslaScraper(BaseDealerScraper):
     handle complex energy storage + solar installations.
 
     All Tesla installers are "Premier Installers" - representing the highest tier.
+
+    **GEO-REDIRECT FIX**: Tesla redirects based on IP geolocation. We force US locale
+    by using `/en_us/` in the URL path. For automated scraping, use BROWSERBASE mode
+    with US residential proxy to ensure US results.
     """
 
     OEM_NAME = "Tesla"
-    DEALER_LOCATOR_URL = "https://www.tesla.com/support/certified-installers"
+    # CRITICAL: Use /en_us/ locale to prevent geo-redirect to UK/EU sites
+    DEALER_LOCATOR_URL = "https://www.tesla.com/en_us/support/certified-installers"
     PRODUCT_LINES = ["Powerwall", "Solar Roof", "Solar Panels", "Wall Connector", "Powershare"]
 
     # NOTE: Tesla requires Playwright with stealth mode due to bot detection (403 without it)
@@ -408,6 +418,116 @@ class TeslaScraper(BaseDealerScraper):
             raise Exception(f"RunPod API request failed: {str(e)}")
         except json.JSONDecodeError:
             raise Exception("Failed to parse RunPod API response as JSON")
+
+    def _scrape_with_browserbase(self, zip_code: str) -> List[StandardizedDealer]:
+        """
+        BROWSERBASE mode: Cloud browser with US residential proxy.
+
+        Tesla uses Cloudflare bot protection AND geo-redirect based on IP.
+        Browserbase with US residential proxy solves both:
+        - US IP = US version of site
+        - Residential proxy = bypass bot detection
+
+        Requires BROWSERBASE_API_KEY in .env
+        """
+        from playwright.sync_api import sync_playwright
+        import time
+        import random
+
+        browserbase_api_key = os.getenv("BROWSERBASE_API_KEY")
+        if not browserbase_api_key:
+            raise ValueError("Missing BROWSERBASE_API_KEY in .env")
+
+        print(f"\n{'='*60}")
+        print(f"Tesla Powerwall Installer Scraper - BROWSERBASE Mode")
+        print(f"ZIP Code: {zip_code}")
+        print(f"{'='*60}\n")
+
+        try:
+            with sync_playwright() as p:
+                print(f"  → Connecting to Browserbase cloud browser...")
+
+                # WebSocket connection with US residential proxy enabled
+                ws_endpoint = f'wss://connect.browserbase.com?apiKey={browserbase_api_key}&enableProxy=true'
+                browser = p.chromium.connect_over_cdp(ws_endpoint)
+
+                # Get default context and page
+                context = browser.contexts[0]
+                page = context.pages[0] if context.pages else context.new_page()
+
+                print(f"  ✓ Connected to Browserbase (US residential proxy)")
+
+                # Human-like delay before navigation
+                time.sleep(random.uniform(1.5, 3.0))
+
+                # Navigate to Tesla installer locator with US locale
+                print(f"  → Navigating to {self.DEALER_LOCATOR_URL}")
+                page.goto(self.DEALER_LOCATOR_URL, timeout=60000, wait_until='domcontentloaded')
+
+                # Wait for page to stabilize
+                try:
+                    page.wait_for_load_state('networkidle', timeout=15000)
+                except:
+                    pass
+
+                time.sleep(random.uniform(3.0, 5.0))
+
+                # Handle cookie consent if present
+                print(f"  → Checking for cookie consent...")
+                try:
+                    accept_btn = page.locator("button:has-text('Accept'), button:has-text('Got it')").first
+                    if accept_btn.is_visible(timeout=3000):
+                        accept_btn.click()
+                        print(f"  ✓ Accepted cookies")
+                        time.sleep(1)
+                except:
+                    pass
+
+                # Find and fill ZIP code input
+                print(f"  → Filling ZIP code: {zip_code}")
+                try:
+                    zip_input = page.locator("input[placeholder*='Zip' i], input[placeholder*='ZIP' i]").first
+                    zip_input.fill(zip_code, timeout=10000)
+                    time.sleep(random.uniform(0.5, 1.0))
+                except Exception as e:
+                    print(f"  ❌ Error filling ZIP code: {e}")
+                    browser.close()
+                    return []
+
+                # Press Enter to trigger autocomplete search
+                print(f"  → Triggering search...")
+                page.keyboard.press("Enter")
+
+                # Wait for results to load
+                print(f"  → Waiting for results...")
+                time.sleep(random.uniform(4.0, 6.0))
+
+                # Scroll to trigger lazy loading (Tesla uses infinite scroll)
+                print(f"  → Scrolling to load all results...")
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                time.sleep(random.uniform(2.0, 3.0))
+
+                # Execute extraction script
+                print(f"  → Extracting installer data...")
+                raw_results = page.evaluate(self.get_extraction_script())
+
+                if not raw_results:
+                    print(f"  ⚠️ No installers found for ZIP {zip_code}")
+                    browser.close()
+                    return []
+
+                # Parse results
+                dealers = [self.parse_dealer_data(d, zip_code) for d in raw_results]
+                print(f"  ✅ Found {len(dealers)} Tesla Powerwall installers")
+
+                browser.close()
+                return dealers
+
+        except Exception as e:
+            print(f"  ❌ Browserbase error: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
 
     def _scrape_with_patchright(self, zip_code: str) -> List[StandardizedDealer]:
         """

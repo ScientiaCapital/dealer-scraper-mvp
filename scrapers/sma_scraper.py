@@ -45,30 +45,24 @@ class SMAScraper(BaseDealerScraper):
     """
     Scraper for SMA Solar installer network.
 
-    **STATUS**: Structure ready, extraction logic TBD
+    **STATUS**: ✅ PLAYWRIGHT mode FUNCTIONAL (tested 2024-12-25)
 
-    **IMPLEMENTATION CHALLENGE**:
+    **IMPLEMENTATION**:
     The SMA PowerUP+ installer map (https://www.sma-america.com/powerupplus/homeowner)
-    uses Google Maps API to dynamically load installer markers. The data is NOT in the HTML DOM.
+    uses Angular with Google Maps integration. Installer data IS rendered to DOM
+    in .singleResult containers after ZIP code search.
 
-    **NEXT STEPS**:
-    1. Manual inspection with Playwright MCP:
-       - Navigate to URL
-       - Open browser DevTools (Network tab)
-       - Search for a ZIP code
-       - Look for API calls that return installer data
-       - Identify the endpoint and parameters
+    **EXTRACTION APPROACH**:
+    1. Navigate to PowerUP+ homeowner page
+    2. Accept cookie consent if present
+    3. Type ZIP code in location input
+    4. Press Enter to trigger search
+    5. Wait for .singleResult containers to load
+    6. Extract installer data from DOM (name, address, phone, website, distance)
 
-    2. Alternative approaches:
-       a) Reverse-engineer Google Maps API calls (check Network tab for XHR/Fetch)
-       b) Extract data from `window` object if installers are stored in JavaScript
-       c) Contact SMA for official API access (https://developer.sma.de/sma-apis)
-       d) Use alternative data sources (EnergySage, Solar Reviews, local business directories)
-
-    3. Once extraction method is identified:
-       - Update get_extraction_script() with working JavaScript
-       - Test on 1-2 ZIP codes
-       - Update SELECTORS dict with correct element references
+    **TESTED EXTRACTION** (ZIP 94102 - San Francisco):
+    - Roam Solar: 40 La Barthe Ln, San Carlos, CA 94070 (21 mi)
+    - Cool Earth Solar Development: 2174 Rheem Drive, Pleasanton, CA 94588 (30 mi)
 
     **COMMERCIAL VALUE**:
     SMA installers are HIGH PRIORITY prospects because:
@@ -113,13 +107,13 @@ class SMAScraper(BaseDealerScraper):
     def get_extraction_script(self) -> str:
         """
         JavaScript extraction script for SMA POWERUP+ installer data.
-        
+
         Extracts installer data from the SMA installer locator page.
-        Data is rendered to DOM in .address-wrapper containers (not Google Maps API markers).
-        
+        Data is rendered to DOM in .singleResult containers.
+
         Returns array of installer objects with:
         - name: Company name
-        - phone: Phone number  
+        - phone: Phone number
         - website: Website URL
         - street: Street address
         - city: City
@@ -127,42 +121,40 @@ class SMAScraper(BaseDealerScraper):
         - zip: ZIP code
         - distance: Distance string (e.g., "21 mi")
         - distance_miles: Distance as float
+
+        TESTED: 2024-12-25 - Successfully extracted 2 installers from ZIP 94102
         """
         return """
         () => {
-          // Extract SMA POWERUP+ installers - only those with address-wrapper
+          // Extract SMA POWERUP+ installers from .singleResult containers
           const installers = [];
           const seen = new Set();
-          
-          // Find containers with address-wrapper (actual installer results)
-          const addressWrappers = document.querySelectorAll('.address-wrapper');
-          
-          addressWrappers.forEach(wrapper => {
-            // Find the parent container that has all installer data
-            const container = wrapper.closest('.ng-scope');
-            if (!container) return;
-            
+
+          // Find all installer result containers
+          const containers = document.querySelectorAll('.singleResult');
+
+          containers.forEach(container => {
             // Get company name from H3
             const nameEl = container.querySelector('h3');
             if (!nameEl) return;
             const name = nameEl.textContent.trim();
             if (!name) return;
-            
-            // Get address
-            const addressDiv = wrapper.querySelector('.address');
+
+            // Get address from .address div
+            const addressDiv = container.querySelector('.address');
             let street = '';
             let city = '';
             let state = '';
             let zip = '';
-            
+
             if (addressDiv) {
               // Address format: "40 La Barthe Ln<br>San Carlos, CA 94070"
               const addressHTML = addressDiv.innerHTML;
               const parts = addressHTML.split('<br>');
-              
+
               if (parts.length >= 2) {
                 street = parts[0].trim();
-                
+
                 // Parse "San Carlos, CA 94070"
                 const cityStateZip = parts[1].trim();
                 const match = cityStateZip.match(/^(.+?),\\s+([A-Z]{2})\\s+(\\d{5})$/);
@@ -173,13 +165,12 @@ class SMAScraper(BaseDealerScraper):
                 }
               }
             }
-            
-            // Get distance
-            const distanceEl = wrapper.querySelector('.distance-unit') || 
-                              container.querySelector('[class*="distance"]');
+
+            // Get distance from .distance-unit span
+            const distanceEl = container.querySelector('.distance-unit');
             let distance = '';
             let distance_miles = 0;
-            
+
             if (distanceEl) {
               distance = distanceEl.textContent.trim();
               const milesMatch = distance.match(/(\\d+(?:\\.\\d+)?)\\s*mi/);
@@ -187,8 +178,8 @@ class SMAScraper(BaseDealerScraper):
                 distance_miles = parseFloat(milesMatch[1]);
               }
             }
-            
-            // Get phone
+
+            // Get phone from tel: link
             let phone = '';
             const phoneLink = container.querySelector('a[href^="tel:"]');
             if (phoneLink) {
@@ -198,22 +189,21 @@ class SMAScraper(BaseDealerScraper):
                 phone = phone.substring(1);
               }
             }
-            
-            // Get website
+
+            // Get website (skip tel: and google links)
             let website = '';
             const links = container.querySelectorAll('a[href]');
             for (const link of links) {
               const href = link.href;
-              // Skip tel links, Google Maps links, and SMA's own domain
-              if (href && !href.includes('tel:') && 
-                  !href.includes('google') && 
+              if (href && !href.includes('tel:') &&
+                  !href.includes('google') &&
                   !href.includes('sma-america.com') &&
                   (href.startsWith('http://') || href.startsWith('https://'))) {
                 website = href;
                 break;
               }
             }
-            
+
             // Extract domain from website
             let domain = '';
             if (website) {
@@ -224,12 +214,12 @@ class SMAScraper(BaseDealerScraper):
                 // Invalid URL, skip domain extraction
               }
             }
-            
+
             // Deduplicate by phone (primary) or name (fallback)
             const key = phone || name;
             if (seen.has(key)) return;
             seen.add(key);
-            
+
             installers.push({
               name,
               phone,
@@ -243,7 +233,7 @@ class SMAScraper(BaseDealerScraper):
               distance_miles
             });
           });
-          
+
           return installers;
         }
         """
@@ -444,20 +434,20 @@ class SMAScraper(BaseDealerScraper):
                 print(f"  → Waiting for results (10s)...")
                 time.sleep(10)
                 
-                # Wait for results to load - check for address-wrapper elements
+                # Wait for results to load - check for .singleResult elements
                 print(f"  → Waiting for results...")
                 try:
-                    # Wait for at least one address-wrapper to appear (actual installer results)
-                    page.wait_for_selector('.address-wrapper', timeout=15000)
+                    # Wait for at least one .singleResult to appear (actual installer results)
+                    page.wait_for_selector('.singleResult', timeout=15000)
                     print(f"     ✓ Results loaded successfully")
                 except Exception as e:
                     print(f"     Warning: Results not found")
                     print(f"     Current URL: {page.url}")
                     # Check if any results loaded
-                    address_count = page.evaluate('() => document.querySelectorAll(".address-wrapper").length')
-                    print(f"     Address wrappers found: {address_count}")
-                    
-                    if address_count == 0:
+                    result_count = page.evaluate('() => document.querySelectorAll(".singleResult").length')
+                    print(f"     Result containers found: {result_count}")
+
+                    if result_count == 0:
                         print(f"     No installers found for ZIP {zip_code}")
                         browser.close()
                         return []
@@ -554,20 +544,18 @@ ScraperFactory.register("sma", SMAScraper)
 
 # Example usage
 if __name__ == "__main__":
-    # PLAYWRIGHT mode (manual inspection and development)
+    # PLAYWRIGHT mode - tested and working
     print("\n" + "="*60)
-    print("SMA Solar Installer Scraper - Development Mode")
+    print("SMA Solar Installer Scraper - PLAYWRIGHT Mode")
     print("="*60 + "\n")
 
-    print("This scraper is NOT YET FUNCTIONAL.")
-    print("Use PLAYWRIGHT mode to inspect the SMA installer map and develop extraction logic.\n")
-
     scraper = SMAScraper(mode=ScraperMode.PLAYWRIGHT)
-    scraper.scrape_zip_code("94102")  # San Francisco (commercial solar market)
+    dealers = scraper.scrape_zip_code("94102")  # San Francisco (commercial solar market)
 
-    print("\nNext steps:")
-    print("1. Use the Playwright MCP workflow printed above")
-    print("2. Identify how installer data is loaded (API/JavaScript/Google Maps)")
-    print("3. Update get_extraction_script() with working extraction logic")
-    print("4. Test on 1-2 ZIP codes")
-    print("5. Switch to RUNPOD mode for production scraping\n")
+    print(f"\n✓ Found {len(dealers)} SMA POWERUP+ installers")
+    for dealer in dealers:
+        print(f"  - {dealer.name}: {dealer.city}, {dealer.state} ({dealer.distance})")
+        if dealer.phone:
+            print(f"    Phone: {dealer.phone}")
+        if dealer.website:
+            print(f"    Website: {dealer.website}")

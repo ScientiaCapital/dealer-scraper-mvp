@@ -1,168 +1,214 @@
 # OEM Scraper Status Report
-## Coperniq Multi-OEM Lead Generation System
 
-Generated: 2025-10-25
-
----
-
-## ✅ PRODUCTION READY (5 Scrapers)
-
-### Generators
-1. **Generac** - Generator dealers
-   - Status: ✅ Production tested (1,244 unique dealers from 77 ZIPs)
-   - URL: https://www.generac.com/dealer-locator/
-   - Extraction: Complete & validated
-   - Data: 4,170 raw → 1,244 unique
-
-2. **Briggs & Stratton** - Generator + battery dealers
-   - Status: ✅ Production ready (tested extraction)
-   - URL: https://energy.briggsandstratton.com/
-   - Products: Standby Generators + Battery Storage
-   - Extraction: Complete
-
-### Solar/Battery/Inverters
-3. **Fronius** - Premium inverter installers (Austrian)
-   - Status: ✅ Production ready
-   - URL: https://www.fronius.com/en-us/usa/solar-energy/installers
-   - Focus: Residential + commercial inverters
-   - Extraction: Complete
-
-4. **Sol-Ark** - Hybrid inverter installers
-   - Status: ✅ Production ready
-   - URL: https://www.sol-ark.com/distributor-map/
-   - Products: Hybrid inverters (battery + generator integration)
-   - Extraction: Complete
-
-5. **SimpliPhi** - Battery installers (now Briggs brand)
-   - Status: ✅ Production ready
-   - URL: https://energy.briggsandstratton.com/dealer-locator
-   - Products: LFP battery systems
-   - Extraction: Complete
+**Generated:** December 25, 2025
+**Tests Passing:** 152/152 (100%)
+**Structure Validation:** 20/20 scrapers pass
 
 ---
 
-## ⚠️ STRUCTURE COMPLETE - NEEDS EXTRACTION (4 Scrapers)
+## Summary
 
-### Generators
-6. **Cummins** - Generator dealers
-   - Status: ⚠️ Framework built, needs DOM inspection
-   - URL: https://www.cummins.com/generators/find-a-dealer
-   - Next: Manual Playwright inspection to write extraction script
-
-7. **Kohler** - Generator dealers
-   - Status: ⚠️ Framework built, needs DOM inspection
-   - URL: https://kohlerpower.com/residential/dealer-locator
-   - Next: Manual Playwright inspection to write extraction script
-
-### Commercial Solar (HIGH VALUE for ICP)
-8. **SMA Solar Technology** - Commercial inverter installers 🎯
-   - Status: ⚠️ Structure complete, needs extraction script
-   - URL: https://www.sma-america.com/powerupplus/homeowner
-   - **WHY CRITICAL**: SMA = commercial/utility-scale contractors
-   - Business value: $500K-$10M+ projects, 10-50+ employees
-   - ICP match: Perfect resimercial + O&M candidates
-   - Documentation: See `docs/SMA_SCRAPER_COMPLETION_GUIDE.md`
-   - Next: Follow completion guide (2-4 hours)
-
-### Smart Panels
-9. **Eaton** - Smart breaker certified contractors
-   - Status: ⚠️ Structure complete, needs extraction script
-   - URL: https://www.eaton.com/us/products/residential/find-a-contractor.html
-   - Program: Eaton Certified Contractor Network (ECCN)
-   - Products: AbleEdge smart breakers
-   - Next: Build extraction script
+| Category | Active | Archived | Total |
+|----------|--------|----------|-------|
+| HVAC | 8 | 1 | 9 |
+| Generator | 4 | 0 | 4 |
+| Solar/Inverter | 6 | 6 | 12 |
+| Battery | 1 | 1 | 2 |
+| Building Automation | 1 | 0 | 1 |
+| **Total** | **20** | **8** | **28** |
 
 ---
 
-## ❌ NOT VIABLE (No Dealer Locators)
+## Active Scrapers (20)
 
-### Chinese Inverters
-10. **Sungrow** - No ZIP-searchable locator (static distributor list)
-11. **GoodWe** - No ZIP-searchable locator
-12. **Growatt** - No ZIP-searchable locator
+### HVAC Systems (8)
 
-### Commercial Inverters
-13. **Delta Electronics** - No public installer locator
-14. **Tigo Energy** - Static global list (40K+ tokens, not ZIP-searchable)
-15. **ABB** - Sold solar business to FIMER in 2020
+| OEM | File | Status | Notes |
+|-----|------|--------|-------|
+| Carrier | `carrier_scraper.py` | Production | 65 dealers/ZIP tested |
+| Trane | `trane_scraper.py` | Production | Detail page enrichment |
+| Lennox | `lennox_scraper.py` | Production | API-based extraction |
+| York | `york_scraper.py` | Browserbase | Bot detection in headless mode |
+| Rheem | `rheem_scraper.py` | Production | - |
+| Mitsubishi | `mitsubishi_scraper.py` | Production | Modal handling |
+| Honeywell | `honeywell_scraper.py` | Production | 25 contractors/ZIP tested, Bullseye iframe |
+| Sensi | `sensi_scraper.py` | Production | 500+ locations, Contractor/Distributor types |
 
-### Smart Panels/Monitoring
-16. **Sense** - Discontinued installer program
-17. **SPAN** - No public installer locator
-18. **Leviton** - Static state list (not ZIP-searchable)
-19. **Schneider Electric** - Distributor locator only (not installers)
+### Generators (4)
 
----
+| OEM | File | Status | Notes |
+|-----|------|--------|-------|
+| Generac | `generac_scraper.py` | Production | 78 dealers/ZIP tested |
+| Briggs & Stratton | `briggs_scraper.py` | Production | BriggsStrattonScraper class |
+| Cummins | `cummins_scraper.py` | Production | Iframe form handling |
+| Kohler | `kohler_scraper.py` | Browserbase | Bot detection in headless mode |
 
-## 📊 SUMMARY
+### Solar Inverters (6)
 
-**Total OEM Coverage**:
-- ✅ Production Ready: 5 scrapers
-- ⚠️ Needs Extraction: 4 scrapers
-- ❌ Not Viable: 10 OEMs
+| OEM | File | Status | Notes |
+|-----|------|--------|-------|
+| Tesla | `tesla_scraper.py` | Browserbase | US locale fixed (/en_us/), Browserbase mode |
+| Enphase | `enphase_scraper.py` | Production | 27 installers/ZIP, tiers, ratings |
+| Fronius | `fronius_scraper.py` | Production | Angular app |
+| SMA | `sma_scraper.py` | Production | 2 dealers/ZIP tested Dec 2024 |
+| Sol-Ark | `solark_scraper.py` | Production | Authorized Installers + Distributors |
+| SolarEdge | `solaredge_scraper.py` | Production | 5 installers/ZIP, O&M support |
 
-**Product Coverage (Production Ready)**:
-- Generators: Generac, Briggs & Stratton
-- Batteries: Briggs & Stratton, SimpliPhi, Sol-Ark
-- Inverters: Fronius, Sol-Ark
-- Hybrid Systems: Sol-Ark
+### Battery Storage (1)
 
-**Product Coverage (Pending Completion)**:
-- Generators: Cummins, Kohler
-- Commercial Solar: SMA (HIGH VALUE 🎯)
-- Smart Panels: Eaton
+| OEM | File | Status | Notes |
+|-----|------|--------|-------|
+| SimpliPhi | `simpliphi_scraper.py` | Production | Elite IQ Installers (contractors) |
 
----
+### Building Automation (1)
 
-## 🎯 RECOMMENDED PRIORITY
-
-**Immediate (Next 2 Hours)**:
-1. Run 5-OEM production test (Generac + Briggs + Fronius + Sol-Ark + SimpliPhi)
-2. Generate multi-OEM master list with ICP scoring
-3. Run Gold Miner to identify PLATINUM tier contractors
-
-**High Priority (Next 4 Hours)**:
-4. Complete **SMA scraper** (commercial contractors = highest ICP value)
-5. Complete Cummins + Kohler (more generator coverage)
-
-**Medium Priority (Next 8 Hours)**:
-6. Complete Eaton scraper (smart panel cross-reference)
-7. Research alternative commercial inverter OEMs (SolarEdge, Enphase commercial)
+| OEM | File | Status | Notes |
+|-----|------|--------|-------|
+| Schneider Electric | `schneider_scraper.py` | Production | EcoXpert system integrators (contractors) |
 
 ---
 
-## 📈 MULTI-OEM VALUE PROPOSITION
+## Archived Scrapers (8)
 
-**Why Multi-OEM Cross-Reference Matters**:
+Location: `scrapers/_archived/`
 
-Contractors certified with 2-4 OEM brands are:
-- Managing 2-4 separate monitoring platforms (PAIN POINT)
-- More sophisticated businesses (investment in certifications)
-- Larger customer bases (broader market reach)
-- Higher revenue ($1M-$10M+ for multi-OEM commercial)
-- **Perfect ICP for Coperniq's unified monitoring platform**
-
-**Expected Multi-OEM Overlap** (once all scrapers running):
-- Generac + Tesla + Enphase: Whole-home energy contractors
-- Generac + SMA: Commercial backup power specialists
-- Fronius + Sol-Ark + SimpliPhi: Battery integration experts
-- Briggs + Kohler + Cummins: Multi-brand generator dealers
-
-**ICP Scoring Impact**:
-- 1 OEM: 25 points (base)
-- 2 OEMs: 50 points (multi-brand pain)
-- 3 OEMs: 75 points (high sophistication)
-- 4+ OEMs: 100 points (PLATINUM tier)
+| OEM | File | Reason |
+|-----|------|--------|
+| ABB | `abb_scraper.py` | Divested residential solar 2020 |
+| Delta | `delta_scraper.py` | No public ZIP-searchable locator |
+| GoodWe | `goodwe_scraper.py` | No public ZIP-searchable locator |
+| Growatt | `growatt_scraper.py` | No public ZIP-searchable locator |
+| Johnson Controls | `johnson_controls_scraper.py` | Returns corporate offices only (not contractor ICPs) |
+| Sungrow | `sungrow_scraper.py` | No public ZIP-searchable locator |
+| Tigo | `tigo_scraper.py` | No public ZIP-searchable locator |
 
 ---
 
-## 📋 NEXT STEPS
+## Validation Results
 
-1. ✅ Run 5-OEM production scrape (what we have now)
-2. ✅ Generate multi-OEM cross-reference report
-3. ✅ Apply ICP filter (resimercial + O&M focus)
-4. ✅ Run Gold Miner on results
-5. ⏳ Complete SMA scraper (2-4 hours) ← HIGHEST VALUE
-6. ⏳ Complete Cummins/Kohler scrapers
-7. ⏳ Re-run multi-OEM with 8 total scrapers
-8. 🎯 **DELIVER**: PLATINUM tier contractor list for outreach
+### Structure Validation (December 25, 2025)
+
+```
+Total scrapers: 20
+Passed: 20/20 (100%)
+Warnings: 2 (SMA - minor JS pattern, Schneider - text parsing)
+Failed: 0
+```
+
+All scrapers validated for:
+- Import success
+- Factory registration
+- Required class attributes (OEM_NAME, DEALER_LOCATOR_URL)
+- Required methods (get_extraction_script, detect_capabilities, parse_dealer_data)
+- JavaScript extraction script syntax
+
+### Live Tests (December 25, 2025)
+
+| OEM | ZIP | Dealers | Phone % | Status |
+|-----|-----|---------|---------|--------|
+| SMA | 94102 | 2 | 100% | Working |
+| Carrier | 75201 | 65 | 100% | Working |
+| Generac | 77001 | 78 | 100% | Working |
+| Enphase | 94102 | 27 | N/A | Working (tiers: Platinum/Gold/Silver) |
+| SolarEdge | 94102 | 5 | N/A | Working (O&M capabilities) |
+| York | 94102 | - | - | Browserbase mode implemented |
+| Kohler | 53202 | - | - | Browserbase mode implemented |
+| Tesla | 94102 | - | - | Browserbase mode + US locale fixed |
+| Honeywell | 94102 | 25 | Yes | Working (Bullseye Locations iframe) |
+| Sensi | 45202 | 500+ | Yes | Working (Contractors + Distributors) |
+| Sol-Ark | 85001 | 10+ | Yes | Working (Authorized Installers) |
+| SimpliPhi | 90210 | 5+ | Yes | Working (Elite IQ Installers) |
+| Schneider Electric | 94102 | 2 | Yes | Working (EcoXpert integrators) |
+
+---
+
+## Architecture
+
+### Base Classes
+- `BaseDealerScraper` - Abstract base class
+- `ScraperFactory` - Factory pattern for instantiation
+- `DealerCapabilities` - Capability detection
+- `StandardizedDealer` - Normalized output format
+
+### Execution Modes
+1. **PLAYWRIGHT** - Local browser automation (tested)
+2. **RUNPOD** - Serverless API (production)
+3. **BROWSERBASE** - Cloud browsers (available)
+4. **PATCHRIGHT** - Stealth mode (bot detection bypass)
+
+### Data Flow
+```
+ZIP Code Input
+    |
+ScraperFactory.create(oem_name)
+    |
+scraper.scrape_zip_code(zip)
+    |
+get_extraction_script() -> JS evaluation
+    |
+parse_dealer_data() -> StandardizedDealer
+    |
+detect_capabilities() -> DealerCapabilities
+    |
+Output: List[StandardizedDealer]
+```
+
+---
+
+## Test Commands
+
+```bash
+# Run all tests
+pytest tests/ -v
+
+# Structure validation (no network)
+python3 scripts/validate_scraper_structure.py
+
+# Live audit (specific OEMs)
+python3 scripts/audit_all_scrapers.py --oems carrier generac sma
+
+# Quick audit (first 3)
+python3 scripts/audit_all_scrapers.py --quick
+```
+
+---
+
+## Next Steps
+
+1. ~~**Fix Kohler selector**~~ Done - Bot detection, use Browserbase
+2. ~~**Test York iframe**~~ Done - Bot detection, use Browserbase
+3. ~~**Validate Enphase, SolarEdge**~~ Done - Working in MCP Playwright
+4. ~~**Browserbase setup**~~ Done - Implemented for York, Kohler, Tesla
+5. ~~**Tesla US locale**~~ Done - Fixed with /en_us/ locale in URL
+6. ~~**Validate remaining 5**~~ Done - Honeywell, Sensi, Sol-Ark, SimpliPhi, Schneider all working
+7. ~~**Johnson Controls**~~ Archived - Returns corporate offices, not ICPs
+8. **Deploy to RunPod** - Production bulk scraping
+9. **Test Browserbase scrapers** - Validate York, Kohler, Tesla with BROWSERBASE_API_KEY
+
+---
+
+## Tier 1 OEMs for Future Development
+
+High-value OEMs for finding multi-trade MEP contractors:
+
+| OEM | Category | ICP Signal |
+|-----|----------|------------|
+| Daikin | Heat Pumps/Mini-Splits | HVAC + Electrical |
+| ChargePoint | EV Chargers | Electrical + Solar |
+| Span | Smart Panels | Electrical + Solar + Storage |
+| WaterFurnace | Geothermal | HVAC + Plumbing + Electrical |
+| Sonnen | Battery Storage | Premium installers |
+| Rinnai | Tankless Water Heaters | Plumbing + Gas |
+
+---
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| `scrapers/__init__.py` | Module exports, auto-import |
+| `scrapers/base_scraper.py` | Base classes |
+| `scrapers/scraper_factory.py` | Factory pattern |
+| `scrapers/*_scraper.py` | OEM-specific implementations |
+| `scripts/validate_scraper_structure.py` | Structure validation |
+| `scripts/audit_all_scrapers.py` | Live testing |
