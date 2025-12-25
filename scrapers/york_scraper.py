@@ -5,7 +5,13 @@ York HVAC Dealer Scraper
 Scrapes the York dealer locator to find HVAC contractors.
 Target URL: https://www.york.com/residential-equipment/find-a-dealer
 
-PRODUCTION READY - MetaLocator iframe-based dealer locator:
+**STATUS**: ⚠️ BROWSERBASE RECOMMENDED (bot detection in headless mode)
+
+The York site uses MetaLocator in an iframe with client-side rendering.
+Results load correctly in interactive browser but not in headless mode.
+For automated bulk scraping, use BROWSERBASE or PATCHRIGHT mode.
+
+MetaLocator iframe-based dealer locator:
 - IFRAME navigation required (locator_iframe16959)
 - Country selection required: "United States" dropdown
 - Clean h3 headings for dealer names
@@ -260,40 +266,47 @@ class YorkScraper(BaseDealerScraper):
                     print(f"  → No cookie popup (already accepted)")
 
                 # CRITICAL: Switch to iframe context
+                # The iframe contains the MetaLocator dealer search
                 print(f"  → Switching to iframe context...")
-                iframe_selector = 'iframe[name="locator_iframe16959"]'
                 try:
-                    iframe_element = page.wait_for_selector(iframe_selector, timeout=10000)
-                    iframe = iframe_element.content_frame()
+                    # Try multiple iframe selectors (name may vary)
+                    iframe = None
+                    for selector in ['iframe[name^="locator_iframe"]', 'iframe[src*="metalocator"]', 'iframe']:
+                        try:
+                            iframe_element = page.wait_for_selector(selector, timeout=5000)
+                            iframe = iframe_element.content_frame()
+                            if iframe:
+                                print(f"     ✓ Found iframe with: {selector}")
+                                break
+                        except:
+                            continue
+
+                    if not iframe:
+                        print(f"  ❌ Could not find iframe")
+                        browser.close()
+                        return []
                 except Exception as e:
                     print(f"  ❌ Could not find iframe: {e}")
                     browser.close()
                     return []
 
                 # CRITICAL: Select "United States" from country dropdown
+                # Updated Dec 2024: Now uses combobox instead of Bootstrap dropdown
                 print(f"  → Selecting United States from country dropdown...")
                 try:
-                    # Use the BUTTON (styled dropdown) instead of the underlying select
-                    country_button = iframe.locator('button[data-id="country"]')
-                    country_button.click()
+                    # Find and select from combobox
+                    country_select = iframe.locator('select[id*="country"], combobox[aria-label*="Country"]').first
+                    country_select.select_option(label="United States")
                     time.sleep(1)
-
-                    # Select "United States" from Bootstrap dropdown menu (uses <span> in dropdown)
-                    # The dropdown creates <li> items with <span> text
-                    us_option = iframe.locator('.dropdown-menu.show li span:has-text("United States")').first
-                    us_option.click()
-                    time.sleep(1)
-                    print(f"  → Selected United States")
+                    print(f"     ✓ Selected United States")
                 except Exception as e:
-                    print(f"  ❌ Error selecting country: {e}")
-                    browser.close()
-                    return []
+                    print(f"  ⚠️ Country selection issue (may already be US): {e}")
 
                 # Fill ZIP code
                 print(f"  → Filling ZIP code: {zip_code}")
                 try:
                     # Find postal code input (within iframe)
-                    zip_input = iframe.locator('input[placeholder*="postal" i], input[placeholder*="ZIP" i], input[type="text"]').first
+                    zip_input = iframe.locator('input[placeholder*="Postal" i], input[placeholder*="ZIP" i]').first
                     zip_input.fill(zip_code)
                     time.sleep(0.5)
                 except Exception as e:
@@ -301,27 +314,41 @@ class YorkScraper(BaseDealerScraper):
                     browser.close()
                     return []
 
-                # Click Search button
+                # Click Search button and wait for results
                 print(f"  → Clicking Search button...")
                 try:
-                    search_button = iframe.locator('button:has-text("Search"), input[type="submit"]').first
+                    search_button = iframe.locator('button:has-text("Search")').first
                     search_button.click()
-                    time.sleep(3)
+                    print(f"     ✓ Search button clicked")
                 except Exception as e:
                     print(f"  ❌ Error clicking search: {e}")
                     browser.close()
                     return []
 
-                # Wait for dealer results
-                print(f"  → Waiting for dealer results...")
+                # Wait for results - the iframe reloads after search
+                print(f"  → Waiting for dealer results (10s)...")
+                time.sleep(10)
+
+                # Re-get iframe reference after AJAX reload
                 try:
-                    # Wait for h3 headings (dealer names) to appear in iframe
-                    iframe.wait_for_selector('h3', timeout=10000)
+                    iframe_element = page.wait_for_selector('iframe[name^="locator_iframe"]', timeout=5000)
+                    iframe = iframe_element.content_frame()
+                except:
+                    pass
+
+                try:
+                    # Wait for h3 headings (dealer names) to appear
+                    iframe.wait_for_selector('h3', timeout=15000)
+                    print(f"     ✓ Results loaded")
                     time.sleep(2)
                 except Exception:
-                    print(f"  ⚠️  No dealers found for ZIP {zip_code}")
-                    browser.close()
-                    return []
+                    # Check if we got any results at all
+                    h3_count = iframe.locator('h3').count()
+                    print(f"     h3 count: {h3_count}")
+                    if h3_count == 0:
+                        print(f"  ⚠️  No dealers found for ZIP {zip_code}")
+                        browser.close()
+                        return []
 
                 # Execute extraction script IN IFRAME CONTEXT
                 print(f"  → Executing extraction script...")
@@ -351,6 +378,179 @@ class YorkScraper(BaseDealerScraper):
                 if 'browser' in locals():
                     browser.close()
                 return []
+
+    def _scrape_with_browserbase(self, zip_code: str) -> List[StandardizedDealer]:
+        """
+        BROWSERBASE mode: Cloud browser with residential proxy for bot detection bypass.
+
+        York's MetaLocator iframe requires:
+        1. Cookie consent handling
+        2. Iframe context switch
+        3. Country selection (United States)
+        4. ZIP code entry and search
+        5. Extraction script execution in iframe context
+
+        Requires BROWSERBASE_API_KEY in .env
+        """
+        from playwright.sync_api import sync_playwright
+        import random
+        import os
+
+        browserbase_api_key = os.getenv("BROWSERBASE_API_KEY")
+        if not browserbase_api_key:
+            raise ValueError("Missing BROWSERBASE_API_KEY in .env")
+
+        print(f"\n{'='*60}")
+        print(f"York Dealer Scraper - BROWSERBASE Mode")
+        print(f"ZIP Code: {zip_code}")
+        print(f"{'='*60}\n")
+
+        try:
+            with sync_playwright() as p:
+                print(f"  → Connecting to Browserbase cloud browser...")
+
+                # WebSocket connection with residential proxy enabled
+                ws_endpoint = f'wss://connect.browserbase.com?apiKey={browserbase_api_key}&enableProxy=true'
+                browser = p.chromium.connect_over_cdp(ws_endpoint)
+
+                # Get default context and page
+                context = browser.contexts[0]
+                page = context.pages[0] if context.pages else context.new_page()
+
+                print(f"  ✓ Connected to Browserbase")
+
+                # Human-like delay before navigation
+                time.sleep(random.uniform(1.5, 3.0))
+
+                # Navigate to York dealer locator
+                print(f"  → Navigating to {self.DEALER_LOCATOR_URL}")
+                page.goto(self.DEALER_LOCATOR_URL, timeout=60000, wait_until='domcontentloaded')
+
+                # Wait for page to stabilize
+                try:
+                    page.wait_for_load_state('networkidle', timeout=15000)
+                except:
+                    pass
+
+                time.sleep(random.uniform(3.0, 5.0))
+
+                # Handle cookie consent if present (TrustArc overlay blocks all clicks)
+                print(f"  → Checking for cookie consent popup...")
+                try:
+                    cookie_iframe_selector = 'iframe[title="Cookie Consent Notice"]'
+                    cookie_iframe_element = page.wait_for_selector(cookie_iframe_selector, timeout=5000)
+                    cookie_iframe = cookie_iframe_element.content_frame()
+
+                    accept_button = cookie_iframe.locator('button:has-text("Accept All")').first
+                    accept_button.click()
+                    print(f"  ✓ Cookies accepted")
+                    time.sleep(2)
+                except Exception:
+                    print(f"  → No cookie popup (already accepted or not shown)")
+
+                # Switch to MetaLocator iframe
+                print(f"  → Switching to iframe context...")
+                iframe = None
+                for selector in ['iframe[name^="locator_iframe"]', 'iframe[src*="metalocator"]', 'iframe']:
+                    try:
+                        iframe_element = page.wait_for_selector(selector, timeout=8000)
+                        iframe = iframe_element.content_frame()
+                        if iframe:
+                            print(f"     ✓ Found iframe with: {selector}")
+                            break
+                    except:
+                        continue
+
+                if not iframe:
+                    print(f"  ❌ Could not find iframe")
+                    browser.close()
+                    return []
+
+                # Wait for iframe content to load
+                time.sleep(random.uniform(2.0, 4.0))
+
+                # Select "United States" from country dropdown
+                print(f"  → Selecting United States from country dropdown...")
+                try:
+                    country_select = iframe.locator('select[id*="country"], select[aria-label*="Country"]').first
+                    country_select.select_option(label="United States")
+                    print(f"     ✓ Selected United States")
+                    time.sleep(1)
+                except Exception as e:
+                    print(f"  ⚠️ Country selection issue (may already be US): {e}")
+
+                # Fill ZIP code
+                print(f"  → Filling ZIP code: {zip_code}")
+                try:
+                    zip_input = iframe.locator('input[placeholder*="Postal" i], input[placeholder*="ZIP" i]').first
+                    zip_input.fill(zip_code)
+                    time.sleep(random.uniform(0.5, 1.0))
+                except Exception as e:
+                    print(f"  ❌ Error filling ZIP code: {e}")
+                    browser.close()
+                    return []
+
+                # Click Search button
+                print(f"  → Clicking Search button...")
+                try:
+                    search_button = iframe.locator('button:has-text("Search")').first
+                    search_button.click()
+                    print(f"     ✓ Search button clicked")
+                except Exception as e:
+                    print(f"  ❌ Error clicking search: {e}")
+                    browser.close()
+                    return []
+
+                # Wait for results to load
+                print(f"  → Waiting for results...")
+                time.sleep(random.uniform(8.0, 12.0))
+
+                # Re-get iframe reference after AJAX reload
+                try:
+                    iframe_element = page.wait_for_selector('iframe[name^="locator_iframe"]', timeout=5000)
+                    iframe = iframe_element.content_frame()
+                except:
+                    pass
+
+                # Wait for h3 headings (dealer names) to appear
+                try:
+                    iframe.wait_for_selector('h3', timeout=15000)
+                    print(f"     ✓ Results loaded")
+                    time.sleep(2)
+                except Exception:
+                    h3_count = iframe.locator('h3').count()
+                    print(f"     h3 count: {h3_count}")
+                    if h3_count == 0:
+                        print(f"  ⚠️ No dealers found for ZIP {zip_code}")
+                        browser.close()
+                        return []
+
+                # Execute extraction script IN IFRAME CONTEXT
+                print(f"  → Extracting dealer data...")
+                raw_results = iframe.evaluate(self.get_extraction_script())
+
+                if not raw_results:
+                    print(f"  ⚠️ No dealers found for ZIP {zip_code}")
+                    browser.close()
+                    return []
+
+                # Parse results
+                dealers = self.parse_results(raw_results, zip_code)
+                print(f"  ✅ Found {len(dealers)} York dealers")
+
+                # Count commercial contractors
+                commercial_count = sum(1 for d in dealers if 'Commercial Contractor' in d.certifications)
+                if commercial_count > 0:
+                    print(f"     ({commercial_count} commercial contractors)")
+
+                browser.close()
+                return dealers
+
+        except Exception as e:
+            print(f"  ❌ Browserbase error: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
 
     def _scrape_with_runpod(
         self, zip_code: str

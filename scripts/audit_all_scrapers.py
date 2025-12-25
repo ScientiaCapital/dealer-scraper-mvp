@@ -30,6 +30,9 @@ from scrapers.base_scraper import ScraperMode, StandardizedDealer
 # ═══════════════════════════════════════════════════════════════════════════
 
 WORKING_OEMS = {
+    # ═══════════════════════════════════════════════════════════════════════════
+    # HVAC SYSTEMS (9 scrapers)
+    # ═══════════════════════════════════════════════════════════════════════════
     "carrier": {
         "name": "Carrier",
         "scraper": "scrapers.carrier_scraper.CarrierScraper",
@@ -44,19 +47,19 @@ WORKING_OEMS = {
         "category": "HVAC",
         "expected_records": 2802,
     },
-    "mitsubishi": {
-        "name": "Mitsubishi",
-        "scraper": "scrapers.mitsubishi_scraper.MitsubishiScraper",
-        "test_zip": "94102",  # San Francisco - commercial focus
+    "lennox": {
+        "name": "Lennox",
+        "scraper": "scrapers.lennox_scraper.LennoxScraper",
+        "test_zip": "75201",  # Dallas - Lennox HQ
         "category": "HVAC",
-        "expected_records": 1799,
+        "expected_records": 500,
     },
-    "generac": {
-        "name": "Generac",
-        "scraper": "scrapers.generac_scraper.GeneracScraper",
-        "test_zip": "77001",  # Houston - storm belt
-        "category": "Generator",
-        "expected_records": 1706,
+    "york": {
+        "name": "York",
+        "scraper": "scrapers.york_scraper.YorkScraper",
+        "test_zip": "17401",  # York, PA HQ
+        "category": "HVAC",
+        "expected_records": 90,
     },
     "rheem": {
         "name": "Rheem",
@@ -65,9 +68,47 @@ WORKING_OEMS = {
         "category": "HVAC",
         "expected_records": 1648,
     },
+    "mitsubishi": {
+        "name": "Mitsubishi",
+        "scraper": "scrapers.mitsubishi_scraper.MitsubishiScraper",
+        "test_zip": "94102",  # San Francisco - commercial focus
+        "category": "HVAC",
+        "expected_records": 1799,
+    },
+    "honeywell": {
+        "name": "Honeywell",
+        "scraper": "scrapers.honeywell_scraper.HoneywellHomeScraper",
+        "test_zip": "28202",  # Charlotte NC HQ
+        "category": "HVAC/Smart Home",
+        "expected_records": 100,
+    },
+    "johnson_controls": {
+        "name": "Johnson Controls",
+        "scraper": "scrapers.johnson_controls_scraper.JohnsonControlsScraper",
+        "test_zip": "53202",  # Milwaukee HQ
+        "category": "HVAC/Building Automation",
+        "expected_records": 50,
+    },
+    "sensi": {
+        "name": "Sensi",
+        "scraper": "scrapers.sensi_scraper.SensiScraper",
+        "test_zip": "45202",  # Cincinnati - Emerson HQ
+        "category": "HVAC/Smart Thermostat",
+        "expected_records": 50,
+    },
+    # ═══════════════════════════════════════════════════════════════════════════
+    # GENERATORS (4 scrapers)
+    # ═══════════════════════════════════════════════════════════════════════════
+    "generac": {
+        "name": "Generac",
+        "scraper": "scrapers.generac_scraper.GeneracScraper",
+        "test_zip": "77001",  # Houston - storm belt
+        "category": "Generator",
+        "expected_records": 1706,
+    },
     "briggs": {
         "name": "Briggs & Stratton",
-        "scraper": "scrapers.briggs_scraper.BriggsScraper",
+        "scraper": "scrapers.briggs_scraper.BriggsStrattonScraper",
         "test_zip": "53201",  # Milwaukee HQ
         "category": "Generator",
         "expected_records": 782,
@@ -79,33 +120,22 @@ WORKING_OEMS = {
         "category": "Generator",
         "expected_records": 702,
     },
-    "schneider": {
-        "name": "Schneider Electric",
-        "scraper": "scrapers.schneider_scraper.SchneiderScraper",
-        "test_zip": "02116",  # Boston - tech hub
-        "category": "Electrical",
-        "expected_records": 143,
+    "kohler": {
+        "name": "Kohler",
+        "scraper": "scrapers.kohler_scraper.KohlerScraper",
+        "test_zip": "94102",  # San Francisco (tested Dec 2024)
+        "category": "Generator",
+        "expected_records": 100,
     },
-    "york": {
-        "name": "York",
-        "scraper": "scrapers.york_scraper.YorkScraper",
-        "test_zip": "17401",  # York, PA HQ
-        "category": "HVAC",
-        "expected_records": 90,
-    },
+    # ═══════════════════════════════════════════════════════════════════════════
+    # SOLAR INVERTERS (6 scrapers)
+    # ═══════════════════════════════════════════════════════════════════════════
     "tesla": {
         "name": "Tesla",
         "scraper": "scrapers.tesla_scraper.TeslaScraper",
         "test_zip": "94102",  # San Francisco
         "category": "Solar/Battery",
         "expected_records": 67,
-    },
-    "sma": {
-        "name": "SMA",
-        "scraper": "scrapers.sma_scraper.SMAScraper",
-        "test_zip": "95054",  # Silicon Valley
-        "category": "Inverter",
-        "expected_records": 43,
     },
     "enphase": {
         "name": "Enphase",
@@ -114,24 +144,55 @@ WORKING_OEMS = {
         "category": "Microinverter",
         "expected_records": 26,
     },
+    "fronius": {
+        "name": "Fronius",
+        "scraper": "scrapers.fronius_scraper.FroniusScraper",
+        "test_zip": "94102",  # San Francisco
+        "category": "Solar Inverter",
+        "expected_records": 50,
+    },
+    "sma": {
+        "name": "SMA",
+        "scraper": "scrapers.sma_scraper.SMAScraper",
+        "test_zip": "94102",  # San Francisco (tested Dec 2024)
+        "category": "Solar Inverter",
+        "expected_records": 43,
+    },
+    "solark": {
+        "name": "Sol-Ark",
+        "scraper": "scrapers.solark_scraper.SolArkScraper",
+        "test_zip": "75201",  # Dallas TX
+        "category": "Solar Inverter",
+        "expected_records": 50,
+    },
+    "solaredge": {
+        "name": "SolarEdge",
+        "scraper": "scrapers.solaredge_scraper.SolarEdgeScraper",
+        "test_zip": "94102",  # San Francisco
+        "category": "Solar Inverter",
+        "expected_records": 50,
+    },
+    # ═══════════════════════════════════════════════════════════════════════════
+    # BATTERY STORAGE (1 scraper)
+    # ═══════════════════════════════════════════════════════════════════════════
+    "simpliphi": {
+        "name": "SimpliPhi",
+        "scraper": "scrapers.simpliphi_scraper.SimpliPhiScraper",
+        "test_zip": "93003",  # Oxnard CA HQ
+        "category": "Battery",
+        "expected_records": 20,
+    },
 }
 
-BROKEN_OEMS = [
-    "kohler",      # Extraction validated, needs Browserbase
-    "lennox",      # URL changed
-    "abb",         # URL changed
-    "delta",       # No dealer locator found
-    "fronius",     # JS rendering required
-    "goodwe",      # Website changed
-    "growatt",     # Website down/moved
-    "honeywell",   # URL changed
-    "johnson_controls",  # No public locator
-    "sensi",       # URL changed
-    "simpliphi",   # Connection timeout
-    "solark",      # URL changed
-    "solaredge",   # URL changed
-    "sungrow",     # Website changed
-    "tigo",        # URL changed
+# Archived scrapers (not viable for bulk scraping - see scrapers/_archived/)
+ARCHIVED_OEMS = [
+    "abb",         # Divested residential solar 2020
+    "delta",       # No public ZIP-searchable dealer locator
+    "goodwe",      # No public ZIP-searchable dealer locator
+    "growatt",     # No public ZIP-searchable dealer locator
+    "schneider",   # Distributor-only (not installers)
+    "sungrow",     # No public ZIP-searchable dealer locator
+    "tigo",        # No public ZIP-searchable dealer locator
 ]
 
 
@@ -370,10 +431,10 @@ def print_summary(report: Dict[str, Any]) -> None:
 
     print("\n" + "═"*60)
 
-    # List broken scrapers for follow-up
-    if BROKEN_OEMS:
-        print(f"\n  📋 BROKEN SCRAPERS (not tested, need investigation):")
-        for oem in BROKEN_OEMS:
+    # List archived scrapers for reference
+    if ARCHIVED_OEMS:
+        print(f"\n  📁 ARCHIVED SCRAPERS (not viable for bulk scraping):")
+        for oem in ARCHIVED_OEMS:
             print(f"     • {oem}")
 
 

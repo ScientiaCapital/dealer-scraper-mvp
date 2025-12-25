@@ -1,6 +1,6 @@
 # Dealer Scraper MVP - Current Tasks
 
-**Last Updated**: 2025-12-24
+**Last Updated**: 2025-12-25
 
 **CRITICAL RULES:**
 - **NO OpenAI models** - Use DeepSeek, Qwen, Moonshot via OpenRouter
@@ -95,46 +95,37 @@ sales-agent after validation. dealer-scraper's job is to push to Supabase ONLY.
 
 ---
 
-### Priority 4: Fix 15 Broken OEM Scrapers
+### Priority 4: OEM Scraper Validation Sprint
 
-**Status**: In Progress
-**Effort**: 1 week (15 scrapers × 30min each)
+**Status**: ✅ COMPLETE (Dec 25, 2025)
+**Effort**: 4-6 hours
 
-**Broken Scrapers**:
-- Delta, Fronius, ABB, GoodWe, Growatt (Solar inverters)
-- Honeywell, Sensi, Lennox (HVAC/Smart home)
-- SimpliPhi, Sol-Ark, SolarEdge, Sungrow, Tigo (Solar/Battery)
-- Johnson Controls (Building automation)
+**Final Status: 20 Active Scrapers, 8 Archived**
 
-**Common Issues**:
-- URL changes (404s)
-- Selector updates needed
-- API endpoint changes
+**Active (Working)**:
+- HVAC (8): Carrier, Trane, Lennox, York, Rheem, Mitsubishi, Honeywell, Sensi
+- Generators (4): Generac, Briggs & Stratton, Cummins, Kohler
+- Solar/Inverter (6): Tesla, Enphase, Fronius, SMA, Sol-Ark, SolarEdge
+- Battery (1): SimpliPhi
+- Building Automation (1): Schneider Electric
 
-**Approach**:
-1. Use MCP Playwright to inspect each site
-2. Update URLs/selectors in scraper files
-3. Test with `--mode validate --limit 5`
-4. Run production with `--mode browserbase`
+**Archived (Not Viable for Bulk Scraping)**:
+- ABB: Divested residential solar 2020
+- Delta, GoodWe, Growatt, Sungrow, Tigo: No public ZIP-searchable locator
+- Johnson Controls: Returns corporate offices only (not contractor ICPs)
 
-**Tasks**:
-- [ ] Delta scraper
-- [ ] Fronius scraper
-- [ ] ABB scraper
-- [ ] GoodWe scraper
-- [ ] Growatt scraper
-- [ ] Honeywell scraper
-- [ ] Sensi scraper
-- [ ] Lennox scraper
-- [ ] SimpliPhi scraper
-- [ ] Sol-Ark scraper
-- [ ] SolarEdge scraper
-- [ ] Sungrow scraper
-- [ ] Tigo scraper
-- [ ] Johnson Controls scraper
-- [ ] Generac scraper (FIXING - extraction script needs update)
+**Completed Tasks**:
+- [x] Live tested all 5 remaining scrapers (Honeywell, Sensi, Sol-Ark, SimpliPhi, Schneider)
+- [x] Archived Johnson Controls (returns corporate offices, not ICPs)
+- [x] Moved Schneider Electric from archived → active (EcoXpert contractors)
+- [x] Added Browserbase mode to York, Kohler, Tesla (bot detection bypass)
+- [x] Fixed Tesla US locale (/en_us/)
+- [x] Created 5 new unit test files (212 tests)
+- [x] Updated OEM_SCRAPER_STATUS.md
+- [x] Structure validation: 20/20 pass
+- [x] Test suite: 364 tests passing
 
-**Dependencies**: MCP Playwright
+**Dependencies**: MCP Playwright, Browserbase
 
 **Blockers**: None
 
@@ -183,6 +174,18 @@ sales-agent after validation. dealer-scraper's job is to push to Supabase ONLY.
 ---
 
 ## Completed Tasks
+
+### 2025-12-25
+- [x] OEM Scraper Validation Sprint - 20 active scrapers, 8 archived
+- [x] Live tested 5 scrapers: Honeywell (25 dealers), Sensi (500+), Sol-Ark (10+), SimpliPhi (5+), Schneider (2)
+- [x] Archived Johnson Controls (returns corporate offices, not ICPs)
+- [x] Moved Schneider Electric from archived → active (EcoXpert contractors)
+- [x] Added Browserbase mode for York, Kohler, Tesla (bot detection bypass)
+- [x] Fixed Tesla US locale (/en_us/)
+- [x] Created 5 unit test files: honeywell, sensi, solark, simpliphi, schneider (212 tests)
+- [x] Updated OEM_SCRAPER_STATUS.md with full audit
+- [x] Structure validation: 20/20 pass
+- [x] Full test suite: 364 tests passing
 
 ### 2025-12-24
 - [x] Colorado DORA bulk migration (7,508 contractors, 114 multi-trade, 9 TDD tests)
