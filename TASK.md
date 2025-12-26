@@ -1,6 +1,6 @@
 # Dealer Scraper MVP - Current Tasks
 
-**Last Updated**: 2025-12-25
+**Last Updated**: 2025-12-26
 
 **CRITICAL RULES:**
 - **NO OpenAI models** - Use DeepSeek, Qwen, Moonshot via OpenRouter
@@ -11,33 +11,44 @@
 
 ## Active Tasks
 
-### 🔥 Priority 1: Close CRM Custom Fields Implementation
+### ✅ Priority 1: Close CRM Custom Fields Implementation
 
-**Status**: Script Complete, Testing Pending
+**Status**: ✅ COMPLETE (Dec 26, 2025)
 **Effort**: 4-6 hours
-**PRP**: `PRPs/2025-11-30-close-crm-oem-fields.md` (if generated)
 
 **⚠️ PROJECT BOUNDARY NOTE**:
-Close CRM sync script (`sync_to_close_crm.py`) was developed in dealer-scraper for testing,
+Close CRM sync script (`crm/`) was developed in dealer-scraper for testing,
 but PRODUCTION use should be in the sales-agent repository. This script will be moved to
 sales-agent after validation. dealer-scraper's job is to push to Supabase ONLY.
 
-**Tasks**:
-- [ ] Create OEM Certifications multi-value field in Close CRM
-- [ ] Create State Licenses multi-value field in Close CRM
-- [ ] Create OEM Count number field
-- [x] Create `scripts/sync_to_close_crm.py` (COMPLETE - 29 TDD tests passing)
-- [ ] Test with 5 leads (READY - script exists, needs integration test)
-- [ ] Create Smart Views for OEM filtering
+**Completed Tasks**:
+- [x] Create 8 custom fields in Close CRM (OEM_Certifications, State_Licenses, OEM_Count, etc.)
+- [x] Implement Supabase extraction from dim_companies (sales-agent shared DB)
+- [x] Fix Close API contact format (phones: [{phone: "..."}])
+- [x] Fix empty array handling (skip in payload)
+- [x] Test with 5 leads - ALL SYNCED SUCCESSFULLY
+- [ ] Create Smart Views for OEM filtering (manual in Close UI)
 
-**Dependencies**:
-- Close CRM API access
-- OEM data in SQLite
-- Test leads identified
+**Custom Fields Created**:
+| Field | Type | Close ID |
+|-------|------|----------|
+| OEM_Certifications | list | cf_5txDBf... |
+| State_Licenses | list | cf_xxxx |
+| OEM_Count | number | cf_xxxx |
+| License_Count | number | cf_xxxx |
+| Is_Multi_OEM | boolean | cf_xxxx |
+| Is_Multi_State | boolean | cf_xxxx |
+| Source_Type | text | cf_xxxx |
+| Coperniq_Score | number | cf_xxxx |
 
-**Blockers**: None
+**CRM Module**: `crm/` (5 files, 1,177 lines)
+- close_field_manager.py - Creates/fetches custom fields
+- close_importer.py - Lead upsert with phone deduplication
+- close_sync_service.py - Orchestrates full sync workflow
+- data_extractor.py - SQLite + Supabase extraction
+- models.py - CloseLeadPayload, SyncReport dataclasses
 
-**Plan**: `~/.claude/plans/streamed-moseying-moon.md`
+**Next Step**: Create Smart Views manually in Close CRM UI
 
 ---
 
@@ -174,6 +185,13 @@ sales-agent after validation. dealer-scraper's job is to push to Supabase ONLY.
 ---
 
 ## Completed Tasks
+
+### 2025-12-26
+- [x] Close CRM Custom Fields Implementation - 8 fields created, 5 leads synced
+- [x] Implemented Supabase extraction from dim_companies (sales-agent shared DB)
+- [x] Fixed Close API contact format and empty array handling
+- [x] Created crm/ module (5 files, 1,177 lines)
+- [x] Added crm/ to git tracking (removed from .gitignore)
 
 ### 2025-12-25
 - [x] OEM Scraper Validation Sprint - 20 active scrapers, 8 archived
