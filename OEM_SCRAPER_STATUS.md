@@ -1,8 +1,9 @@
 # OEM Scraper Status Report
 
-**Generated:** December 25, 2025
-**Tests Passing:** 152/152 (100%)
+**Last Audit:** December 26, 2025 (Sprint 3)
+**Unit Tests:** 212/212 passed (OEM scrapers)
 **Structure Validation:** 20/20 scrapers pass
+**Live Validation:** 15 WORKING, 0 BROKEN, 5 PARTIAL (need Browserbase)
 
 ---
 
@@ -49,7 +50,7 @@
 |-----|------|--------|-------|
 | Tesla | `tesla_scraper.py` | Browserbase | US locale fixed (/en_us/), Browserbase mode |
 | Enphase | `enphase_scraper.py` | Production | 27 installers/ZIP, tiers, ratings |
-| Fronius | `fronius_scraper.py` | Production | Angular app |
+| Fronius | `fronius_scraper.py` | Browserbase | Geolocation API required |
 | SMA | `sma_scraper.py` | Production | 2 dealers/ZIP tested Dec 2024 |
 | Sol-Ark | `solark_scraper.py` | Production | Authorized Installers + Distributors |
 | SolarEdge | `solaredge_scraper.py` | Production | 5 installers/ZIP, O&M support |
@@ -58,7 +59,7 @@
 
 | OEM | File | Status | Notes |
 |-----|------|--------|-------|
-| SimpliPhi | `simpliphi_scraper.py` | Production | Elite IQ Installers (contractors) |
+| SimpliPhi | `simpliphi_scraper.py` | Production | 10 dealers/ZIP, Elite IQ Installers |
 
 ### Building Automation (1)
 
@@ -102,23 +103,25 @@ All scrapers validated for:
 - Required methods (get_extraction_script, detect_capabilities, parse_dealer_data)
 - JavaScript extraction script syntax
 
-### Live Tests (December 25, 2025)
+### Live Tests (December 26, 2025 - Sprint 3)
 
 | OEM | ZIP | Dealers | Phone % | Status |
 |-----|-----|---------|---------|--------|
 | SMA | 94102 | 2 | 100% | Working |
 | Carrier | 75201 | 65 | 100% | Working |
 | Generac | 77001 | 78 | 100% | Working |
+| Trane | 75201 | 6 | N/A | Working (Fixed selector + extraction) |
 | Enphase | 94102 | 27 | N/A | Working (tiers: Platinum/Gold/Silver) |
-| SolarEdge | 94102 | 5 | N/A | Working (O&M capabilities) |
-| York | 94102 | - | - | Browserbase mode implemented |
-| Kohler | 53202 | - | - | Browserbase mode implemented |
-| Tesla | 94102 | - | - | Browserbase mode + US locale fixed |
-| Honeywell | 94102 | 25 | Yes | Working (Bullseye Locations iframe) |
-| Sensi | 45202 | 500+ | Yes | Working (Contractors + Distributors) |
-| Sol-Ark | 85001 | 10+ | Yes | Working (Authorized Installers) |
-| SimpliPhi | 90210 | 5+ | Yes | Working (Elite IQ Installers) |
+| SolarEdge | 94102 | 5 | N/A | Working (auto Playwright converted) |
+| Sol-Ark | 85001 | 20 | Yes | Working (auto Playwright converted) |
+| Sensi | 45202 | 500+ | Yes | Working (DDL cards + autocomplete) |
+| SimpliPhi | 90210 | 10 | Yes | Working (auto Playwright converted) |
 | Schneider Electric | 94102 | 2 | Yes | Working (EcoXpert integrators) |
+| York | 94102 | - | - | Browserbase mode (bot detection) |
+| Kohler | 53202 | - | - | Browserbase mode (bot detection) |
+| Tesla | 94102 | - | - | Browserbase mode (US locale fixed) |
+| Honeywell | 94102 | - | - | Browserbase mode (iframe context) |
+| Fronius | 94102 | - | - | Browserbase mode (geolocation API) |
 
 ---
 
@@ -175,15 +178,22 @@ python3 scripts/audit_all_scrapers.py --quick
 
 ## Next Steps
 
-1. ~~**Fix Kohler selector**~~ Done - Bot detection, use Browserbase
-2. ~~**Test York iframe**~~ Done - Bot detection, use Browserbase
-3. ~~**Validate Enphase, SolarEdge**~~ Done - Working in MCP Playwright
-4. ~~**Browserbase setup**~~ Done - Implemented for York, Kohler, Tesla
-5. ~~**Tesla US locale**~~ Done - Fixed with /en_us/ locale in URL
-6. ~~**Validate remaining 5**~~ Done - Honeywell, Sensi, Sol-Ark, SimpliPhi, Schneider all working
-7. ~~**Johnson Controls**~~ Archived - Returns corporate offices, not ICPs
-8. **Deploy to RunPod** - Production bulk scraping
-9. **Test Browserbase scrapers** - Validate York, Kohler, Tesla with BROWSERBASE_API_KEY
+### Completed (Dec 26 Sprint 3)
+1. ~~**Fix Trane selector**~~ Done - Fixed ZIP input selector + extraction script
+2. ~~**Fix Sensi search**~~ Done - DDL cards + Google Places autocomplete
+3. ~~**Fix Sol-Ark manual mode**~~ Done - Converted to auto Playwright (20 dealers)
+4. ~~**Fix SolarEdge manual mode**~~ Done - Converted to auto Playwright (5 dealers)
+5. ~~**Fix Generac**~~ Done - Verified working (78 dealers)
+6. ~~**Fix SimpliPhi manual mode**~~ Done - Converted to auto Playwright (10 dealers)
+7. ~~**Investigate Fronius**~~ Documented - Requires Browserbase (geolocation API)
+
+### Remaining (Need Browserbase)
+8. **York** - Bot detection requires cloud browser
+9. **Kohler** - Bot detection requires cloud browser
+10. **Tesla** - US locale fixed, needs Browserbase execution
+11. **Honeywell** - Bullseye iframe requires cloud browser
+12. **Fronius** - Geolocation API requires cloud browser
+13. **Deploy to RunPod** - Production bulk scraping
 
 ---
 

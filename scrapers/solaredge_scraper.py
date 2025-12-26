@@ -342,48 +342,165 @@ class SolarEdgeScraper(BaseDealerScraper):
 
     def _scrape_with_playwright(self, zip_code: str) -> List[StandardizedDealer]:
         """
-        PLAYWRIGHT mode: Print manual MCP Playwright instructions.
+        PLAYWRIGHT mode: Scrape SolarEdge installers using browser automation.
         """
-        print(f"\n{'='*60}")
-        print(f"SolarEdge Installer Network Scraper - PLAYWRIGHT Mode")
-        print(f"ZIP Code: {zip_code}")
-        print(f"{'='*60}\n")
+        import time
+        from playwright.sync_api import sync_playwright
 
-        print("⚠️  MANUAL WORKFLOW - Execute these MCP Playwright tools in order:\n")
+        dealers = []
 
-        print("1. Navigate to SolarEdge installer locator:")
-        print(f'   mcp__playwright__browser_navigate({{"url": "{self.DEALER_LOCATOR_URL}"}})\n')
+        with sync_playwright() as p:
+            try:
+                print(f"\n🔧 SOLAREDGE: Scraping ZIP {zip_code}")
 
-        print("2. Take snapshot to get current element refs:")
-        print('   mcp__playwright__browser_snapshot({})\n')
+                # Launch browser
+                browser = p.chromium.launch(headless=True)
+                context = browser.new_context(
+                    viewport={'width': 1920, 'height': 1080},
+                    user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+                )
+                page = context.new_page()
 
-        print("3. Handle cookie consent (if present):")
-        print('   mcp__playwright__browser_click({"element": "Accept", "ref": "[from snapshot]"})\n')
+                # Navigate to installer locator
+                print(f"  → Navigating to {self.DEALER_LOCATOR_URL}")
+                page.goto(self.DEALER_LOCATOR_URL, timeout=60000)
+                time.sleep(5)
 
-        print("4. Enter ZIP code:")
-        print(f'   mcp__playwright__browser_type({{')
-        print(f'       "element": "ZIP code input",')
-        print(f'       "ref": "[from snapshot]",')
-        print(f'       "text": "{zip_code}",')
-        print(f'       "submit": False')
-        print(f'   }})\n')
+                # Accept cookies
+                try:
+                    page.locator('button:has-text("Accept")').first.click(timeout=3000)
+                    time.sleep(2)
+                except Exception:
+                    pass
 
-        print("5. Click search button:")
-        print('   mcp__playwright__browser_click({"element": "Search", "ref": "[from snapshot]"})\n')
+                # Fill search input
+                print(f"  → Searching for ZIP: {zip_code}")
+                zip_input = page.locator('input[name="zip_or_address"]')
+                zip_input.fill(zip_code)
+                time.sleep(2)
 
-        print("6. Wait for results:")
-        print('   mcp__playwright__browser_wait_for({"time": 3})\n')
+                # Handle Google Places autocomplete
+                try:
+                    autocomplete = page.locator('.pac-container .pac-item').first
+                    autocomplete.wait_for(state='visible', timeout=3000)
+                    print(f"  → Selecting autocomplete suggestion...")
+                    autocomplete.click()
+                    time.sleep(1)
+                except Exception:
+                    pass
 
-        print("7. Extract installer data:")
-        extraction_script = self.get_extraction_script()
-        print(f'   mcp__playwright__browser_evaluate({{"function": """{extraction_script}"""}})\n')
+                # Click submit
+                print(f"  → Submitting search...")
+                page.locator('input[name="op"][type="submit"]').click()
+                time.sleep(8)
 
-        print("8. Process results with:")
-        print(f'   solaredge_scraper.parse_results(results_json, "{zip_code}")\n')
+                # Wait for results
+                print(f"  → Waiting for results...")
+                try:
+                    page.wait_for_selector('.installer-tile, .results-tiles', timeout=10000)
+                    time.sleep(2)
+                except Exception:
+                    print(f"  ⚠️  No results found for ZIP {zip_code}")
+                    browser.close()
+                    return []
 
-        print(f"{'='*60}\n")
+                # Execute extraction script
+                print(f"  → Executing extraction script...")
+                extraction_script = """
+                () => {
+                    const dealers = [];
+                    const tiles = document.querySelectorAll('.installer-tile');
 
-        return []
+                    tiles.forEach(tile => {
+                        try {
+                            const text = tile.innerText || '';
+                            const lines = text.split('\\n').map(l => l.trim()).filter(l => l);
+
+                            // First line is the company name
+                            const name = lines[0] || '';
+                            if (!name || name.length < 3) return;
+
+                            // Extract services (badges)
+                            const services = [];
+                            const serviceKeywords = ['Maintenance', 'Solar', 'Storage', 'Commercial', 'Residential'];
+                            lines.forEach(line => {
+                                serviceKeywords.forEach(kw => {
+                                    if (line.includes(kw)) services.push(kw);
+                                });
+                            });
+
+                            // Extract address (usually has state abbreviation + ZIP)
+                            let address_full = '', city = '', state = '', zip = '';
+                            for (const line of lines) {
+                                const stateZipMatch = line.match(/([A-Z]{2})[,\\s]+?(\\d{5})/);
+                                if (stateZipMatch) {
+                                    address_full = line;
+                                    state = stateZipMatch[1];
+                                    zip = stateZipMatch[2];
+                                    // Try to extract city
+                                    const parts = line.split(',').map(p => p.trim());
+                                    if (parts.length >= 2) {
+                                        city = parts[parts.length - 2];
+                                    }
+                                    break;
+                                }
+                            }
+
+                            // Check capabilities
+                            const has_maintenance = services.includes('Maintenance');
+                            const has_commercial = services.includes('Commercial') || name.toLowerCase().includes('commercial');
+                            const has_storage = services.includes('Storage');
+
+                            dealers.push({
+                                name: name,
+                                phone: '',  // Not visible in list view
+                                website: '',
+                                street: '',
+                                city: city,
+                                state: state,
+                                zip: zip,
+                                address_full: address_full,
+                                certifications: ['SolarEdge Certified'].concat(services),
+                                tier: has_maintenance ? 'O&M Provider' : 'Standard',
+                                has_commercial: has_commercial,
+                                has_ops_maintenance: has_maintenance,
+                                is_resimercial: has_commercial,
+                                capabilities: services
+                            });
+                        } catch (e) {
+                            console.error('Error parsing tile:', e);
+                        }
+                    });
+
+                    return dealers;
+                }
+                """
+                raw_results = page.evaluate(extraction_script)
+
+                if not raw_results:
+                    print(f"  ❌ No installers found for ZIP {zip_code}")
+                    browser.close()
+                    return []
+
+                # Parse results
+                dealers = [self.parse_dealer_data(d, zip_code) for d in raw_results]
+                print(f"  ✅ Found {len(dealers)} SolarEdge installers")
+
+                # Count O&M providers
+                om_count = sum(1 for d in dealers if d.has_ops_maintenance)
+                if om_count > 0:
+                    print(f"     ({om_count} O&M providers)")
+
+                browser.close()
+                return dealers
+
+            except Exception as e:
+                print(f"  ❌ Error scraping ZIP {zip_code}: {e}")
+                import traceback
+                traceback.print_exc()
+                if 'browser' in locals():
+                    browser.close()
+                return []
 
     def _scrape_with_runpod(self, zip_code: str) -> List[StandardizedDealer]:
         """

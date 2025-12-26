@@ -52,12 +52,14 @@ class FroniusScraper(BaseDealerScraper):
     DEALER_LOCATOR_URL = "https://www.fronius.com/en-us/usa/solar-energy/home-owners/contact/find-installers"
     PRODUCT_LINES = ["String Inverters", "Hybrid Inverters", "Battery Storage", "Energy Storage", "Commercial"]
 
-    # CSS Selectors (to be verified after site inspection)
+    # CSS Selectors (verified December 2025)
+    # NOTE: This scraper requires BROWSERBASE mode due to geolocation requirements
     SELECTORS = {
-        "search_input": "input[type='text']",           # Address/city search input
-        "search_button": "button[type='submit']",       # Search button
-        "partner_cards": ".partner-item",               # Partner result cards
-        "geolocation_btn": "button.geolocation",        # Use my location button
+        "search_input": "input[placeholder*='city' i]",  # Address/city search input
+        "search_button": "button:has-text('Search')",    # Search button
+        "cookie_accept": "button:has-text('Allow all')", # Cookie consent
+        "list_view": "text=List",                        # List view toggle
+        "partner_cards": "button:has-text('Fronius Solutions Partner')",  # Partner buttons
     }
 
     def __init__(self, mode: ScraperMode = ScraperMode.PLAYWRIGHT):

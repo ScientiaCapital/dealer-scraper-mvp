@@ -66,121 +66,106 @@ class SensiScraper(BaseDealerScraper):
         """
         JavaScript extraction for Sensi installers.
 
-        Extracts from "Locations near You" results.
-        Self-designated contractors, so data quality may vary.
+        Extracts from DDL location finder cards.
+        Structure: ddl-location-finder-card with info-left, info-right, tags
         """
         return r"""
 () => {
   const dealers = [];
 
-  // Find location cards
-  const locationCards = Array.from(document.querySelectorAll(
-    '.location, .result, article, .card, [class*="location-item"], [class*="result-item"]'
-  )).filter(card => {
-    const text = card.textContent || '';
-    return text.length > 50 && !text.includes('No results found');
-  });
+  // Find DDL location finder cards
+  const cards = document.querySelectorAll('.ddl-location-finder-card');
+  console.log(`[Sensi] Found ${cards.length} installer cards`);
 
-  console.log(`[Sensi] Found ${locationCards.length} location cards`);
-
-  locationCards.forEach((card) => {
+  cards.forEach((card) => {
     try {
-      // Extract name
-      const nameEl = card.querySelector('h1, h2, h3, h4, h5, [class*="name"], [class*="title"], strong');
-      const name = nameEl ? nameEl.textContent.trim() : '';
+      // Get info sections
+      const infoLeft = card.querySelector('.ddl-location-finder-card__info-left');
+      const infoRight = card.querySelector('.ddl-location-finder-card__info-right');
+      const tagsEl = card.querySelector('.ddl-location-finder-card__tags');
 
+      if (!infoLeft) return;
+
+      // Parse the info-left section (name + address)
+      const leftText = infoLeft.innerText || '';
+      const lines = leftText.split('\n').map(l => l.trim()).filter(l => l);
+
+      // First line is the company name
+      const name = lines[0] || '';
       if (!name || name.length < 3) return;
 
-      // Extract phone from tel: link
-      const phoneLink = card.querySelector('a[href^="tel:"]');
-      let phone = '';
-      if (phoneLink) {
-        phone = phoneLink.href.replace('tel:', '').replace(/[^0-9]/g, '');
-        // Remove country code if present
-        if (phone.length === 11 && phone.startsWith('1')) {
-          phone = phone.substring(1);
-        }
-      }
-
-      // Extract website
-      const websiteLink = Array.from(card.querySelectorAll('a[href^="http"]'))
-        .find(link => {
-          const href = link.href;
-          return !href.includes('google') && !href.includes('facebook') &&
-                 !href.includes('sensi.') && !href.includes('copeland.') &&
-                 !href.includes('emerson.');
-        });
-      const website = websiteLink ? websiteLink.href : '';
-      let domain = '';
-      if (website) {
-        try {
-          const url = new URL(website);
-          domain = url.hostname.replace(/^www\./, '');
-        } catch(e) {}
-      }
-
-      // Extract address
+      // Address parsing from remaining lines
       let street = '', city = '', state = '', zip = '';
-      const addressEl = card.querySelector('[class*="address"], address, [class*="location-address"]');
-      if (addressEl) {
-        const addressText = addressEl.textContent.trim();
-        // Parse address patterns
-        const addressMatch = addressText.match(/^(.+?),\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),?\s*([A-Z]{2})\s*(\d{5})/);
-        if (addressMatch) {
-          street = addressMatch[1].trim();
-          city = addressMatch[2];
-          state = addressMatch[3];
-          zip = addressMatch[4];
-        } else {
-          // Fallback: city, state, ZIP
-          const cityStateMatch = addressText.match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),?\s*([A-Z]{2})\s*(\d{5})/);
-          if (cityStateMatch) {
-            city = cityStateMatch[1];
-            state = cityStateMatch[2];
-            zip = cityStateMatch[3];
-          }
+      if (lines.length >= 2) {
+        street = lines[1] || '';
+      }
+      if (lines.length >= 3) {
+        city = lines[2] || '';
+      }
+      // Last line typically has "State, US ZIP" format
+      const lastLine = lines[lines.length - 1] || '';
+      const stateMatch = lastLine.match(/([A-Za-z]+),?\s*US?\s*(\d{5})/);
+      if (stateMatch) {
+        // Map state name to abbreviation
+        const stateNames = {
+          'Kentucky': 'KY', 'Ohio': 'OH', 'Indiana': 'IN', 'Tennessee': 'TN',
+          'Texas': 'TX', 'California': 'CA', 'Florida': 'FL', 'New York': 'NY',
+          'Pennsylvania': 'PA', 'Illinois': 'IL', 'Michigan': 'MI', 'Georgia': 'GA'
+        };
+        const stateName = stateMatch[1];
+        state = stateNames[stateName] || stateName.substring(0, 2).toUpperCase();
+        zip = stateMatch[2];
+      }
+
+      // Extract distance from info-right
+      let distance = '', distance_miles = 0;
+      if (infoRight) {
+        const rightText = infoRight.innerText || '';
+        const distMatch = rightText.match(/([\d.]+)\s*mi/);
+        if (distMatch) {
+          distance_miles = parseFloat(distMatch[1]);
+          distance = `${distance_miles} mi`;
         }
       }
 
-      // Extract services
-      const services = [];
-      const serviceItems = card.querySelectorAll('[class*="service"], [class*="specialty"], li');
-      serviceItems.forEach(item => {
-        const text = item.textContent.trim();
-        if (text && text.length < 100 && !text.includes('miles') && !text.includes('km')) {
-          services.push(text);
-        }
-      });
+      // Extract tags (Contractor, Distributor, etc.)
+      const tags = [];
+      if (tagsEl) {
+        const tagSpans = tagsEl.querySelectorAll('span, div');
+        tagSpans.forEach(span => {
+          const tag = span.textContent.trim();
+          if (tag && tag.length > 2 && tag.length < 50) {
+            tags.push(tag);
+          }
+        });
+      }
 
-      // Extract distance
-      let distance = '', distance_miles = 0;
-      const distanceMatch = card.textContent.match(/([\d.]+)\s*(mi|miles|km)/i);
-      if (distanceMatch) {
-        const value = parseFloat(distanceMatch[1]);
-        const unit = distanceMatch[2].toLowerCase();
-        if (unit.includes('km')) {
-          distance_miles = value * 0.621371;
-          distance = `${distance_miles.toFixed(1)} mi`;
-        } else {
-          distance_miles = value;
-          distance = `${value} mi`;
-        }
+      // Determine tier based on tags
+      const isContractor = tags.some(t => t.toLowerCase().includes('contractor'));
+      const isDistributor = tags.some(t => t.toLowerCase().includes('distributor'));
+      let tier = 'Standard';
+      if (isContractor && isDistributor) {
+        tier = 'Contractor + Distributor';
+      } else if (isContractor) {
+        tier = 'Contractor';
+      } else if (isDistributor) {
+        tier = 'Distributor';
       }
 
       dealers.push({
         name: name,
-        phone: phone,
-        domain: domain,
-        website: website,
+        phone: '',  // Phone not visible in list view
+        domain: '',
+        website: '',
         street: street,
         city: city,
         state: state,
         zip: zip,
-        address_full: street && city && state ? `${street}, ${city}, ${state} ${zip}` : `${city}, ${state} ${zip}`,
+        address_full: `${street}, ${city}, ${state} ${zip}`.replace(/^,\s*/, ''),
         rating: 0.0,
         review_count: 0,
-        tier: services.length > 0 ? 'Sensi Pro' : 'Standard',
-        certifications: services,
+        tier: tier,
+        certifications: tags,
         distance: distance,
         distance_miles: distance_miles,
         oem_source: 'Sensi'
@@ -230,10 +215,15 @@ class SensiScraper(BaseDealerScraper):
                 # Fill ZIP/address field
                 print(f"  → Filling address field with ZIP: {zip_code}")
                 try:
+                    # Target the visible "Enter Location" input specifically
+                    # The page has hidden search inputs that match before the visible one
                     address_input = page.locator(
-                        'input[placeholder*="address" i], input[placeholder*="ZIP" i], '
-                        'input[placeholder*="location" i], input[type="text"], input[type="search"]'
+                        'input[placeholder="Enter Location"], '
+                        'input[placeholder*="Location" i]:visible, '
+                        'input[placeholder*="address" i]:visible, '
+                        'input[placeholder*="ZIP" i]:visible'
                     ).first
+                    address_input.wait_for(state='visible', timeout=10000)
                     address_input.fill(zip_code)
                     time.sleep(1)
                 except Exception as e:
@@ -241,26 +231,38 @@ class SensiScraper(BaseDealerScraper):
                     browser.close()
                     return []
 
-                # Click search button
-                print(f"  → Clicking search button...")
+                # Handle Google Places autocomplete
+                print(f"  → Waiting for autocomplete suggestions...")
                 try:
-                    search_button = page.locator(
-                        'button:has-text("Search"), button:has-text("Find"), '
-                        'input[type="submit"], button[type="submit"]'
-                    ).first
-                    search_button.click()
-                    time.sleep(4)
+                    # Wait for Google Places autocomplete to appear
+                    autocomplete = page.locator('.pac-container .pac-item').first
+                    autocomplete.wait_for(state='visible', timeout=5000)
+                    time.sleep(0.5)
+
+                    # Click the first suggestion
+                    print(f"  → Selecting first autocomplete suggestion...")
+                    autocomplete.click()
+                    time.sleep(2)
                 except Exception as e:
-                    # Try Enter key
-                    print(f"  → Trying Enter key...")
-                    page.keyboard.press("Enter")
-                    time.sleep(4)
+                    # Fallback: Try search button or Enter key
+                    print(f"  → Autocomplete not found, trying search button...")
+                    try:
+                        search_button = page.locator(
+                            'button:has-text("Search"), button:has-text("Find"), '
+                            'input[type="submit"], button[type="submit"]'
+                        ).first
+                        search_button.click()
+                        time.sleep(4)
+                    except Exception:
+                        print(f"  → Trying Enter key...")
+                        page.keyboard.press("Enter")
+                        time.sleep(4)
 
                 # Wait for results
                 print(f"  → Waiting for results...")
                 try:
                     page.wait_for_selector(
-                        '.location, .result, article, [class*="location-item"]',
+                        '.ddl-location-finder-card, .ddl-location-finder__result-cards',
                         timeout=10000
                     )
                     time.sleep(2)

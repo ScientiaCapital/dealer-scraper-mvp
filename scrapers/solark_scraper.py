@@ -396,50 +396,152 @@ class SolArkScraper(BaseDealerScraper):
 
     def _scrape_with_playwright(self, zip_code: str) -> List[StandardizedDealer]:
         """
-        PLAYWRIGHT mode: Print manual MCP Playwright instructions.
+        PLAYWRIGHT mode: Scrape Sol-Ark distributors using browser automation.
         """
-        print(f"\n{'='*60}")
-        print(f"Sol-Ark Distributor Network Scraper - PLAYWRIGHT Mode")
-        print(f"ZIP Code: {zip_code}")
-        print(f"{'='*60}\n")
+        import time
+        from playwright.sync_api import sync_playwright
 
-        print("⚠️  MANUAL WORKFLOW - Execute these MCP Playwright tools in order:\n")
+        dealers = []
 
-        print("1. Navigate to Sol-Ark distributor map:")
-        print(f'   mcp__playwright__browser_navigate({{"url": "{self.DEALER_LOCATOR_URL}"}})\n')
+        with sync_playwright() as p:
+            try:
+                print(f"\n🔧 SOL-ARK: Scraping ZIP {zip_code}")
 
-        print("2. Take snapshot to get current element refs:")
-        print('   mcp__playwright__browser_snapshot({})\n')
+                # Launch browser
+                browser = p.chromium.launch(headless=True)
+                context = browser.new_context(
+                    viewport={'width': 1920, 'height': 1080},
+                    user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+                )
+                page = context.new_page()
 
-        print("3. Handle cookie consent (if present):")
-        print('   mcp__playwright__browser_click({"element": "Accept", "ref": "[from snapshot]"})\n')
+                # Navigate to distributor map
+                print(f"  → Navigating to {self.DEALER_LOCATOR_URL}")
+                page.goto(self.DEALER_LOCATOR_URL, timeout=60000)
+                time.sleep(5)
 
-        print("4. Enter ZIP code or location:")
-        print(f'   mcp__playwright__browser_type({{')
-        print(f'       "element": "Search input",')
-        print(f'       "ref": "[from snapshot]",')
-        print(f'       "text": "{zip_code}",')
-        print(f'       "submit": False')
-        print(f'   }})\n')
+                # Fill search input
+                print(f"  → Searching for ZIP: {zip_code}")
+                search_input = page.locator('#storelocator-search_location')
+                search_input.fill(zip_code)
+                time.sleep(1)
 
-        print("5. Click search button (or map may auto-update):")
-        print('   mcp__playwright__browser_click({"element": "Search", "ref": "[from snapshot]"})\n')
+                # Handle autocomplete
+                try:
+                    suggestion = page.locator('.ui-autocomplete li').first
+                    suggestion.wait_for(state='visible', timeout=3000)
+                    print(f"  → Selecting autocomplete suggestion...")
+                    suggestion.click()
+                    time.sleep(4)
+                except Exception:
+                    print(f"  → Pressing Enter to search...")
+                    search_input.press('Enter')
+                    time.sleep(4)
 
-        print("6. Wait for map and results to load:")
-        print('   mcp__playwright__browser_wait_for({"time": 3})\n')
+                # Wait for results
+                print(f"  → Waiting for results...")
+                try:
+                    page.wait_for_selector('.storelocator-store', timeout=10000)
+                    time.sleep(2)
+                except Exception:
+                    print(f"  ⚠️  No results found for ZIP {zip_code}")
+                    browser.close()
+                    return []
 
-        print("7. Extract distributor data:")
-        extraction_script = self.get_extraction_script()
-        print(f'   mcp__playwright__browser_evaluate({{"function": """{extraction_script}"""}})\n')
+                # Execute extraction script
+                print(f"  → Executing extraction script...")
+                extraction_script = """
+                () => {
+                    const dealers = [];
+                    const stores = document.querySelectorAll('.storelocator-store');
 
-        print("8. Process results with:")
-        print(f'   solark_scraper.parse_results(results_json, "{zip_code}")\n')
+                    stores.forEach(store => {
+                        try {
+                            // Extract name
+                            const nameEl = store.querySelector('.storelocator-storename');
+                            const name = nameEl ? nameEl.textContent.trim() : '';
+                            if (!name) return;
 
-        print(f"{'='*60}\n")
-        print("NOTE: Sol-Ark shows 'Top Distributors' section + interactive map.")
-        print("      Extraction script captures both featured and map results.\n")
+                            // Extract address
+                            const addressEl = store.querySelector('.storelocator-address');
+                            const address_full = addressEl ? addressEl.textContent.trim() : '';
 
-        return []
+                            // Parse address components
+                            let street = '', city = '', state = '', zip = '';
+                            if (address_full) {
+                                // Format: "38455 State Hwy 22, Monroe, 68647, United States"
+                                const parts = address_full.split(',').map(p => p.trim());
+                                if (parts.length >= 3) {
+                                    street = parts[0];
+                                    city = parts[1];
+                                    // Extract ZIP from remaining parts
+                                    const zipMatch = address_full.match(/(\d{5})/);
+                                    if (zipMatch) zip = zipMatch[1];
+                                    // State abbreviation might be in the format
+                                    const stateMatch = address_full.match(/,\s*([A-Z]{2})\s+\d{5}/);
+                                    if (stateMatch) state = stateMatch[1];
+                                }
+                            }
+
+                            // Extract phone
+                            const phoneEl = store.querySelector('.storelocator-phone a[href^="tel:"]');
+                            let phone = '';
+                            if (phoneEl) {
+                                phone = phoneEl.href.replace('tel:', '').replace(/\D/g, '');
+                            }
+
+                            // Extract email
+                            const emailEl = store.querySelector('.storelocator-email a[href^="mailto:"]');
+                            const email = emailEl ? emailEl.href.replace('mailto:', '') : '';
+
+                            // Extract website
+                            const websiteEl = store.querySelector('.storelocator-web a[href^="http"]');
+                            const website = websiteEl ? websiteEl.href : '';
+
+                            dealers.push({
+                                name: name,
+                                phone: phone,
+                                email: email,
+                                website: website,
+                                street: street,
+                                city: city,
+                                state: state,
+                                zip: zip,
+                                address_full: address_full,
+                                certifications: ['Sol-Ark Authorized'],
+                                tier: 'Sol-Ark Authorized Distributor',
+                                has_commercial: true,
+                                is_resimercial: true
+                            });
+                        } catch (e) {
+                            console.error('Error parsing store:', e);
+                        }
+                    });
+
+                    return dealers;
+                }
+                """
+                raw_results = page.evaluate(extraction_script)
+
+                if not raw_results:
+                    print(f"  ❌ No distributors found for ZIP {zip_code}")
+                    browser.close()
+                    return []
+
+                # Parse results
+                dealers = [self.parse_dealer_data(d, zip_code) for d in raw_results]
+                print(f"  ✅ Found {len(dealers)} Sol-Ark distributors")
+
+                browser.close()
+                return dealers
+
+            except Exception as e:
+                print(f"  ❌ Error scraping ZIP {zip_code}: {e}")
+                import traceback
+                traceback.print_exc()
+                if 'browser' in locals():
+                    browser.close()
+                return []
 
     def _scrape_with_runpod(self, zip_code: str) -> List[StandardizedDealer]:
         """
