@@ -108,35 +108,48 @@ sales-agent after validation. dealer-scraper's job is to push to Supabase ONLY.
 
 ### Priority 4: OEM Scraper Validation Sprint
 
-**Status**: ✅ COMPLETE (Dec 25, 2025)
-**Effort**: 4-6 hours
+**Status**: ✅ COMPLETE (Dec 26, 2025 - Sprint 3)
+**Effort**: 8+ hours (3 sprints)
 
 **Final Status: 20 Active Scrapers, 8 Archived**
+**Live Validation: 15 WORKING, 5 PARTIAL (need Browserbase)**
 
-**Active (Working)**:
-- HVAC (8): Carrier, Trane, Lennox, York, Rheem, Mitsubishi, Honeywell, Sensi
-- Generators (4): Generac, Briggs & Stratton, Cummins, Kohler
-- Solar/Inverter (6): Tesla, Enphase, Fronius, SMA, Sol-Ark, SolarEdge
-- Battery (1): SimpliPhi
-- Building Automation (1): Schneider Electric
+**Working (15)**:
+- HVAC: Carrier, Trane, Lennox, Rheem, Mitsubishi, Sensi
+- Generators: Generac, Briggs & Stratton, Cummins
+- Solar/Inverter: Enphase, SMA, Sol-Ark, SolarEdge
+- Battery: SimpliPhi
+- Building Automation: Schneider Electric
+
+**Need Browserbase (5)**:
+- York, Kohler (bot detection)
+- Tesla, Honeywell (iframe/context issues)
+- Fronius (geolocation API required)
 
 **Archived (Not Viable for Bulk Scraping)**:
 - ABB: Divested residential solar 2020
 - Delta, GoodWe, Growatt, Sungrow, Tigo: No public ZIP-searchable locator
 - Johnson Controls: Returns corporate offices only (not contractor ICPs)
 
-**Completed Tasks**:
-- [x] Live tested all 5 remaining scrapers (Honeywell, Sensi, Sol-Ark, SimpliPhi, Schneider)
-- [x] Archived Johnson Controls (returns corporate offices, not ICPs)
-- [x] Moved Schneider Electric from archived → active (EcoXpert contractors)
-- [x] Added Browserbase mode to York, Kohler, Tesla (bot detection bypass)
-- [x] Fixed Tesla US locale (/en_us/)
-- [x] Created 5 new unit test files (212 tests)
-- [x] Updated OEM_SCRAPER_STATUS.md
+**Sprint 3 Completed (Dec 26)**:
+- [x] Converted SimpliPhi from manual → auto Playwright (10 dealers/ZIP)
+- [x] Converted Sol-Ark from manual → auto Playwright (20 dealers/ZIP)
+- [x] Converted SolarEdge from manual → auto Playwright (5 dealers/ZIP)
+- [x] Fixed Trane ZIP selector + extraction script (6 dealers/ZIP)
+- [x] Fixed Sensi DDL cards + Google Places autocomplete (500+ locations)
+- [x] Documented Fronius Browserbase requirement (geolocation API)
+- [x] Updated OEM_SCRAPER_STATUS.md with Sprint 3 results
 - [x] Structure validation: 20/20 pass
-- [x] Test suite: 364 tests passing
 
-**Dependencies**: MCP Playwright, Browserbase
+**Sprint 1-2 Completed (Dec 25)**:
+- [x] Archived Johnson Controls (returns corporate offices, not ICPs)
+- [x] Moved Schneider Electric from archived → active
+- [x] Added Browserbase mode to York, Kohler, Tesla
+- [x] Fixed Tesla US locale (/en_us/)
+- [x] Created 5 unit test files (212 tests)
+- [x] Test suite: 380 tests (355 pass, 25 env issues)
+
+**Dependencies**: Playwright, Browserbase
 
 **Blockers**: None
 
@@ -187,6 +200,14 @@ sales-agent after validation. dealer-scraper's job is to push to Supabase ONLY.
 ## Completed Tasks
 
 ### 2025-12-26
+- [x] **OEM Scraper Sprint 3** - 15 working, 5 need Browserbase
+- [x] Converted SimpliPhi from manual → auto Playwright (10 dealers/ZIP)
+- [x] Converted Sol-Ark from manual → auto Playwright (20 dealers/ZIP)
+- [x] Converted SolarEdge from manual → auto Playwright (5 dealers/ZIP)
+- [x] Fixed Trane ZIP input selector + extraction script
+- [x] Fixed Sensi DDL cards + Google Places autocomplete
+- [x] Documented Fronius Browserbase requirement (geolocation API)
+- [x] Updated OEM_SCRAPER_STATUS.md with Sprint 3 results
 - [x] Close CRM Custom Fields Implementation - 8 fields created, 5 leads synced
 - [x] Implemented Supabase extraction from dim_companies (sales-agent shared DB)
 - [x] Fixed Close API contact format and empty array handling
@@ -302,5 +323,5 @@ sales-agent after validation. dealer-scraper's job is to push to Supabase ONLY.
 
 ---
 
-**Last Reviewed**: 2025-11-30
+**Last Reviewed**: 2025-12-26
 **Next Review**: Daily standup
