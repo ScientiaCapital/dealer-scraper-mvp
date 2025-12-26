@@ -110,7 +110,6 @@ scrapers/enphase_scraper.py
 scraper.py
 scripts/generate_leads.py
 enrichment/
-crm/
 data/
 
 # Claude Code project context - PRIVATE (contains strategy, business context)
