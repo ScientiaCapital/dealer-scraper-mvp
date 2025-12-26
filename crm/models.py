@@ -24,6 +24,7 @@ class CloseLeadPayload:
     addresses: List[Dict[str, Any]] = field(default_factory=list)
     contacts: List[Dict[str, Any]] = field(default_factory=list)
     custom: Dict[str, Any] = field(default_factory=dict)
+    owner_id: Optional[str] = None  # Close CRM user ID for lead assignment
 
     def to_api_payload(self, field_mapping: Dict[str, str]) -> Dict[str, Any]:
         """
@@ -50,6 +51,10 @@ class CloseLeadPayload:
 
         if self.contacts:
             payload["contacts"] = self.contacts
+
+        # Assign lead owner
+        if self.owner_id:
+            payload["user_id"] = self.owner_id
 
         # Map custom fields to Close field IDs
         for field_name, value in self.custom.items():
