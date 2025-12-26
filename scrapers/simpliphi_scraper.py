@@ -58,13 +58,17 @@ class SimpliPhiScraper(BaseDealerScraper):
     DEALER_LOCATOR_URL = "https://energy.briggsandstratton.com/na/en_us/residential/where-to-buy/dealer-locator.html"
     PRODUCT_LINES = ["Battery Storage", "LFP Batteries", "Energy Storage Systems", "Backup Power", "Commercial"]
 
-    # CSS Selectors (to be verified after site inspection)
+    # CSS Selectors (verified December 2025)
     SELECTORS = {
-        "country_select": "select#country",              # Country dropdown
-        "zip_input": "input[name='zip']",                # ZIP code input
-        "search_button": "button[type='submit']",        # Search button
-        "dealer_cards": ".dealer-item",                  # Dealer result cards
-        "product_filter": "input[type='checkbox']",      # Product type checkboxes
+        "country_select": "select[name='dealercountry']",  # Country dropdown
+        "zip_input": "input[name='zipcode']",              # ZIP code input
+        "product_select": "select[name='productOfInterest']",  # Product dropdown
+        "search_button": ".dealer-search-textbox button",  # Search button
+        "dealer_cards": ".dealer-info-container",          # Dealer result cards
+        "dealer_name": ".dealer-name",                     # Dealer name
+        "dealer_phone": ".dealer-phone-number",            # Phone number
+        "dealer_address": ".dealer-address",               # Street address
+        "dealer_city_state": ".dealer-city-state-zip",     # City, State ZIP
     }
 
     def __init__(self, mode: ScraperMode = ScraperMode.PLAYWRIGHT):
@@ -90,211 +94,116 @@ class SimpliPhiScraper(BaseDealerScraper):
         This script extracts dealers who offer Battery Energy Storage.
         """
 
-        extraction_script = """
-        () => {
-            const dealers = [];
+        extraction_script = r"""
+() => {
+  const dealers = [];
 
-            // Briggs & Stratton uses dealer cards with contact info
-            const dealerElements = document.querySelectorAll(
-                '.dealer-item, .dealer-card, .installer-item, [data-dealer], .location-card, .result-item'
-            );
+  // Find all dealer containers using the correct selector
+  const containers = document.querySelectorAll('.dealer-info-container');
+  console.log(`[SimpliPhi] Found ${containers.length} dealer containers`);
 
-            console.log(`Found ${dealerElements.length} dealer elements`);
+  containers.forEach((container, idx) => {
+    try {
+      // Extract dealer name
+      const name = container.querySelector('.dealer-name')?.textContent?.trim() || '';
+      if (!name || name.length < 2) return;
 
-            dealerElements.forEach(element => {
-                try {
-                    // Extract dealer name
-                    const nameElement = element.querySelector(
-                        '.dealer-name, .company-name, .installer-name, h3, h4, strong, .title'
-                    );
-                    const name = nameElement?.textContent?.trim() || '';
+      // Extract phone number
+      let phone = container.querySelector('.dealer-phone-number')?.textContent?.trim() || '';
+      phone = phone.replace('Call:', '').trim();
 
-                    if (!name || name.length < 2) return;
+      // Extract address
+      const street = container.querySelector('.dealer-address')?.textContent?.trim() || '';
+      const cityStateZip = container.querySelector('.dealer-city-state-zip')?.textContent?.trim() || '';
 
-                    // Skip placeholders
-                    if (name.toLowerCase().includes('loading') || name.toLowerCase().includes('search')) {
-                        return;
-                    }
-
-                    // Extract phone number
-                    const phoneElement = element.querySelector(
-                        'a[href^="tel:"], .phone, .telephone, .contact-phone, [class*="phone"]'
-                    );
-                    let phone = '';
-                    if (phoneElement) {
-                        phone = phoneElement.textContent?.trim() || phoneElement.href?.replace('tel:', '') || '';
-                        phone = phone.replace(/[^\\d]/g, ''); // Normalize to digits only
-                    }
-
-                    // Extract website
-                    const websiteElement = element.querySelector(
-                        'a[href^="http"]:not([href*="briggsandstratton"]):not([href*="simpliphi"]), .website, .url, [class*="website"]'
-                    );
-                    const website = websiteElement?.href || '';
-
-                    // Extract email
-                    const emailElement = element.querySelector('a[href^="mailto:"], .email');
-                    const email = emailElement?.href?.replace('mailto:', '') || '';
-
-                    // Extract address
-                    const addressElement = element.querySelector(
-                        '.address, .location, .dealer-address, [class*="address"]'
-                    );
-                    const address_full = addressElement?.textContent?.trim() || '';
-
-                    // Parse address components
-                    let street = '', city = '', state = '', zip = '';
-                    if (address_full) {
-                        // Format: "123 Main St, City, ST 12345"
-                        const parts = address_full.split(',').map(p => p.trim());
-
-                        if (parts.length >= 2) {
-                            street = parts[0];
-
-                            // Last part usually has state + ZIP
-                            const lastPart = parts[parts.length - 1];
-                            const stateZipMatch = lastPart.match(/([A-Z]{2})\\s+(\\d{5})/);
-
-                            if (stateZipMatch) {
-                                state = stateZipMatch[1];
-                                zip = stateZipMatch[2];
-
-                                // City is second-to-last part
-                                if (parts.length >= 3) {
-                                    city = parts[parts.length - 2];
-                                } else {
-                                    city = parts[0];
-                                }
-                            } else {
-                                // Try alternate format: "City ST 12345"
-                                const altMatch = lastPart.match(/(.+?)\\s+([A-Z]{2})\\s+(\\d{5})/);
-                                if (altMatch) {
-                                    city = altMatch[1];
-                                    state = altMatch[2];
-                                    zip = altMatch[3];
-                                }
-                            }
-                        }
-                    }
-
-                    // Extract certifications and capabilities
-                    const certifications = ['SimpliPhi Authorized'];
-                    const capabilities = [];
-
-                    // All SimpliPhi installers have battery capability
-                    capabilities.push('Battery Storage');
-                    capabilities.push('Energy Storage Systems');
-
-                    // Check for product offerings
-                    const productElements = element.querySelectorAll(
-                        '.product, .service, .offering, .capability, [class*="product"]'
-                    );
-
-                    let has_generators = false;
-                    let has_solar = false;
-
-                    productElements.forEach(prod => {
-                        const text = prod.textContent?.trim().toLowerCase() || '';
-
-                        if (text.includes('generator') || text.includes('standby')) {
-                            capabilities.push('Generators');
-                            certifications.push('Generator Certified');
-                            has_generators = true;
-                        }
-                        if (text.includes('solar') || text.includes('pv')) {
-                            capabilities.push('Solar');
-                            certifications.push('Solar Installation');
-                            has_solar = true;
-                        }
-                        if (text.includes('commercial')) {
-                            capabilities.push('Commercial');
-                            certifications.push('Commercial Systems');
-                        }
-                    });
-
-                    // Check name for capability indicators
-                    const nameLower = name.toLowerCase();
-                    if (!has_solar) {
-                        if (nameLower.includes('solar') || nameLower.includes('renewable')) {
-                            capabilities.push('Solar');
-                            has_solar = true;
-                        }
-                    }
-                    if (!has_generators) {
-                        if (nameLower.includes('generator') || nameLower.includes('power')) {
-                            capabilities.push('Generators');
-                            has_generators = true;
-                        }
-                    }
-
-                    const has_commercial = capabilities.includes('Commercial') ||
-                                          nameLower.includes('commercial') ||
-                                          nameLower.includes('solutions') ||
-                                          nameLower.includes('systems');
-
-                    // Extract distance if shown
-                    const distanceElement = element.querySelector(
-                        '.distance, [class*="distance"], [data-distance]'
-                    );
-                    let distance = '';
-                    let distance_miles = 0;
-                    if (distanceElement) {
-                        distance = distanceElement.textContent?.trim() || '';
-                        const distMatch = distance.match(/([\\d.]+)\\s*(mi|km)/);
-                        if (distMatch) {
-                            distance_miles = parseFloat(distMatch[1]);
-                            if (distMatch[2] === 'km') {
-                                distance_miles = distance_miles * 0.621371; // Convert km to miles
-                            }
-                        }
-                    }
-
-                    const dealer = {
-                        name: name,
-                        phone: phone,
-                        email: email,
-                        website: website,
-                        street: street,
-                        city: city,
-                        state: state,
-                        zip: zip,
-                        address_full: address_full,
-                        certifications: certifications,
-                        capabilities: capabilities,
-                        rating: 0,              // Briggs & Stratton dealer locator doesn't show ratings
-                        review_count: 0,
-                        tier: 'SimpliPhi Authorized Installer',
-                        distance: distance,
-                        distance_miles: distance_miles,
-                        has_commercial: has_commercial,
-                        has_generators: has_generators,
-                        has_solar: has_solar,
-                        is_multi_product: has_generators && has_solar,  // Both generator + solar = premium
-                        is_resimercial: has_commercial
-                    };
-
-                    // Prioritize multi-product dealers (generators + solar + batteries)
-                    if (dealer.is_multi_product && has_commercial) {
-                        dealers.unshift(dealer); // Highest priority - triple threat
-                    } else if (dealer.is_multi_product) {
-                        dealers.push(dealer);     // High priority - multi-product
-                    } else {
-                        dealers.push(dealer);     // Standard priority
-                    }
-
-                } catch (error) {
-                    console.error('Error parsing SimpliPhi dealer:', error);
-                }
-            });
-
-            console.log(`Extracted ${dealers.length} SimpliPhi installers`);
-            console.log(`Multi-product (Gen+Solar+Battery): ${dealers.filter(d => d.is_multi_product).length}`);
-            console.log(`Solar capable: ${dealers.filter(d => d.has_solar).length}`);
-            console.log(`Generator capable: ${dealers.filter(d => d.has_generators).length}`);
-
-            return dealers;
+      // Parse city, state, zip from combined field
+      let city = '', state = '', zip = '';
+      if (cityStateZip) {
+        const match = cityStateZip.match(/(.+),\s*([A-Z]{2})\s*(\d{5})?/);
+        if (match) {
+          city = match[1] || '';
+          state = match[2] || '';
+          zip = match[3] || '';
         }
-        """
+      }
+
+      // Construct full address
+      const address_full = [street, cityStateZip].filter(p => p).join(', ');
+
+      // Extract certifications and capabilities
+      const certifications = ['SimpliPhi Authorized'];
+      const capabilities = ['Battery Storage', 'Energy Storage Systems'];
+
+      // Check for product offerings
+      let has_generators = false;
+      let has_solar = false;
+
+      container.querySelectorAll('.dealer-info-sales-content, .dealer-product-line-icon').forEach(prod => {
+        const text = prod.textContent?.trim().toLowerCase() || '';
+
+        if (text.includes('generator') || text.includes('standby')) {
+          capabilities.push('Generators');
+          certifications.push('Generator Certified');
+          has_generators = true;
+        }
+        if (text.includes('solar') || text.includes('pv')) {
+          capabilities.push('Solar');
+          certifications.push('Solar Installation');
+          has_solar = true;
+        }
+      });
+
+      // Check name for capability indicators
+      const nameLower = name.toLowerCase();
+      if (!has_solar && (nameLower.includes('solar') || nameLower.includes('renewable') || nameLower.includes('energy'))) {
+        capabilities.push('Solar');
+        has_solar = true;
+      }
+      if (!has_generators && (nameLower.includes('generator') || nameLower.includes('power'))) {
+        capabilities.push('Generators');
+        has_generators = true;
+      }
+
+      // Check for commercial indicators
+      const has_commercial = nameLower.includes('commercial') ||
+                            nameLower.includes('solutions') ||
+                            nameLower.includes('systems') ||
+                            nameLower.includes('inc') ||
+                            nameLower.includes('llc');
+
+      dealers.push({
+        name: name,
+        phone: phone,
+        email: '',
+        website: '',
+        street: street,
+        city: city,
+        state: state,
+        zip: zip,
+        address_full: address_full,
+        certifications: certifications,
+        capabilities: capabilities,
+        rating: 0,
+        review_count: 0,
+        tier: 'SimpliPhi Elite IQ Installer',
+        distance: '',
+        distance_miles: 0,
+        has_commercial: has_commercial,
+        has_generators: has_generators,
+        has_solar: has_solar,
+        is_multi_product: has_generators || has_solar,
+        is_resimercial: has_commercial,
+        oem_source: 'SimpliPhi'
+      });
+    } catch (error) {
+      console.log(`[SimpliPhi] Error parsing dealer: ${error.message}`);
+    }
+  });
+
+  console.log(`[SimpliPhi] Extracted ${dealers.length} installers`);
+  return dealers;
+}
+"""
 
         return extraction_script
 
@@ -412,62 +321,106 @@ class SimpliPhiScraper(BaseDealerScraper):
 
     def _scrape_with_playwright(self, zip_code: str) -> List[StandardizedDealer]:
         """
-        PLAYWRIGHT mode: Print manual MCP Playwright instructions.
+        PLAYWRIGHT mode: Automated scraping using Playwright.
         """
-        print(f"\n{'='*60}")
-        print(f"SimpliPhi Power Installer Network Scraper - PLAYWRIGHT Mode")
-        print(f"ZIP Code: {zip_code}")
-        print(f"{'='*60}\n")
+        from playwright.sync_api import sync_playwright
+        import time
 
-        print("⚠️  MANUAL WORKFLOW - Execute these MCP Playwright tools in order:\n")
+        dealers = []
 
-        print("1. Navigate to Briggs & Stratton dealer locator:")
-        print(f'   mcp__playwright__browser_navigate({{"url": "{self.DEALER_LOCATOR_URL}"}})\n')
+        with sync_playwright() as p:
+            try:
+                print(f"\n🔋 SIMPLIPHI: Scraping ZIP {zip_code}")
 
-        print("2. Take snapshot to get current element refs:")
-        print('   mcp__playwright__browser_snapshot({})\n')
+                # Launch browser
+                browser = p.chromium.launch(headless=True)
+                context = browser.new_context(
+                    viewport={'width': 1920, 'height': 1080},
+                    user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+                )
+                page = context.new_page()
 
-        print("3. Handle cookie consent (if present):")
-        print('   mcp__playwright__browser_click({"element": "Accept", "ref": "[from snapshot]"})\n')
+                # Navigate to dealer locator
+                print(f"  → Navigating to {self.DEALER_LOCATOR_URL}")
+                page.goto(self.DEALER_LOCATOR_URL, timeout=60000)
+                time.sleep(3)
 
-        print("4. Select country (USA):")
-        print('   mcp__playwright__browser_select_option({')
-        print('       "element": "Country dropdown",')
-        print('       "ref": "[from snapshot]",')
-        print('       "values": ["USA"]')
-        print('   })\n')
+                # Select United States
+                print(f"  → Selecting United States")
+                try:
+                    page.locator(self.SELECTORS["country_select"]).select_option("United States")
+                    time.sleep(1)
+                except Exception as e:
+                    print(f"  ⚠️  Country select: {e}")
 
-        print("5. Enter ZIP code:")
-        print(f'   mcp__playwright__browser_type({{')
-        print(f'       "element": "ZIP code input",')
-        print(f'       "ref": "[from snapshot]",')
-        print(f'       "text": "{zip_code}",')
-        print(f'       "submit": False')
-        print(f'   }})\n')
+                # Select Battery Storage product
+                print(f"  → Selecting Battery Storage product")
+                try:
+                    page.locator(self.SELECTORS["product_select"]).select_option("Battery Storage")
+                    time.sleep(1)
+                except Exception as e:
+                    print(f"  ⚠️  Product select: {e}")
 
-        print("6. Check 'Battery Energy Storage' checkbox:")
-        print('   mcp__playwright__browser_click({"element": "Battery Energy Storage", "ref": "[from snapshot]"})\n')
+                # Fill ZIP code
+                print(f"  → Filling ZIP code: {zip_code}")
+                try:
+                    zip_input = page.locator(self.SELECTORS["zip_input"])
+                    zip_input.fill(zip_code)
+                    time.sleep(1)
+                except Exception as e:
+                    print(f"  ❌ ZIP input error: {e}")
+                    browser.close()
+                    return []
 
-        print("7. Click search button:")
-        print('   mcp__playwright__browser_click({"element": "Search", "ref": "[from snapshot]"})\n')
+                # Click search button
+                print(f"  → Clicking search button")
+                try:
+                    search_btn = page.locator(self.SELECTORS["search_button"]).first
+                    search_btn.click()
+                except Exception as e:
+                    print(f"  ⚠️  Search button: {e}, trying Enter key")
+                    page.locator(self.SELECTORS["zip_input"]).press("Enter")
 
-        print("8. Wait for results to load:")
-        print('   mcp__playwright__browser_wait_for({"time": 3})\n')
+                # Wait for results to load
+                print(f"  → Waiting for results...")
+                time.sleep(8)
 
-        print("9. Extract installer data:")
-        extraction_script = self.get_extraction_script()
-        print(f'   mcp__playwright__browser_evaluate({{"function": """{extraction_script}"""}})\n')
+                # Check for dealer results
+                dealer_count = page.locator(self.SELECTORS["dealer_cards"]).count()
+                if dealer_count == 0:
+                    print(f"  ⚠️  No dealers found for ZIP {zip_code}")
+                    browser.close()
+                    return []
 
-        print("10. Process results with:")
-        print(f'   simpliphi_scraper.parse_results(results_json, "{zip_code}")\n')
+                print(f"  → Found {dealer_count} dealer cards, extracting...")
 
-        print(f"{'='*60}\n")
-        print("NOTE: Briggs & Stratton dealer locator allows filtering by:")
-        print("      - Product type (Standby Generators, Battery Energy Storage)")
-        print("      - Search radius (50, 75, 100, 150 miles)")
-        print("      Extraction script captures dealers offering Battery Energy Storage.\n")
+                # Execute extraction script
+                raw_results = page.evaluate(self.get_extraction_script())
 
-        return []
+                if not raw_results:
+                    print(f"  ❌ Extraction returned no results")
+                    browser.close()
+                    return []
+
+                # Parse results
+                dealers = self.parse_results(raw_results, zip_code)
+                print(f"  ✅ Found {len(dealers)} SimpliPhi installers")
+
+                # Count multi-trade
+                solar_count = sum(1 for d in dealers if d.capabilities.has_solar)
+                if solar_count > 0:
+                    print(f"     ({solar_count} also do solar)")
+
+                browser.close()
+                return dealers
+
+            except Exception as e:
+                print(f"  ❌ Error scraping ZIP {zip_code}: {e}")
+                import traceback
+                traceback.print_exc()
+                if 'browser' in locals():
+                    browser.close()
+                return []
 
     def _scrape_with_runpod(self, zip_code: str) -> List[StandardizedDealer]:
         """

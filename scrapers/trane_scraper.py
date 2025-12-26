@@ -503,60 +503,132 @@ class TraneScraper(BaseDealerScraper):
 
                 # Search by ZIP
                 print(f"  → Searching ZIP: {zip_code}")
-                zip_input = page.locator('input[type="text"]').first
+                # Use specific selectors with fallbacks (generic last)
+                zip_input = page.locator(
+                    'input[placeholder*="zip" i], '
+                    'input[placeholder*="postal" i], '
+                    'input[placeholder*="location" i], '
+                    'input[name*="zip" i], '
+                    'input[type="text"]'
+                ).first
+                zip_input.wait_for(state='visible', timeout=10000)
                 zip_input.fill(zip_code)
                 time.sleep(0.5)
 
-                search_btn = page.locator('button:has-text("Search")').first
-                search_btn.click()
+                # Try multiple search button selectors
+                search_btn = page.locator(
+                    'button[type="submit"][data-action="search"], '
+                    'button[type="submit"][title*="Search" i], '
+                    'button:has-text("Search"), '
+                    'button[type="submit"]'
+                ).first
+                try:
+                    search_btn.click(timeout=5000)
+                except:
+                    # Fallback: press Enter in the input field
+                    print("  → Search button not found, pressing Enter...")
+                    zip_input.press('Enter')
                 time.sleep(4)
 
                 # Extract dealer cards
                 raw_dealers = page.evaluate(r"""
 () => {
     const dealers = [];
-    const cards = document.querySelectorAll('[class*="dealer"], [class*="card"], [class*="result"]');
+    // Updated selector: Trane uses div[id^="dealer-"] for dealer cards
+    // Exclude the filter block (dealer-card-block)
+    const cards = document.querySelectorAll('div[id^="dealer-"]:not([id="dealer-card-block"])');
 
     cards.forEach(card => {
-        const nameEl = card.querySelector('h2, h3, h4, a[class*="name"]');
-        const name = nameEl ? nameEl.textContent.trim() : '';
-        if (!name || name.length < 3) return;
+        // The dealer name is typically the second line after the badge
+        // Structure: [Badge] [Dealer Name] [Address] [Rating]
+        const text = card.innerText;
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 2);
 
-        // Look for phone (local, not toll-free)
+        // Find the dealer name - skip badge lines
+        let name = '';
+        for (const line of lines) {
+            // Skip known badge/label lines
+            if (line.includes('Comfort Specialist')) continue;
+            if (line.includes('24/7 Emergency')) continue;
+            if (line.includes('NATE Certified')) continue;
+            if (line.includes('Financing')) continue;
+            if (line.includes('Diagnostics')) continue;
+            if (line.includes('Call Now')) continue;
+            if (line.includes('Contact Dealer')) continue;
+            if (line.includes('Google Reviews')) continue;
+            if (line.match(/^\d+\.?\d*$/)) continue; // Skip ratings
+            // First non-badge line with a reasonable name length
+            if (line.length >= 3 && line.length < 60) {
+                name = line;
+                break;
+            }
+        }
+
+        // Skip if no valid name found
+        if (!name || name.length < 3) return;
+        if (name.includes('Get your expert') || name.includes('Breathe easier')) return;
+        if (name.includes('Find a dealer')) return;
+
+        // Look for phone (prefer local over toll-free)
         let phone = '';
-        const phoneLink = card.querySelector('a[href^="tel:"]');
-        if (phoneLink) {
+        const phoneLinks = card.querySelectorAll('a[href^="tel:"]');
+        for (const phoneLink of phoneLinks) {
             const rawPhone = phoneLink.href.replace('tel:', '').replace(/[^0-9]/g, '');
             const tollFree = ['800', '888', '877', '866', '855', '844', '833'];
             if (rawPhone.length >= 10) {
                 const areaCode = rawPhone.slice(-10, -7);
                 if (!tollFree.includes(areaCode)) {
                     phone = rawPhone.slice(-10);
+                    break;
                 }
             }
         }
 
-        // Location
-        const text = card.textContent;
-        let city = '', state = '';
-        const cityStateMatch = text.match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*([A-Z]{2})/);
+        // Location from text content (reuse 'text' from above)
+        let city = '', state = '', address = '';
+        // Look for address line (contains street address patterns)
+        for (const line of lines) {
+            if (line.match(/\d+.*(?:St|Rd|Ave|Blvd|Dr|Pkwy|Ln|Way|Hwy|Frontage)/i)) {
+                address = line;
+                // Extract city from address - typically after last comma
+                const parts = line.split(',').map(p => p.trim());
+                if (parts.length >= 2) {
+                    city = parts[parts.length - 1]; // Last part is usually city
+                }
+                break;
+            }
+        }
+        // If no address with state, try city pattern
+        const cityStateMatch = text.match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*([A-Z]{2})\s*(\d{5})?/);
         if (cityStateMatch) {
-            city = cityStateMatch[1];
+            if (!city) city = cityStateMatch[1];
             state = cityStateMatch[2];
         }
+
+        // Website link
+        let website = '';
+        const websiteLink = card.querySelector('a[href^="http"]:not([href*="trane.com"])');
+        if (websiteLink) website = websiteLink.href;
 
         // Rating
         let rating = 0;
         const ratingMatch = text.match(/(\d+\.?\d*)\s*(?:out|stars?|\()/i);
         if (ratingMatch) rating = parseFloat(ratingMatch[1]);
 
+        // Check for certifications/badges
+        const certifications = ['Trane Dealer'];
+        if (text.includes('Comfort Specialist')) certifications.push('Trane Comfort Specialist');
+        if (text.includes('TCS')) certifications.push('TCS Certified');
+
         dealers.push({
             name: name,
             phone: phone,
+            website: website,
+            address: address,
             city: city,
             state: state,
             rating: rating,
-            certifications: ['Trane Dealer']
+            certifications: certifications
         });
     });
 
