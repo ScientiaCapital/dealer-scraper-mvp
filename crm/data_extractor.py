@@ -6,6 +6,7 @@ Aggregates OEM certifications and state licenses per contractor.
 """
 
 import os
+import ast
 import sqlite3
 from pathlib import Path
 from typing import Iterator, Dict, Any, Optional, List
@@ -241,13 +242,14 @@ class DataExtractor:
             params.append(f"state=eq.{state_filter}")
 
         if min_oem_count > 0:
-            params.append(f"oem_count=gte.{min_oem_count}")
+            # Filter for non-empty oem_brands array
+            params.append("oem_brands=not.eq.{}")
 
         if limit:
             params.append(f"limit={limit}")
 
-        # Order by ICP score descending for best leads first
-        params.append("order=icp_score.desc")
+        # Order by OEM dealers first (those with oem_brands), then by ICP score
+        params.append("order=oem_brands.desc.nullslast,icp_score.desc.nullslast")
 
         url = f"{base_url}?{'&'.join(params)}"
 
@@ -266,8 +268,29 @@ class DataExtractor:
             return
 
         for row in rows:
-            oem_brands = row.get("oem_brands") or []
-            license_types = row.get("license_types") or []
+            # Parse oem_brands - may be stored as string repr of list
+            oem_brands_raw = row.get("oem_brands")
+            if isinstance(oem_brands_raw, str) and oem_brands_raw.startswith("["):
+                try:
+                    oem_brands = ast.literal_eval(oem_brands_raw)
+                except (ValueError, SyntaxError):
+                    oem_brands = []
+            elif isinstance(oem_brands_raw, list):
+                oem_brands = oem_brands_raw
+            else:
+                oem_brands = []
+
+            # Parse license_types similarly
+            license_types_raw = row.get("license_types")
+            if isinstance(license_types_raw, str) and license_types_raw.startswith("["):
+                try:
+                    license_types = ast.literal_eval(license_types_raw)
+                except (ValueError, SyntaxError):
+                    license_types = []
+            elif isinstance(license_types_raw, list):
+                license_types = license_types_raw
+            else:
+                license_types = []
 
             # Apply OEM filter (check if OEM is in the brands list)
             if oem_filter and oem_filter not in oem_brands:
