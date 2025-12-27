@@ -12,11 +12,22 @@ Target URL: https://www.tesla.com/en_us/support/certified-installers
 We force US locale by using `/en_us/` in the URL path. For automated scraping, use
 BROWSERBASE mode with US residential proxy to ensure US results.
 
-**BOT DETECTION**: Tesla uses Cloudflare/bot protection. Requires Playwright with:
-- Stealth user agent
-- JavaScript execution
-- Realistic browsing patterns
-- Browserbase with residential proxy (recommended)
+**BOT DETECTION**: Tesla uses enterprise-grade Akamai EdgeSuite protection.
+TESTED Dec 27, 2025:
+- ❌ Playwright headless: Blocked (Access Denied)
+- ❌ Patchright headless: Blocked (Access Denied)
+- ❌ Patchright headed: Blocked (Access Denied)
+- ❌ Puppeteer MCP: Blocked (Access Denied)
+- ❌ Firecrawl: Blocked (Access Denied)
+- ✅ Browserbase with residential proxy: REQUIRED for production
+
+**BROWSERBASE SETUP**:
+1. Sign up at https://www.browserbase.com/sign-up (free tier available)
+2. Create a project and get API key
+3. Set environment variables:
+   - BROWSERBASE_API_KEY=bb_live_xxxxx
+   - BROWSERBASE_PROJECT_ID=xxxxx
+4. The scraper uses Browserbase SDK + Patchright for maximum stealth
 
 Capabilities detected from Tesla certification:
 - Battery installation (Powerwall is their core product)
@@ -423,20 +434,26 @@ class TeslaScraper(BaseDealerScraper):
         """
         BROWSERBASE mode: Cloud browser with US residential proxy.
 
-        Tesla uses Cloudflare bot protection AND geo-redirect based on IP.
-        Browserbase with US residential proxy solves both:
+        Tesla uses enterprise-grade Akamai EdgeSuite protection AND geo-redirect.
+        Browserbase with US residential proxy + fingerprint settings solves both:
         - US IP = US version of site
-        - Residential proxy = bypass bot detection
+        - Residential proxy = bypass Akamai bot detection
+        - Browser fingerprinting = avoid detection patterns
 
-        Requires BROWSERBASE_API_KEY in .env
+        Requires BROWSERBASE_API_KEY and BROWSERBASE_PROJECT_ID in .env
         """
-        from playwright.sync_api import sync_playwright
+        from browserbase import Browserbase
+        from patchright.sync_api import sync_playwright
         import time
         import random
 
         browserbase_api_key = os.getenv("BROWSERBASE_API_KEY")
+        browserbase_project_id = os.getenv("BROWSERBASE_PROJECT_ID")
+
         if not browserbase_api_key:
             raise ValueError("Missing BROWSERBASE_API_KEY in .env")
+        if not browserbase_project_id:
+            raise ValueError("Missing BROWSERBASE_PROJECT_ID in .env")
 
         print(f"\n{'='*60}")
         print(f"Tesla Powerwall Installer Scraper - BROWSERBASE Mode")
@@ -444,18 +461,37 @@ class TeslaScraper(BaseDealerScraper):
         print(f"{'='*60}\n")
 
         try:
+            # Initialize Browserbase client
+            bb = Browserbase(api_key=browserbase_api_key, timeout=60.0)
+
+            # Create session with residential proxy and US fingerprint
+            print(f"  → Creating Browserbase session with residential proxy...")
+            session = bb.sessions.create(
+                project_id=browserbase_project_id,
+                proxies=True,  # Enable residential proxy
+                browser_settings={
+                    "fingerprint": {
+                        "locales": ["en-US"],
+                        "screen": {"max_width": 1920, "max_height": 1080}
+                    },
+                    "viewport": {"width": 1920, "height": 1080}
+                }
+            )
+            print(f"  ✓ Session created: {session.id}")
+
+            # Connect with Patchright (stealth Playwright)
             with sync_playwright() as p:
                 print(f"  → Connecting to Browserbase cloud browser...")
 
-                # WebSocket connection with US residential proxy enabled
-                ws_endpoint = f'wss://connect.browserbase.com?apiKey={browserbase_api_key}&enableProxy=true'
+                # Connect via CDP using session ID
+                ws_endpoint = f'wss://connect.browserbase.com?apiKey={browserbase_api_key}&sessionId={session.id}'
                 browser = p.chromium.connect_over_cdp(ws_endpoint)
 
                 # Get default context and page
                 context = browser.contexts[0]
                 page = context.pages[0] if context.pages else context.new_page()
 
-                print(f"  ✓ Connected to Browserbase (US residential proxy)")
+                print(f"  ✓ Connected to Browserbase (US residential proxy + stealth)")
 
                 # Human-like delay before navigation
                 time.sleep(random.uniform(1.5, 3.0))
@@ -463,6 +499,13 @@ class TeslaScraper(BaseDealerScraper):
                 # Navigate to Tesla installer locator with US locale
                 print(f"  → Navigating to {self.DEALER_LOCATOR_URL}")
                 page.goto(self.DEALER_LOCATOR_URL, timeout=60000, wait_until='domcontentloaded')
+
+                # Check for Access Denied (Akamai block)
+                page_text = page.evaluate('() => document.body.innerText')
+                if 'Access Denied' in page_text or 'access denied' in page_text.lower():
+                    print(f"  ❌ Blocked by Akamai (Access Denied)")
+                    browser.close()
+                    return []
 
                 # Wait for page to stabilize
                 try:
