@@ -3,7 +3,7 @@
 **Last Audit:** December 27, 2025 (Sprint 3 - Final)
 **Unit Tests:** 212/212 passed (OEM scrapers)
 **Structure Validation:** 20/20 scrapers pass
-**Live Validation:** 17 WORKING (Playwright), 0 BROKEN, 3 NEED BROWSERBASE
+**Live Validation:** 19 WORKING (Playwright/Patchright), 0 BROKEN, 1 NEED BROWSERBASE
 
 ---
 
@@ -32,7 +32,7 @@
 | York | `york_scraper.py` | Production | 4-6 dealers/ZIP, MetaLocator iframe |
 | Rheem | `rheem_scraper.py` | Production | - |
 | Mitsubishi | `mitsubishi_scraper.py` | Production | Modal handling |
-| Honeywell | `honeywell_scraper.py` | Browserbase | Bullseye iframe blocked by Cloudflare |
+| Honeywell | `honeywell_scraper.py` | Patchright | Bypasses Cloudflare, 286 dealers in Houston |
 | Sensi | `sensi_scraper.py` | Production | 500+ locations, Contractor/Distributor types |
 
 ### Generators (4)
@@ -42,7 +42,7 @@
 | Generac | `generac_scraper.py` | Production | 78 dealers/ZIP tested |
 | Briggs & Stratton | `briggs_scraper.py` | Production | BriggsStrattonScraper class |
 | Cummins | `cummins_scraper.py` | Production | Iframe form handling |
-| Kohler | `kohler_scraper.py` | Browserbase | Bot detection in headless mode |
+| Kohler | `kohler_scraper.py` | Patchright | Bypasses Akamai (headed mode + JS injection) |
 
 ### Solar Inverters (6)
 
@@ -118,9 +118,9 @@ All scrapers validated for:
 | SimpliPhi | 90210 | 10 | Yes | ✅ Working (auto Playwright converted) |
 | Schneider Electric | 94102 | 2 | Yes | ✅ Working (EcoXpert integrators) |
 | York | 10001 | 4-6 | Yes | ✅ Working (MetaLocator iframe, certs extracted) |
-| Kohler | 53202 | - | - | ⚠️ Browserbase (Akamai bot detection) |
-| Tesla | 94102 | - | - | ⚠️ Browserbase (Akamai bot detection) |
-| Honeywell | 77001 | - | - | ⚠️ Browserbase (Cloudflare on Bullseye iframe) |
+| Kohler | 53044 | 1+ | Yes | ✅ Working (Patchright headed mode) |
+| Tesla | 94102 | - | - | ⚠️ Browserbase (Akamai bot detection too strong) |
+| Honeywell | 77001 | 286 | Yes | ✅ Working (Patchright bypasses Cloudflare) |
 | Fronius | 94102 | 8 | N/A | ✅ Working (Geolocation spoofing) |
 
 ---
@@ -187,12 +187,14 @@ python3 scripts/audit_all_scrapers.py --quick
 6. ~~**Fix SimpliPhi manual mode**~~ Done - Converted to auto Playwright (10 dealers)
 7. ~~**Investigate Fronius**~~ Documented - Requires Browserbase (geolocation API)
 
-### Remaining (Need Browserbase - 3 Scrapers)
+### Completed (Dec 27 Sprint 4 - Patchright Bot Bypass)
 8. ~~**York**~~ ✅ Working with Playwright (MetaLocator iframe)
-9. **Kohler** - Akamai bot detection requires cloud browser
-10. **Tesla** - Akamai bot detection requires cloud browser
-11. **Honeywell** - Cloudflare on Bullseye iframe requires cloud browser
-12. ~~**Fronius**~~ ✅ Working with Playwright (Geolocation spoofing)
+9. ~~**Kohler**~~ ✅ Working with Patchright (headed mode + JS injection bypasses Akamai)
+10. ~~**Honeywell**~~ ✅ Working with Patchright (bypasses Cloudflare on Bullseye iframe, 286 dealers)
+11. ~~**Fronius**~~ ✅ Working with Playwright (Geolocation spoofing)
+
+### Remaining (Need Browserbase - 1 Scraper)
+12. **Tesla** - Akamai bot detection too strong for Patchright, requires Browserbase
 13. **Deploy to RunPod** - Production bulk scraping
 
 ---
