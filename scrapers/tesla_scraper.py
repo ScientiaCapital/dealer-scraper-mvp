@@ -12,11 +12,14 @@ Target URL: https://www.tesla.com/en_us/support/certified-installers
 We force US locale by using `/en_us/` in the URL path. For automated scraping, use
 BROWSERBASE mode with US residential proxy to ensure US results.
 
-**BOT DETECTION**: Tesla uses Cloudflare/bot protection. Requires Playwright with:
-- Stealth user agent
-- JavaScript execution
-- Realistic browsing patterns
-- Browserbase with residential proxy (recommended)
+**BOT DETECTION**: Tesla uses enterprise-grade Akamai EdgeSuite protection.
+TESTED Dec 27, 2024:
+- ❌ Playwright headless: Blocked (Access Denied)
+- ❌ Patchright headless: Blocked (Access Denied)
+- ❌ Patchright headed: Blocked (Access Denied)
+- ❌ Puppeteer MCP: Blocked (Access Denied)
+- ❌ Firecrawl: Blocked (Access Denied)
+- ✅ Browserbase with residential proxy: REQUIRED for production
 
 Capabilities detected from Tesla certification:
 - Battery installation (Powerwall is their core product)
