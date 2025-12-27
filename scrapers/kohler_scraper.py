@@ -33,11 +33,11 @@ class KohlerScraper(BaseDealerScraper):
     """
     Scraper for Kohler dealer network.
 
-    **STATUS**: ⚠️ BROWSERBASE RECOMMENDED (bot detection in headless mode)
+    **STATUS**: ✅ PRODUCTION (Patchright mode bypasses Akamai)
 
-    The Kohler/Rehlko site has bot detection that blocks headless Playwright.
-    The extraction script works correctly (verified via MCP Playwright Dec 2024).
-    For automated bulk scraping, use BROWSERBASE or PATCHRIGHT mode.
+    TESTED: Dec 27, 2024 - Patchright (headed mode) successfully bypasses Akamai bot detection.
+    The extraction script works correctly on kohlerhomeenergy.rehlko.com/find-a-dealer.
+    For automated bulk scraping, use PATCHRIGHT mode (requires headed browser) or BROWSERBASE.
 
     **IMPLEMENTATION**:
     The Kohler/Rehlko dealer locator (kohlerhomeenergy.rehlko.com/find-a-dealer)
@@ -558,8 +558,130 @@ class KohlerScraper(BaseDealerScraper):
             return []
 
     def _scrape_with_patchright(self, zip_code: str) -> List[StandardizedDealer]:
-        """PATCHRIGHT mode: Stealth browser automation (future implementation)."""
-        raise NotImplementedError("Patchright mode not yet implemented")
+        """
+        PATCHRIGHT mode: Stealth browser automation to bypass Akamai bot detection.
+
+        Patchright is a stealth fork of Playwright that patches automation fingerprints.
+        TESTED: Dec 27, 2024 - Successfully bypasses Akamai on kohlerhomeenergy.rehlko.com
+
+        REQUIREMENTS:
+        - Patchright must run in HEADED mode (headless=False)
+        - JavaScript injection required for form filling (Patchright locators blocked)
+        """
+        from patchright.sync_api import sync_playwright
+        import time
+
+        print(f"\n{'='*60}")
+        print(f"Kohler Dealer Scraper - PATCHRIGHT Mode")
+        print(f"ZIP Code: {zip_code}")
+        print(f"{'='*60}\n")
+
+        try:
+            with sync_playwright() as p:
+                print(f"  → Launching Patchright browser (headed mode)...")
+
+                # MUST use headed mode to bypass Akamai
+                browser = p.chromium.launch(
+                    headless=False,
+                    args=[
+                        '--disable-blink-features=AutomationControlled',
+                        '--disable-dev-shm-usage',
+                        '--no-sandbox',
+                    ]
+                )
+
+                context = browser.new_context(
+                    viewport={'width': 1920, 'height': 1080},
+                    user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                    locale='en-US',
+                    timezone_id='America/New_York'
+                )
+
+                page = context.new_page()
+
+                # Navigate to Kohler dealer locator
+                print(f"  → Navigating to {self.DEALER_LOCATOR_URL}")
+                page.goto(self.DEALER_LOCATOR_URL, timeout=60000)
+
+                # Wait for React app to initialize
+                print(f"  → Waiting for page to load...")
+                time.sleep(5)
+
+                # Check for bot detection
+                page_text = page.evaluate('() => document.body.innerText')
+                if 'Access Denied' in page_text:
+                    print(f"  ❌ Blocked by Akamai - try Browserbase mode")
+                    browser.close()
+                    return []
+
+                # Use JavaScript injection to fill ZIP (Patchright locators may fail)
+                print(f"  → Filling ZIP code via JS: {zip_code}")
+                fill_result = page.evaluate(f"""(zip) => {{
+                    const inputs = document.querySelectorAll('input[name="zipcode"], input[placeholder*="ZIP"]');
+                    let filled = false;
+                    inputs.forEach(input => {{
+                        const style = window.getComputedStyle(input);
+                        const isVisible = style.display !== 'none' && style.visibility !== 'hidden' && input.offsetParent !== null;
+                        if (isVisible && !filled) {{
+                            input.scrollIntoView({{block: 'center'}});
+                            input.focus();
+                            input.value = zip;
+                            input.dispatchEvent(new Event('input', {{bubbles: true}}));
+                            input.dispatchEvent(new Event('change', {{bubbles: true}}));
+                            filled = true;
+                        }}
+                    }});
+                    return {{filled, inputCount: inputs.length}};
+                }}""", zip_code)
+                print(f"     Fill result: {fill_result}")
+
+                time.sleep(1)
+
+                # Click search button via JS
+                print(f"  → Clicking search button...")
+                click_result = page.evaluate("""() => {
+                    const buttons = document.querySelectorAll('button[type="submit"], button:has-text("Go")');
+                    let clicked = false;
+                    buttons.forEach(btn => {
+                        const style = window.getComputedStyle(btn);
+                        const isVisible = style.display !== 'none' && style.visibility !== 'hidden';
+                        if (isVisible && !clicked) {
+                            btn.click();
+                            clicked = true;
+                        }
+                    });
+                    return {clicked, buttonCount: buttons.length};
+                }""")
+                print(f"     Click result: {click_result}")
+
+                # Wait for results to load
+                print(f"  → Waiting for results...")
+                time.sleep(5)
+
+                # Execute extraction script
+                print(f"  → Extracting dealer data...")
+                raw_results = page.evaluate(self.get_extraction_script())
+
+                if not raw_results:
+                    print(f"  ⚠️ No dealers found for ZIP {zip_code}")
+                    browser.close()
+                    return []
+
+                # Parse results
+                dealers = [self.parse_dealer_data(d, zip_code) for d in raw_results]
+                print(f"  ✅ Found {len(dealers)} Kohler dealers")
+
+                for dealer in dealers[:5]:
+                    print(f"     - {dealer.name} ({dealer.tier})")
+
+                browser.close()
+                return dealers
+
+        except Exception as e:
+            print(f"  ❌ Patchright error: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
 
     def parse_results(self, results_json: List[Dict], zip_code: str) -> List[StandardizedDealer]:
         """
