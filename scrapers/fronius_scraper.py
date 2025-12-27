@@ -6,6 +6,13 @@ Fronius is an Austrian manufacturer specializing in string inverters, battery st
 
 Target URL: https://www.fronius.com/en-us/usa/solar-energy/home-owners/contact/find-installers
 
+⚠️  REQUIRES BROWSERBASE - GEOLOCATION API REQUIRED:
+- Page shows "Loading..." indefinitely without geolocation
+- Warning: "It seems like you are blocking geolocation tracking"
+- Playwright local testing: BLOCKED (geolocation not provided)
+- Browserbase with geolocation spoofing: Required for production
+- Shows "3440 Results" count but won't load actual installer cards
+
 Capabilities detected from Fronius certification:
 - Solar installation (string inverters are their core product)
 - Battery installation (GEN24 Plus hybrid inverters with integrated battery management)
