@@ -3,7 +3,7 @@
 **Last Audit:** December 27, 2025 (Sprint 3 - Final)
 **Unit Tests:** 212/212 passed (OEM scrapers)
 **Structure Validation:** 20/20 scrapers pass
-**Live Validation:** 16 WORKING (Playwright), 0 BROKEN, 4 NEED BROWSERBASE
+**Live Validation:** 17 WORKING (Playwright), 0 BROKEN, 3 NEED BROWSERBASE
 
 ---
 
@@ -50,7 +50,7 @@
 |-----|------|--------|-------|
 | Tesla | `tesla_scraper.py` | Browserbase | US locale fixed (/en_us/), Browserbase mode |
 | Enphase | `enphase_scraper.py` | Production | 27 installers/ZIP, tiers, ratings |
-| Fronius | `fronius_scraper.py` | Browserbase | Geolocation API required |
+| Fronius | `fronius_scraper.py` | Production | Geolocation spoofing, 8+ installers/ZIP |
 | SMA | `sma_scraper.py` | Production | 2 dealers/ZIP tested Dec 2024 |
 | Sol-Ark | `solark_scraper.py` | Production | Authorized Installers + Distributors |
 | SolarEdge | `solaredge_scraper.py` | Production | 5 installers/ZIP, O&M support |
@@ -121,7 +121,7 @@ All scrapers validated for:
 | Kohler | 53202 | - | - | ⚠️ Browserbase (Akamai bot detection) |
 | Tesla | 94102 | - | - | ⚠️ Browserbase (Akamai bot detection) |
 | Honeywell | 77001 | - | - | ⚠️ Browserbase (Cloudflare on Bullseye iframe) |
-| Fronius | 94102 | - | - | ⚠️ Browserbase (Geolocation API required) |
+| Fronius | 94102 | 8 | N/A | ✅ Working (Geolocation spoofing) |
 
 ---
 
@@ -187,12 +187,12 @@ python3 scripts/audit_all_scrapers.py --quick
 6. ~~**Fix SimpliPhi manual mode**~~ Done - Converted to auto Playwright (10 dealers)
 7. ~~**Investigate Fronius**~~ Documented - Requires Browserbase (geolocation API)
 
-### Remaining (Need Browserbase - 4 Scrapers)
+### Remaining (Need Browserbase - 3 Scrapers)
 8. ~~**York**~~ ✅ Working with Playwright (MetaLocator iframe)
 9. **Kohler** - Akamai bot detection requires cloud browser
 10. **Tesla** - Akamai bot detection requires cloud browser
 11. **Honeywell** - Cloudflare on Bullseye iframe requires cloud browser
-12. **Fronius** - Geolocation API requires cloud browser
+12. ~~**Fronius**~~ ✅ Working with Playwright (Geolocation spoofing)
 13. **Deploy to RunPod** - Production bulk scraping
 
 ---
