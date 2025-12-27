@@ -1,9 +1,9 @@
 # OEM Scraper Status Report
 
-**Last Audit:** December 26, 2025 (Sprint 3)
+**Last Audit:** December 27, 2025 (Sprint 3 - Final)
 **Unit Tests:** 212/212 passed (OEM scrapers)
 **Structure Validation:** 20/20 scrapers pass
-**Live Validation:** 15 WORKING, 0 BROKEN, 5 PARTIAL (need Browserbase)
+**Live Validation:** 16 WORKING (Playwright), 0 BROKEN, 4 NEED BROWSERBASE
 
 ---
 
@@ -29,10 +29,10 @@
 | Carrier | `carrier_scraper.py` | Production | 65 dealers/ZIP tested |
 | Trane | `trane_scraper.py` | Production | Detail page enrichment |
 | Lennox | `lennox_scraper.py` | Production | API-based extraction |
-| York | `york_scraper.py` | Browserbase | Bot detection in headless mode |
+| York | `york_scraper.py` | Production | 4-6 dealers/ZIP, MetaLocator iframe |
 | Rheem | `rheem_scraper.py` | Production | - |
 | Mitsubishi | `mitsubishi_scraper.py` | Production | Modal handling |
-| Honeywell | `honeywell_scraper.py` | Production | 25 contractors/ZIP tested, Bullseye iframe |
+| Honeywell | `honeywell_scraper.py` | Browserbase | Bullseye iframe blocked by Cloudflare |
 | Sensi | `sensi_scraper.py` | Production | 500+ locations, Contractor/Distributor types |
 
 ### Generators (4)
@@ -103,25 +103,25 @@ All scrapers validated for:
 - Required methods (get_extraction_script, detect_capabilities, parse_dealer_data)
 - JavaScript extraction script syntax
 
-### Live Tests (December 26, 2025 - Sprint 3)
+### Live Tests (December 27, 2025 - Sprint 3 Final)
 
 | OEM | ZIP | Dealers | Phone % | Status |
 |-----|-----|---------|---------|--------|
-| SMA | 94102 | 2 | 100% | Working |
-| Carrier | 75201 | 65 | 100% | Working |
-| Generac | 77001 | 78 | 100% | Working |
-| Trane | 75201 | 6 | N/A | Working (Fixed selector + extraction) |
-| Enphase | 94102 | 27 | N/A | Working (tiers: Platinum/Gold/Silver) |
-| SolarEdge | 94102 | 5 | N/A | Working (auto Playwright converted) |
-| Sol-Ark | 85001 | 20 | Yes | Working (auto Playwright converted) |
-| Sensi | 45202 | 500+ | Yes | Working (DDL cards + autocomplete) |
-| SimpliPhi | 90210 | 10 | Yes | Working (auto Playwright converted) |
-| Schneider Electric | 94102 | 2 | Yes | Working (EcoXpert integrators) |
-| York | 94102 | - | - | Browserbase mode (bot detection) |
-| Kohler | 53202 | - | - | Browserbase mode (bot detection) |
-| Tesla | 94102 | - | - | Browserbase mode (US locale fixed) |
-| Honeywell | 94102 | - | - | Browserbase mode (iframe context) |
-| Fronius | 94102 | - | - | Browserbase mode (geolocation API) |
+| SMA | 94102 | 2 | 100% | ✅ Working |
+| Carrier | 75201 | 65 | 100% | ✅ Working |
+| Generac | 77001 | 78 | 100% | ✅ Working |
+| Trane | 75201 | 6 | N/A | ✅ Working (Fixed selector + extraction) |
+| Enphase | 94102 | 27 | N/A | ✅ Working (tiers: Platinum/Gold/Silver) |
+| SolarEdge | 94102 | 5 | N/A | ✅ Working (auto Playwright converted) |
+| Sol-Ark | 85001 | 20 | Yes | ✅ Working (auto Playwright converted) |
+| Sensi | 45202 | 500+ | Yes | ✅ Working (DDL cards + autocomplete) |
+| SimpliPhi | 90210 | 10 | Yes | ✅ Working (auto Playwright converted) |
+| Schneider Electric | 94102 | 2 | Yes | ✅ Working (EcoXpert integrators) |
+| York | 10001 | 4-6 | Yes | ✅ Working (MetaLocator iframe, certs extracted) |
+| Kohler | 53202 | - | - | ⚠️ Browserbase (Akamai bot detection) |
+| Tesla | 94102 | - | - | ⚠️ Browserbase (Akamai bot detection) |
+| Honeywell | 77001 | - | - | ⚠️ Browserbase (Cloudflare on Bullseye iframe) |
+| Fronius | 94102 | - | - | ⚠️ Browserbase (Geolocation API required) |
 
 ---
 
@@ -187,11 +187,11 @@ python3 scripts/audit_all_scrapers.py --quick
 6. ~~**Fix SimpliPhi manual mode**~~ Done - Converted to auto Playwright (10 dealers)
 7. ~~**Investigate Fronius**~~ Documented - Requires Browserbase (geolocation API)
 
-### Remaining (Need Browserbase)
-8. **York** - Bot detection requires cloud browser
-9. **Kohler** - Bot detection requires cloud browser
-10. **Tesla** - US locale fixed, needs Browserbase execution
-11. **Honeywell** - Bullseye iframe requires cloud browser
+### Remaining (Need Browserbase - 4 Scrapers)
+8. ~~**York**~~ ✅ Working with Playwright (MetaLocator iframe)
+9. **Kohler** - Akamai bot detection requires cloud browser
+10. **Tesla** - Akamai bot detection requires cloud browser
+11. **Honeywell** - Cloudflare on Bullseye iframe requires cloud browser
 12. **Fronius** - Geolocation API requires cloud browser
 13. **Deploy to RunPod** - Production bulk scraping
 

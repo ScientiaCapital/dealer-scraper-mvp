@@ -5,8 +5,11 @@ Honeywell Home Pro Installer Scraper
 Scrapes the Honeywell Home Pro installer directory to find HVAC/thermostat contractors.
 Target URL: https://www.honeywellhome.com/us/en/find-a-pro/
 
-PRODUCTION READY - BULLSEYE LOCATIONS IFRAME:
-- Third-party iframe (resideo.bullseyelocations.com/local/ResideoHomeProReact)
+⚠️  REQUIRES BROWSERBASE - CLOUDFLARE PROTECTION:
+- Third-party iframe uses Bullseye Locations (resideo.bullseyelocations.com)
+- Bullseye protected by Cloudflare - blocks headless browsers
+- Playwright local testing: BLOCKED ("Sorry, you have been blocked")
+- Browserbase with residential proxy: Required for production
 - ZIP/location-based filtering
 - Category filtering (HVAC, Security, etc.)
 - Standard dealer cards with contact info
@@ -232,11 +235,21 @@ class HoneywellHomeScraper(BaseDealerScraper):
 
                 # Switch to Bullseye Locations iframe
                 print(f"  → Switching to Bullseye Locations iframe...")
+                iframe = None
                 try:
-                    # Wait for iframe to be available
-                    iframe_selector = 'iframe[id="bullseye_iframe"], iframe[src*="bullseye"]'
-                    iframe_element = page.wait_for_selector(iframe_selector, timeout=15000)
-                    iframe = iframe_element.content_frame()
+                    # Find iframe by URL pattern - Bullseye uses resideo.bullseyelocations.com
+                    for frame in page.frames:
+                        if 'bullseye' in frame.url:
+                            iframe = frame
+                            print(f"     ✓ Found Bullseye frame: {frame.url[:60]}...")
+                            break
+
+                    if not iframe:
+                        # Fallback: try element selector
+                        iframe_selector = 'iframe[src*="bullseye"], iframe[src*="resideo"]'
+                        iframe_element = page.wait_for_selector(iframe_selector, timeout=15000)
+                        iframe = iframe_element.content_frame()
+
                     if not iframe:
                         print(f"  ❌ Could not access iframe content")
                         browser.close()

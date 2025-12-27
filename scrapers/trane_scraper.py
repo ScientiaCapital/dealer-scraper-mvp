@@ -149,13 +149,16 @@ class TraneScraper(BaseDealerScraper):
             print(f"  ✗ Error scraping directory table: {e}")
             return []
 
-    def scrape_detail_page(self, page, detail_url: str) -> Dict[str, Any]:
+    def scrape_detail_page(
+        self, page, detail_url: str, max_retries: int = 3
+    ) -> Dict[str, Any]:
         """
-        Extract rich data from a dealer detail page.
+        Extract rich data from a dealer detail page with retry logic.
 
         Args:
             page: Playwright page object
             detail_url: URL of dealer detail page
+            max_retries: Number of retry attempts for transient failures
 
         Returns:
             Dict with enriched dealer data:
@@ -177,9 +180,21 @@ class TraneScraper(BaseDealerScraper):
             'detail_page_url': detail_url,
         }
 
+        for attempt in range(max_retries):
+            try:
+                page.goto(detail_url, timeout=30000, wait_until='domcontentloaded')
+                time.sleep(1.5)  # Let page settle
+                break  # Success, exit retry loop
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                    print(f"    ⚠️ Retry {attempt + 1}/{max_retries} in {wait_time}s: {str(e)[:50]}")
+                    time.sleep(wait_time)
+                else:
+                    print(f"    ✗ Failed after {max_retries} retries: {str(e)[:50]}")
+                    return enriched  # Return empty enrichment data
+
         try:
-            page.goto(detail_url, timeout=30000, wait_until='domcontentloaded')
-            time.sleep(1.5)  # Let page settle
 
             # Extract using JavaScript
             data = page.evaluate(r"""
@@ -198,24 +213,51 @@ class TraneScraper(BaseDealerScraper):
 
     const pageText = document.body.innerText;
 
-    // Google Rating (e.g., "4.9")
-    const ratingMatch = pageText.match(/(\d+\.?\d*)\s*(?:out of 5|\/5|stars?)/i);
-    if (ratingMatch) {
-        result.google_rating = parseFloat(ratingMatch[1]);
-    } else {
-        // Try to find rating badge
-        const ratingEl = document.querySelector('[class*="rating"], [class*="stars"], [data-rating]');
-        if (ratingEl) {
-            const ratingText = ratingEl.textContent || ratingEl.getAttribute('data-rating') || '';
-            const match = ratingText.match(/(\d+\.?\d*)/);
-            if (match) result.google_rating = parseFloat(match[1]);
+    // Google Rating + Review Count (NEW: handle "4.9\n347 Google Reviews" format)
+    // Pattern: rating on line above review count
+    const googleReviewPattern = /(\d+\.?\d*)\s*\n?\s*(\d+)\s*Google\s*Reviews?/i;
+    const combinedMatch = pageText.match(googleReviewPattern);
+    if (combinedMatch) {
+        const possibleRating = parseFloat(combinedMatch[1]);
+        if (possibleRating >= 1 && possibleRating <= 5) {
+            result.google_rating = possibleRating;
+        }
+        result.google_review_count = parseInt(combinedMatch[2]);
+    }
+
+    // Fallback: just get review count if combined pattern failed
+    if (!result.google_review_count) {
+        const reviewMatch = pageText.match(/(\d+)\s*Google\s*Reviews?/i);
+        if (reviewMatch) {
+            result.google_review_count = parseInt(reviewMatch[1]);
         }
     }
 
-    // Google Review Count (e.g., "1010 Google Reviews")
-    const reviewMatch = pageText.match(/(\d+)\s*(?:Google\s*)?[Rr]eviews?/);
-    if (reviewMatch) {
-        result.google_review_count = parseInt(reviewMatch[1]);
+    // If we have reviews but no rating, look for standalone rating nearby
+    if (result.google_review_count && !result.google_rating) {
+        const lines = pageText.split('\n').map(l => l.trim());
+        for (let i = 0; i < lines.length; i++) {
+            if (lines[i].includes('Google Review')) {
+                for (let j = 1; j <= 3; j++) {
+                    if (i - j >= 0) {
+                        const possibleRating = parseFloat(lines[i-j]);
+                        if (possibleRating >= 1 && possibleRating <= 5) {
+                            result.google_rating = possibleRating;
+                            break;
+                        }
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    // Legacy fallback patterns
+    if (!result.google_rating) {
+        const ratingMatch = pageText.match(/(\d+\.?\d*)\s*(?:out of 5|\/5|stars?)/i);
+        if (ratingMatch) {
+            result.google_rating = parseFloat(ratingMatch[1]);
+        }
     }
 
     // Areas of Expertise (e.g., "HVAC repair, AC installation")
@@ -272,18 +314,22 @@ class TraneScraper(BaseDealerScraper):
         }
     });
 
-    // Business Hours (try to extract)
-    const hoursSection = document.querySelector('[class*="hours"], [class*="schedule"]');
-    if (hoursSection) {
-        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-        days.forEach(day => {
-            const dayRegex = new RegExp(day + '[:\\s]+([0-9:APMapm\\s-]+)', 'i');
-            const match = hoursSection.textContent.match(dayRegex);
-            if (match) {
-                result.business_hours[day] = match[1].trim();
+    // Business Hours (improved: handle "Mon: 8 AM EST - 5 PM EST" format)
+    // Look for hours in full page text, not just a specific section
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    days.forEach(day => {
+        // Pattern: "Mon: 8 AM EST - 5 PM EST" or "Mon: Closed"
+        const dayRegex = new RegExp(day + '[:\\s]+([0-9:APMapm\\s\\-A-Za-z]+?)(?=\\n|Tue|Wed|Thu|Fri|Sat|Sun|$)', 'i');
+        const match = pageText.match(dayRegex);
+        if (match) {
+            let hours = match[1].trim();
+            // Clean up any trailing day names
+            hours = hours.replace(/(Mon|Tue|Wed|Thu|Fri|Sat|Sun).*$/i, '').trim();
+            if (hours.length > 0 && hours.length < 50) {
+                result.business_hours[day] = hours;
             }
-        });
-    }
+        }
+    });
 
     return result;
 }
@@ -379,10 +425,28 @@ class TraneScraper(BaseDealerScraper):
                 print(f"  ✓ Found {len(directory_dealers)} dealers in directory")
 
                 # Phase 2: Visit each detail page
-                print(f"\nPHASE 2: Visiting {len(directory_dealers)} detail pages...")
-                print(f"  Estimated time: ~{len(directory_dealers) * self.DELAY_BETWEEN_REQUESTS / 60:.1f} minutes\n")
+                # Check for existing checkpoint to resume
+                processed_count, processed_names = self._load_checkpoint(checkpoint_dir)
 
-                for i, dealer_data in enumerate(directory_dealers, 1):
+                if processed_count > 0:
+                    # Load previously scraped dealers from checkpoint
+                    checkpoints = sorted(Path(checkpoint_dir).glob("trane_checkpoint_*.json"))
+                    if checkpoints:
+                        with open(checkpoints[-1]) as f:
+                            checkpoint_data = json.load(f)
+                        for d in checkpoint_data.get('dealers', []):
+                            try:
+                                dealer = StandardizedDealer(**d)
+                                dealers.append(dealer)
+                            except Exception:
+                                pass
+                    print(f"  📂 Loaded {len(dealers)} dealers from checkpoint")
+
+                remaining = [d for d in directory_dealers if d.get('name', '') not in processed_names]
+                print(f"\nPHASE 2: Visiting {len(remaining)} detail pages ({len(directory_dealers) - len(remaining)} already done)...")
+                print(f"  Estimated time: ~{len(remaining) * self.DELAY_BETWEEN_REQUESTS / 60:.1f} minutes\n")
+
+                for i, dealer_data in enumerate(remaining, processed_count + 1):
                     detail_url = dealer_data.get('detail_url', '')
 
                     if detail_url:
@@ -429,6 +493,38 @@ class TraneScraper(BaseDealerScraper):
                 bb.sessions.update(session.id, status="COMPLETED")
 
         return dealers
+
+    def _load_checkpoint(self, checkpoint_dir: str) -> tuple:
+        """
+        Load the most recent checkpoint to resume scraping.
+
+        Returns:
+            Tuple of (processed_count, processed_dealer_names_set)
+            If no checkpoint exists, returns (0, set())
+        """
+        checkpoints = sorted(Path(checkpoint_dir).glob("trane_checkpoint_*.json"))
+        if not checkpoints:
+            return 0, set()
+
+        # Load most recent checkpoint
+        latest = checkpoints[-1]
+        try:
+            with open(latest) as f:
+                data = json.load(f)
+
+            processed_count = data.get('stats', {}).get('total_scraped', 0)
+            processed_names = set(
+                d.get('name', '') for d in data.get('dealers', [])
+            )
+
+            print(f"  📂 Resuming from checkpoint: {latest.name}")
+            print(f"     Already processed: {processed_count} dealers")
+
+            return processed_count, processed_names
+
+        except Exception as e:
+            print(f"  ⚠️ Could not load checkpoint: {e}")
+            return 0, set()
 
     def _save_trane_checkpoint(
         self,
