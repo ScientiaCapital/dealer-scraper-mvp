@@ -48,7 +48,7 @@
 
 | OEM | File | Status | Notes |
 |-----|------|--------|-------|
-| Tesla | `tesla_scraper.py` | Browserbase | Browserbase SDK + Patchright (needs valid API key) |
+| Tesla | `tesla_scraper.py` | Enterprise Only | Akamai blocks even Browserbase basic - needs Enterprise plan |
 | Enphase | `enphase_scraper.py` | Production | 27 installers/ZIP, tiers, ratings |
 | Fronius | `fronius_scraper.py` | Production | Geolocation spoofing, 8+ installers/ZIP |
 | SMA | `sma_scraper.py` | Production | 2 dealers/ZIP tested Dec 2024 |
@@ -119,7 +119,7 @@ All scrapers validated for:
 | Schneider Electric | 94102 | 2 | Yes | ✅ Working (EcoXpert integrators) |
 | York | 10001 | 4-6 | Yes | ✅ Working (MetaLocator iframe, certs extracted) |
 | Kohler | 53044 | 1+ | Yes | ✅ Working (Patchright headed mode) |
-| Tesla | 94102 | - | - | ⚠️ Browserbase (Akamai bot detection too strong) |
+| Tesla | 94102 | - | - | ❌ Enterprise Only (Akamai blocks Browserbase basic+proxy) |
 | Honeywell | 77001 | 286 | Yes | ✅ Working (Patchright bypasses Cloudflare) |
 | Fronius | 94102 | 8 | N/A | ✅ Working (Geolocation spoofing) |
 

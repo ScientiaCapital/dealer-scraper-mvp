@@ -14,20 +14,22 @@ BROWSERBASE mode with US residential proxy to ensure US results.
 
 **BOT DETECTION**: Tesla uses enterprise-grade Akamai EdgeSuite protection.
 TESTED Dec 27, 2025:
-- ❌ Playwright headless: Blocked (Access Denied)
-- ❌ Patchright headless: Blocked (Access Denied)
-- ❌ Patchright headed: Blocked (Access Denied)
+- ❌ Playwright headless/headed: Blocked (Access Denied)
+- ❌ Patchright headless/headed: Blocked (Access Denied)
 - ❌ Puppeteer MCP: Blocked (Access Denied)
 - ❌ Firecrawl: Blocked (Access Denied)
-- ✅ Browserbase with residential proxy: REQUIRED for production
+- ❌ Browserbase basic stealth + residential proxy: Blocked (Access Denied)
+- ⚠️ Browserbase Advanced Stealth: Requires Enterprise plan ($$$)
 
-**BROWSERBASE SETUP**:
-1. Sign up at https://www.browserbase.com/sign-up (free tier available)
-2. Create a project and get API key
-3. Set environment variables:
-   - BROWSERBASE_API_KEY=bb_live_xxxxx
-   - BROWSERBASE_PROJECT_ID=xxxxx
-4. The scraper uses Browserbase SDK + Patchright for maximum stealth
+**CURRENT STATUS**: Tesla's /support/certified-installers page is protected by
+Akamai's most aggressive bot detection. Even Browserbase with residential proxy
+gets blocked. The homepage (tesla.com) works, but installer pages are locked down.
+
+**OPTIONS**:
+1. Upgrade to Browserbase Enterprise plan (Advanced Stealth with custom Chromium)
+2. Use alternative scraping service specializing in Akamai bypass
+3. Manual data collection
+4. Partner API (if Tesla offers one)
 
 Capabilities detected from Tesla certification:
 - Battery installation (Powerwall is their core product)
@@ -483,9 +485,8 @@ class TeslaScraper(BaseDealerScraper):
             with sync_playwright() as p:
                 print(f"  → Connecting to Browserbase cloud browser...")
 
-                # Connect via CDP using session ID
-                ws_endpoint = f'wss://connect.browserbase.com?apiKey={browserbase_api_key}&sessionId={session.id}'
-                browser = p.chromium.connect_over_cdp(ws_endpoint)
+                # Connect via CDP using session's connect_url (official method)
+                browser = p.chromium.connect_over_cdp(session.connect_url)
 
                 # Get default context and page
                 context = browser.contexts[0]
