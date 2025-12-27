@@ -48,7 +48,7 @@
 
 | OEM | File | Status | Notes |
 |-----|------|--------|-------|
-| Tesla | `tesla_scraper.py` | Browserbase | US locale fixed (/en_us/), Browserbase mode |
+| Tesla | `tesla_scraper.py` | Browserbase | Browserbase SDK + Patchright (needs valid API key) |
 | Enphase | `enphase_scraper.py` | Production | 27 installers/ZIP, tiers, ratings |
 | Fronius | `fronius_scraper.py` | Production | Geolocation spoofing, 8+ installers/ZIP |
 | SMA | `sma_scraper.py` | Production | 2 dealers/ZIP tested Dec 2024 |
