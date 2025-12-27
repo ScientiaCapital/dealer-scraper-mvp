@@ -575,9 +575,117 @@ class TeslaScraper(BaseDealerScraper):
 
     def _scrape_with_patchright(self, zip_code: str) -> List[StandardizedDealer]:
         """
-        PATCHRIGHT mode: Not implemented yet.
+        PATCHRIGHT mode: Use Google Maps as fallback for Tesla installers.
+
+        Since Tesla's certified installer page is blocked by Akamai (even with
+        Browserbase residential proxy), we use Google Maps search as alternative.
+        This finds solar/energy companies that install Tesla Powerwall.
         """
-        raise NotImplementedError("Patchright mode not yet implemented for Tesla")
+        from browserbase import Browserbase
+        from patchright.sync_api import sync_playwright
+        import time
+        import re
+
+        browserbase_api_key = os.getenv("BROWSERBASE_API_KEY")
+        browserbase_project_id = os.getenv("BROWSERBASE_PROJECT_ID")
+
+        if not browserbase_api_key or not browserbase_project_id:
+            print("⚠️ Browserbase credentials not set, cannot use Google Maps fallback")
+            return []
+
+        print(f"\n{'='*60}")
+        print(f"Tesla Installer Scraper - GOOGLE MAPS FALLBACK")
+        print(f"ZIP Code: {zip_code}")
+        print(f"{'='*60}\n")
+
+        try:
+            bb = Browserbase(api_key=browserbase_api_key)
+            session = bb.sessions.create(project_id=browserbase_project_id, proxies=True)
+            print(f"  ✓ Browserbase session: {session.id}")
+
+            with sync_playwright() as p:
+                browser = p.chromium.connect_over_cdp(session.connect_url)
+                context = browser.contexts[0]
+                page = context.pages[0] if context.pages else context.new_page()
+
+                # Search Google Maps for Tesla Powerwall installers
+                url = f'https://www.google.com/maps/search/Tesla+Powerwall+certified+installer+near+{zip_code}'
+                print(f"  → Searching Google Maps...")
+                page.goto(url, timeout=60000)
+                time.sleep(5)
+
+                # Scroll to load more results
+                for _ in range(3):
+                    page.evaluate('document.querySelector("div[role=main]")?.scrollBy(0, 800)')
+                    time.sleep(1)
+
+                # Extract text content
+                text = page.evaluate('() => document.body.innerText')
+
+                # Parse phone numbers
+                phones = re.findall(r'\(\d{3}\)\s*\d{3}-\d{4}', text)
+                print(f"  ✓ Found {len(phones)} phone numbers")
+
+                # Parse business data from text
+                dealers = []
+                lines = text.split('\n')
+
+                current_business = {}
+                for i, line in enumerate(lines):
+                    line = line.strip()
+                    if not line:
+                        continue
+
+                    # Check for business type indicators
+                    if any(x in line.lower() for x in ['solar', 'power', 'energy', 'electric', 'battery']):
+                        # Look for phone in nearby lines
+                        phone = ''
+                        for j in range(max(0, i-3), min(len(lines), i+5)):
+                            phone_match = re.search(r'\(\d{3}\)\s*\d{3}-\d{4}', lines[j])
+                            if phone_match:
+                                phone = phone_match.group()
+                                break
+
+                        # Look for rating
+                        rating = ''
+                        rating_match = re.search(r'(\d+\.\d+)\s*\(\d+\)', ' '.join(lines[max(0,i-2):i+3]))
+                        if rating_match:
+                            rating = rating_match.group(1)
+
+                        # Get name (usually line before business type)
+                        name = lines[i-1].strip() if i > 0 else line
+
+                        if name and len(name) > 3 and len(name) < 100:
+                            if not any(x in name.lower() for x in ['search', 'map', 'google', 'directions']):
+                                dealers.append({
+                                    'name': name,
+                                    'phone': phone.replace('(', '').replace(')', '').replace(' ', '').replace('-', ''),
+                                    'rating': rating,
+                                    'tier': 'Google Maps Result',
+                                    'oem_source': 'Tesla (via Google Maps)'
+                                })
+
+                # Deduplicate
+                seen = set()
+                unique_dealers = []
+                for d in dealers:
+                    if d['name'] not in seen:
+                        seen.add(d['name'])
+                        unique_dealers.append(d)
+
+                browser.close()
+
+                # Convert to StandardizedDealer
+                result = [self.parse_dealer_data(d, zip_code) for d in unique_dealers[:20]]
+                print(f"  ✅ Found {len(result)} Tesla/Solar installers from Google Maps")
+
+                return result
+
+        except Exception as e:
+            print(f"  ❌ Google Maps fallback error: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
 
     def parse_results(self, results_json: List[Dict], zip_code: str) -> List[StandardizedDealer]:
         """
