@@ -273,7 +273,10 @@ def run_batch(start_idx=0, batch_size=BATCH_SIZE):
 
             logger.info(f"  ✓ {len(dealers)} dealers found, {len(new_dealers)} new (Total: {len(master_data['dealers'])})")
         else:
-            master_data['failed_zips'].append(zip_code)
+            # Mark as completed even if no dealers (don't retry empty ZIPs forever)
+            if zip_code not in master_data['failed_zips']:
+                master_data['failed_zips'].append(zip_code)
+            master_data['completed_zips'].append(zip_code)  # Also mark as completed to skip on retry
             logger.warning(f"  ✗ No dealers found")
 
         # Save after each ZIP

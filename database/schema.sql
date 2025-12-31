@@ -27,7 +27,10 @@ CREATE TABLE IF NOT EXISTS contractors (
     is_deleted INTEGER DEFAULT 0,
     deleted_at TIMESTAMP,
     deleted_by TEXT,
-    deletion_reason TEXT
+    deletion_reason TEXT,
+    -- Individual vs business classification (for TX data cleanup)
+    is_individual INTEGER DEFAULT 0,       -- 1 = individual person, 0 = business
+    individual_detection_method TEXT       -- 'name_format', 'manual', etc.
 );
 
 -- Contact information (multiple per contractor)
@@ -99,6 +102,25 @@ CREATE TABLE IF NOT EXISTS oem_certifications (
     scraped_from_zip TEXT,
     source_url TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(contractor_id, oem_name)
+);
+
+-- Dealer detail page enrichments (from Trane, etc.)
+-- Stores Google ratings, business hours, certifications from detail pages
+CREATE TABLE IF NOT EXISTS dealer_enrichments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    contractor_id INTEGER NOT NULL REFERENCES contractors(id) ON DELETE CASCADE,
+    oem_name TEXT NOT NULL,              -- 'Trane', 'Carrier', etc.
+    google_rating REAL DEFAULT 0.0,      -- 1.0-5.0 scale
+    google_review_count INTEGER DEFAULT 0,
+    business_hours TEXT,                 -- JSON: {"Mon": "8AM-5PM", ...}
+    areas_of_expertise TEXT,             -- JSON array: ["HVAC", "Heat Pump", ...]
+    dealer_certifications TEXT,          -- JSON array: ["Comfort Specialist", "NATE", ...]
+    has_emergency_service INTEGER DEFAULT 0,
+    has_financing INTEGER DEFAULT 0,
+    financing_provider TEXT,
+    detail_url TEXT,
+    scraped_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(contractor_id, oem_name)
 );
 
@@ -248,6 +270,14 @@ CREATE INDEX IF NOT EXISTS idx_licenses_type ON licenses(license_type);
 -- OEM indexes
 CREATE INDEX IF NOT EXISTS idx_oem_contractor ON oem_certifications(contractor_id);
 CREATE INDEX IF NOT EXISTS idx_oem_name ON oem_certifications(oem_name);
+
+-- Dealer enrichments indexes
+CREATE INDEX IF NOT EXISTS idx_dealer_enrichments_contractor ON dealer_enrichments(contractor_id);
+CREATE INDEX IF NOT EXISTS idx_dealer_enrichments_oem ON dealer_enrichments(oem_name);
+CREATE INDEX IF NOT EXISTS idx_dealer_enrichments_rating ON dealer_enrichments(google_rating);
+
+-- Individual vs business index (for filtering TX individuals)
+CREATE INDEX IF NOT EXISTS idx_contractors_is_individual ON contractors(is_individual);
 
 -- Pipeline run indexes
 CREATE INDEX IF NOT EXISTS idx_runs_state ON pipeline_runs(state);
