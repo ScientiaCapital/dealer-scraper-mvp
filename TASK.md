@@ -85,24 +85,40 @@ sales-agent after validation. dealer-scraper's job is to push to Supabase ONLY.
 
 ### Priority 3: Kohler Production Run
 
-**Status**: Ready to Execute
-**Effort**: 2 hours
+**Status**: 🔄 IN PROGRESS (Dec 29, 2025)
+**Effort**: 4+ hours (Patchright local, no Browserbase)
 
-**Tasks**:
-- [ ] Review extraction script (VALIDATED Nov 28)
-- [ ] Run Browserbase production scraper
+**Progress (Dec 29)**:
+- [x] Fixed Kohler scraper (cookie consent, React input, popup extraction)
+- [x] Built master scraper v2 with card-clicking for full details
+- [x] Updated config.py with 395 SREC ZIPs (30 per state × 13 states)
+- [x] **307/395 ZIPs scraped (78%)**
+- [x] **337 unique dealers captured**
+- [x] **100% phone coverage** (0 toll-free numbers)
+- [x] **~94% address coverage**
+- [ ] Complete remaining 88 ZIPs
 - [ ] Import to SQLite
-- [ ] Verify data quality (phone %, expected count)
 - [ ] Push to Supabase
-- [ ] Update CLAUDE.md status to COMPLETE
 
-**Dependencies**:
-- Browserbase API credits
-- SQLite database ready
+**Tier Distribution**:
+| Tier | Count |
+|------|-------|
+| Titanium | 66 |
+| Platinum | 56 |
+| Gold | 46 |
+| Silver | 61 |
+| Certified | 108 |
 
-**Blockers**: None
+**States Covered**: CA(21), TX(56), FL(68), PA(31), NJ(35), MA(13), OH(30), MD(13), NY(15), NH(12), RI(4), CT(3), DE(1), others
 
-**Expected**: 500+ generator dealers, 99% phone coverage
+**Technical Notes**:
+- Using Patchright (stealth Playwright) locally - bypasses Akamai bot detection
+- Card-clicking extraction gets full dealer details from popup
+- NYC ZIPs (10xxx) return 0 dealers - expected (no generators in dense urban)
+
+**Dependencies**: None (local Patchright, no cloud API needed)
+
+**Expected Final**: 350-400 unique dealers across 15 SREC states
 
 ---
 

@@ -99,65 +99,132 @@ class KohlerScraper(BaseDealerScraper):
         TESTED: 2024-12-25 against kohlerhomeenergy.rehlko.com/find-a-dealer
         ZIP 94102 - Extracted 4 dealers: CD & POWER (Gold), STATE ELECTRIC (Silver),
         FITCH ELECTRIC, VIERRA ELECTRIC with name, phone, address, tier, website, distance.
+
+        UPDATED: 2024-12-29 - Enhanced debugging and fallback extraction methods
         """
         return """
 () => {
   const dealers = [];
   const seen = new Set();
-  const phoneLinks = document.querySelectorAll('a[href^="tel:"]');
 
-  phoneLinks.forEach(phoneLink => {
-    const phone = phoneLink.textContent?.trim().replace(/[^0-9]/g, '') || '';
-    // Skip main 844 number, short numbers, and duplicates
-    if (phone.startsWith('844') || phone.length < 10) return;
-    if (seen.has(phone)) return;
-    seen.add(phone);
+  console.log('[EXTRACTION] Starting dealer extraction...');
 
-    // Trace up to find the li container
-    let container = phoneLink;
-    while (container && container.tagName !== 'LI') {
-      container = container.parentElement;
+  // Find dealer list - UL with many LI children containing dealer info
+  const lists = document.querySelectorAll('ul');
+  console.log('[EXTRACTION] Found', lists.length, 'UL elements');
+
+  let dealerList = null;
+  for (const ul of lists) {
+    const lis = ul.querySelectorAll('li');
+    if (lis.length >= 3) {
+      const firstText = lis[0]?.innerText || '';
+      console.log('[EXTRACTION] Checking UL with', lis.length, 'LIs, first text:', firstText.substring(0, 100));
+      if (firstText.includes('miles') || firstText.includes('Dealer')) {
+        dealerList = ul;
+        console.log('[EXTRACTION] ✓ Found dealer list UL with', lis.length, 'items');
+        break;
+      }
     }
-    if (!container) return;
+  }
 
-    // Get all paragraphs
-    const paragraphs = container.querySelectorAll('p');
+  if (!dealerList) {
+    console.log('[EXTRACTION] ⚠️ Could not find dealer list UL');
+    // Fallback: try to find any list items with dealer-like content
+    const allLis = document.querySelectorAll('li');
+    console.log('[EXTRACTION] Fallback: checking all', allLis.length, 'LI elements');
+    return dealers;
+  }
+
+  const items = dealerList.querySelectorAll('li');
+  console.log('[EXTRACTION] Processing', items.length, 'dealer items...');
+
+  items.forEach((li, index) => {
+    const fullText = li.innerText || '';
+
+    // Skip if doesn't look like a dealer entry
+    if (!fullText.includes('miles')) {
+      console.log('[EXTRACTION] Item', index, 'skipped - no "miles" found');
+      return;
+    }
+
+    console.log('[EXTRACTION] Item', index, 'text:', fullText.substring(0, 150));
+
+    // Extract phone number from text (format: XXX-XXX-XXXX or (XXX) XXX-XXXX)
+    // Handle both phone links and plain text numbers
+    const phoneMatch = fullText.match(/(\\(?\\d{3}\\)?[\\s.-]?\\d{3}[\\s.-]?\\d{4})/);
+    let phone = phoneMatch ? phoneMatch[1].replace(/[^0-9]/g, '') : '';
+
+    // Skip main 844/800 numbers and duplicates
+    if (phone.startsWith('844') || phone.startsWith('800') || phone.length < 10) {
+      console.log('[EXTRACTION] Item', index, 'phone skipped (toll-free or invalid):', phone);
+      phone = '';
+    }
+    if (phone && seen.has(phone)) {
+      console.log('[EXTRACTION] Item', index, 'skipped - duplicate phone:', phone);
+      return;
+    }
+    if (phone) seen.add(phone);
+
+    // Get paragraphs for structured data
+    const paragraphs = li.querySelectorAll('p');
+    console.log('[EXTRACTION] Item', index, 'has', paragraphs.length, 'paragraphs');
+
     const name = paragraphs[0]?.textContent?.trim() || '';
+    if (!name) {
+      console.log('[EXTRACTION] Item', index, 'skipped - no name found');
+      return;
+    }
+    console.log('[EXTRACTION] Item', index, 'name:', name);
 
-    // Distance is in second paragraph
+    // Distance from second paragraph
     const distanceText = paragraphs[1]?.textContent?.trim() || '';
     const distanceMatch = distanceText.match(/([\\d.]+)\\s*miles/i);
     const distance_miles = distanceMatch ? parseFloat(distanceMatch[1]) : 0;
     const distance = distanceMatch ? `${distanceMatch[1]} miles` : '';
 
-    // Tier from text content
-    const fullText = container.textContent || '';
+    // Tier from span with bg-*-dealer class or text
     let tier = 'Certified Installer';
-    if (fullText.includes('Gold Dealer')) tier = 'Gold Dealer';
+    if (fullText.includes('Titanium Dealer')) tier = 'Titanium Dealer';
+    else if (fullText.includes('Platinum Dealer')) tier = 'Platinum Dealer';
+    else if (fullText.includes('Gold Dealer')) tier = 'Gold Dealer';
     else if (fullText.includes('Silver Dealer')) tier = 'Silver Dealer';
     else if (fullText.includes('Bronze Dealer')) tier = 'Bronze Dealer';
 
-    // Address - find paragraph with address pattern
+    // Address - extract from paragraphs, typically in 3rd or 4th paragraph
     let street = '', city = '', state = '', zip = '';
-    for (const p of paragraphs) {
-      const text = p.textContent || '';
-      const addrMatch = text.match(/^(\\d+[^,]+),\\s*([^,]+),\\s*([A-Z]{2})\\s+(\\d{5})/);
+
+    // Try to find address in paragraphs (usually after name and distance)
+    for (let i = 2; i < paragraphs.length; i++) {
+      const pText = paragraphs[i]?.textContent?.trim() || '';
+      const addrMatch = pText.match(/^([^,]+),\\s*([^,]+),\\s*([A-Z]{2})\\s+(\\d{5})/);
       if (addrMatch) {
         street = addrMatch[1].trim();
         city = addrMatch[2].trim();
-        state = addrMatch[3];
+        state = addrMatch[3].toUpperCase();
         zip = addrMatch[4];
         break;
       }
     }
 
-    const address_full = street ? `${street}, ${city}, ${state} ${zip}` : '';
+    // Fallback: search full text for address pattern
+    if (!street) {
+      const addrMatch = fullText.match(/([A-Z0-9][^,\\n]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Way|Lane|Ln|Boulevard|Blvd|Court|Ct|Circle|Cir|Highway|Hwy|HWY))[,\\s]+([A-Za-z\\s]+),\\s*([A-Z]{2})\\s+(\\d{5})/i);
+      if (addrMatch) {
+        street = addrMatch[1].trim();
+        city = addrMatch[2].trim();
+        state = addrMatch[3].toUpperCase();
+        zip = addrMatch[4];
+      }
+    }
 
-    // Website link (skip rehlko.com links)
+    const address_full = street ? `${street}, ${city}, ${state} ${zip}` : '';
+    console.log('[EXTRACTION] Item', index, 'address:', address_full);
+
+    // Website link
     let website = '', domain = '';
-    const websiteLinks = container.querySelectorAll('a[href^="http"]');
+    const websiteLinks = li.querySelectorAll('a[href^="http"]');
     for (const link of websiteLinks) {
-      if (!link.href.includes('rehlko.com')) {
+      if (!link.href.includes('rehlko.com') && !link.href.includes('kohler')) {
         website = link.href;
         try {
           domain = new URL(website).hostname.replace('www.', '');
@@ -183,8 +250,10 @@ class KohlerScraper(BaseDealerScraper):
       rating: 0,
       review_count: 0
     });
+    console.log('[EXTRACTION] ✓ Added dealer:', name);
   });
 
+  console.log('[EXTRACTION] Total dealers extracted:', dealers.length);
   return dealers;
 }
 """
@@ -594,7 +663,10 @@ class KohlerScraper(BaseDealerScraper):
                     viewport={'width': 1920, 'height': 1080},
                     user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
                     locale='en-US',
-                    timezone_id='America/New_York'
+                    timezone_id='America/New_York',
+                    # Disable geolocation to prevent location override
+                    geolocation={'latitude': 0, 'longitude': 0},
+                    permissions=[]  # Deny all permissions including geolocation
                 )
 
                 page = context.new_page()
@@ -614,56 +686,193 @@ class KohlerScraper(BaseDealerScraper):
                     browser.close()
                     return []
 
-                # Use JavaScript injection to fill ZIP (Patchright locators may fail)
-                print(f"  → Filling ZIP code via JS: {zip_code}")
-                fill_result = page.evaluate(f"""(zip) => {{
-                    const inputs = document.querySelectorAll('input[name="zipcode"], input[placeholder*="ZIP"]');
-                    let filled = false;
-                    inputs.forEach(input => {{
-                        const style = window.getComputedStyle(input);
-                        const isVisible = style.display !== 'none' && style.visibility !== 'hidden' && input.offsetParent !== null;
-                        if (isVisible && !filled) {{
-                            input.scrollIntoView({{block: 'center'}});
-                            input.focus();
-                            input.value = zip;
-                            input.dispatchEvent(new Event('input', {{bubbles: true}}));
-                            input.dispatchEvent(new Event('change', {{bubbles: true}}));
-                            filled = true;
-                        }}
-                    }});
-                    return {{filled, inputCount: inputs.length}};
-                }}""", zip_code)
-                print(f"     Fill result: {fill_result}")
-
-                time.sleep(1)
-
-                # Click search button via JS
-                print(f"  → Clicking search button...")
-                click_result = page.evaluate("""() => {
-                    const buttons = document.querySelectorAll('button[type="submit"], button:has-text("Go")');
-                    let clicked = false;
-                    buttons.forEach(btn => {
-                        const style = window.getComputedStyle(btn);
-                        const isVisible = style.display !== 'none' && style.visibility !== 'hidden';
-                        if (isVisible && !clicked) {
-                            btn.click();
-                            clicked = true;
+                # Dismiss Osano cookie consent banner first (blocks all interactions)
+                print(f"  → Checking for cookie consent banner...")
+                try:
+                    osano_selectors = [
+                        '.osano-cm-button--type_accept',  # Accept All button
+                        'button.osano-cm-accept-all',
+                        '.osano-cm-dialog__close',
+                        '.osano-cm-window button',
+                    ]
+                    for selector in osano_selectors:
+                        try:
+                            consent_btn = page.locator(selector).first
+                            if consent_btn.is_visible(timeout=3000):
+                                consent_btn.click(force=True)  # Force click to bypass overlay
+                                print(f"     ✓ Dismissed cookie consent using {selector}")
+                                time.sleep(1)
+                                break
+                        except:
+                            continue
+                    # If still present, try JavaScript click
+                    page.evaluate("""() => {
+                        const btns = document.querySelectorAll('.osano-cm-button--type_accept, .osano-cm-accept, button[class*="osano"]');
+                        for (const btn of btns) {
+                            if (btn.offsetParent !== null) { btn.click(); return true; }
                         }
-                    });
-                    return {clicked, buttonCount: buttons.length};
+                        // Hide the overlay if can't click
+                        const overlay = document.querySelector('.osano-cm-window');
+                        if (overlay) overlay.style.display = 'none';
+                        return false;
+                    }""")
+                    time.sleep(0.5)
+                except Exception as e:
+                    print(f"     No cookie consent banner found")
+
+                # Dismiss any other modals that might be present
+                print(f"  → Checking for other modals to dismiss...")
+                try:
+                    modal_selectors = [
+                        'button[aria-label="Close"]',
+                        'button:has-text("Close")',
+                        'button.close',
+                        '[role="dialog"] button:not(.osano-cm-button)',
+                    ]
+                    for selector in modal_selectors:
+                        try:
+                            close_btn = page.locator(selector).first
+                            if close_btn.is_visible(timeout=2000):
+                                close_btn.click(force=True)
+                                print(f"     ✓ Dismissed modal using {selector}")
+                                time.sleep(0.5)
+                                break
+                        except:
+                            continue
+                except Exception as e:
+                    print(f"     No modals to dismiss")
+
+                # Find and fill visible ZIP input using native Playwright typing
+                # (JavaScript value assignment doesn't trigger React state updates)
+                print(f"  → Filling ZIP code: {zip_code}")
+                # Use specific selectors for ZIP input, not generic text inputs
+                zip_selectors = [
+                    'input[name="zipcode"]',
+                    'input[placeholder*="ZIP" i]',
+                    'input[placeholder*="postal" i]',
+                ]
+                inputs = []
+                for selector in zip_selectors:
+                    inputs = page.query_selector_all(selector)
+                    if inputs:
+                        break
+
+                if not inputs:
+                    print(f"  ⚠️ No ZIP input found with specific selectors")
+                    browser.close()
+                    return []
+
+                filled = False
+                verified = False
+
+                for inp in inputs:
+                    box = inp.bounding_box()
+                    if box and box['width'] > 0 and box['height'] > 0 and box['y'] > 0:
+                        # Attempt to fill with retry logic
+                        for attempt in range(3):
+                            # Click to focus the input
+                            inp.click()
+                            time.sleep(0.5)
+                            # Clear any existing value - try multiple methods
+                            inp.fill('')  # Clear with fill
+                            time.sleep(0.2)
+                            # Type slowly to trigger React onChange events
+                            inp.type(zip_code, delay=100)
+                            time.sleep(0.5)
+
+                            # Verify the value was entered
+                            input_value = inp.input_value()
+                            if input_value == zip_code:
+                                filled = True
+                                verified = True
+                                print(f"     ✓ Typed and verified ZIP code: {input_value}")
+                                break
+                            else:
+                                print(f"     ⚠️ Attempt {attempt+1} - Value mismatch: expected '{zip_code}', got '{input_value}'")
+                                time.sleep(1)
+
+                        if verified:
+                            break
+
+                if not filled or not verified:
+                    print(f"  ⚠️ Could not fill ZIP input reliably")
+                    browser.close()
+                    return []
+
+                time.sleep(1.5)
+
+                # Try pressing Enter key instead of clicking Go button
+                # (Go button is off-screen, pressing Enter is more reliable)
+                print(f"  → Pressing Enter to submit...")
+                try:
+                    page.keyboard.press('Enter')
+                    print(f"     ✓ Pressed Enter key")
+                except Exception as e:
+                    print(f"     ⚠️ Enter key failed, trying button click: {e}")
+                    # Fallback: scroll button into view and click
+                    try:
+                        go_button = page.locator('button:has-text("Go")').first
+                        go_button.scroll_into_view_if_needed()
+                        time.sleep(0.5)
+                        go_button.click()
+                        print(f"     ✓ Clicked Go button (after scroll)")
+                    except Exception as e2:
+                        print(f"     ⚠️ Button click also failed: {e2}")
+
+                # Wait for results to load (longer wait for React updates)
+                print(f"  → Waiting for results (10 seconds)...")
+                time.sleep(10)
+
+                # Check if there's an error message about invalid ZIP
+                error_check = page.evaluate("""() => {
+                    const bodyText = document.body.innerText;
+                    const hasError = bodyText.includes('Enter a valid US ZIP') ||
+                                    bodyText.includes('No results found');
+                    return {hasError, snippet: bodyText.substring(0, 300)};
                 }""")
-                print(f"     Click result: {click_result}")
 
-                # Wait for results to load
-                print(f"  → Waiting for results...")
-                time.sleep(5)
+                if error_check['hasError']:
+                    print(f"  ⚠️ Error detected on page: {error_check['snippet'][:100]}")
+                    print(f"     Debugging: Taking screenshot...")
+                    page.screenshot(path=f"/tmp/kohler_error_{zip_code}.png")
+                    print(f"     Screenshot saved to /tmp/kohler_error_{zip_code}.png")
+                    browser.close()
+                    return []
 
-                # Execute extraction script
+                # Execute extraction script with debugging
                 print(f"  → Extracting dealer data...")
+
+                # First, check page state
+                page_state = page.evaluate("""() => {
+                    const allUls = document.querySelectorAll('ul');
+                    const allLis = document.querySelectorAll('li');
+                    const phoneLinks = document.querySelectorAll('a[href^="tel:"]');
+                    const plainPhones = document.body.innerText.match(/\\d{3}[-.]?\\d{3}[-.]?\\d{4}/g) || [];
+
+                    return {
+                        ul_count: allUls.length,
+                        li_count: allLis.length,
+                        phone_links: phoneLinks.length,
+                        plain_phones: plainPhones.length,
+                        sample_text: document.body.innerText.substring(0, 500)
+                    };
+                }""")
+                print(f"     Page state: {page_state}")
+
                 raw_results = page.evaluate(self.get_extraction_script())
 
                 if not raw_results:
                     print(f"  ⚠️ No dealers found for ZIP {zip_code}")
+                    print(f"     Debugging: Taking screenshot...")
+                    page.screenshot(path=f"/tmp/kohler_debug_{zip_code}.png")
+                    print(f"     Screenshot saved to /tmp/kohler_debug_{zip_code}.png")
+
+                    # Try to extract page HTML for inspection
+                    page_html = page.content()
+                    with open(f"/tmp/kohler_debug_{zip_code}.html", "w") as f:
+                        f.write(page_html)
+                    print(f"     HTML saved to /tmp/kohler_debug_{zip_code}.html")
+
                     browser.close()
                     return []
 
