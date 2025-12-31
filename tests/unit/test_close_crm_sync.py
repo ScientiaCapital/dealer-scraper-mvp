@@ -387,7 +387,7 @@ class TestCloseImporterUpsert:
             url=None,
             description="Updated",
             addresses=[],
-            contacts=[{"phone": "5553334444"}],
+            contacts=[{"phones": [{"phone": "5553334444"}]}],
             custom={"OEM_Count": 3}  # Updated value
         )
 
@@ -419,7 +419,7 @@ class TestCloseImporterUpsert:
             url=None,
             description="",
             addresses=[],
-            contacts=[{"phone": "5555556666"}],
+            contacts=[{"phones": [{"phone": "5555556666"}]}],
             custom={
                 "OEM_Count": 2,
                 "OEM_Certifications": ["Generac", "Tesla"]
